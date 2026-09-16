@@ -1,0 +1,15 @@
+# Dados pessoais — NUNCA commitar
+dados_candidato.json
+aplicadas.json
+cron.env
+*.pdf
+*.log
+logs/
+*.bak-*
+.playwright-mcp/
+followup.log
+guardiao.log
+loop.log*
+# Perfil do browser (sessões logadas!)
+.chrome-profile/
+chrome-profile/

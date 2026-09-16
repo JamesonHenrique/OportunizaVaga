@@ -1,0 +1,83 @@
+{
+  "_COMO_USAR": "Copie para dados_candidato.json e preencha com SEUS dados reais. Este arquivo NUNCA vai ao git (.gitignore). O robô NUNCA inventa: campo vazio = ele registra 'bloqueado' em vez de chutar.",
+  "nome": "SEU NOME COMPLETO",
+  "email": "seu-email@gmail.com",
+  "telefone": "+55 (00) 90000-0000",
+  "linkedin": "https://www.linkedin.com/in/seu-perfil",
+  "github": "https://github.com/seu-usuario",
+  "instagram": "",
+  "facebook": "",
+  "local": "SUA CIDADE/UF",
+  "endereco": "SEU ENDEREÇO (só preenchido se você topar que o robô use em formulários)",
+  "formacao": "SEU CURSO - SUA FACULDADE (período)",
+  "idiomas": "Português nativo; Inglês INTERMEDIÁRIO (só declare o real)",
+  "resumo": "SEU RESUMO PROFISSIONAL EM 3-4 LINHAS (verdadeiro)",
+  "objetivo": "Ex.: Atuar como desenvolvedor júnior remoto",
+  "palavras_chave_ats": ["Java", "Spring Boot", "Angular", "TypeScript"],
+  "contas": {
+    "gupy": "login via Google com o e-mail acima",
+    "gmail": "o e-mail acima, logado no Chrome do robô",
+    "linkedin": "sua conta (ver c-LinkedIn no prompt)"
+  },
+  "disponibilidade": {
+    "inicio": "imediato",
+    "tipo_contrato": ["CLT", "PJ"],
+    "jornada": "integral",
+    "modalidade": "remoto",
+    "viagens": "não",
+    "observacao": ""
+  },
+  "experiencia": {
+    "cargo_atual": "SEU CARGO REAL",
+    "empresa_atual": "SUA EMPRESA REAL",
+    "tecnologias": ["Java", "Spring Boot", "Angular", "PostgreSQL"],
+    "stacks_similares_jr": ["React básico", "Vue básico", "NestJS", "FastAPI"],
+    "projetos_relevantes": "DESCREVA 2-3 PROJETOS REAIS",
+    "certificacoes": "",
+    "portfolio": "",
+    "inicio_cargo_atual": "2026-08",
+    "anos": "",
+    "regra_tempo_experiencia": "VAZIO DE PROPÓSITO: vazio = proibido afirmar tempo de experiência"
+  },
+  "documentos": {
+    "cpf": "",
+    "rg": "",
+    "cnh": "",
+    "pis": "",
+    "observacao": "Só preencha se topar que o robô use em formulários; vazio = vaga vai para 'bloqueados'"
+  },
+  "preferencias": {
+    "salario": "base mínima + regra (ex.: base R$ X; se a vaga informar faixa, usar o meio dela)",
+    "cidade": "SUA CIDADE/UF",
+    "modalidade": "remoto",
+    "horario": "comercial",
+    "beneficios": ""
+  },
+  "respostas_padrao_gupy": {
+    "nome_mae": "",
+    "estado_civil": "",
+    "pretensao_regra": "base + meio da faixa quando informada; campo numérico nunca recebe 'A combinar'",
+    "data_nascimento": "",
+    "sexo": "",
+    "deficiencia": "não",
+    "pretensao_base": 0,
+    "equipamento_proprio": "sim",
+    "remuneracao_atual": "",
+    "beneficios": "",
+    "pretensao": "",
+    "indicacao": "não",
+    "trabalha_na_empresa": "não",
+    "cr_grade": "",
+    "area_interesse": "desenvolvimento de software",
+    "nivel_candidato": "júnior",
+    "frase_transferencia": "Ex.: 'Angular + TypeScript, transferível para React — disponível para atuar'"
+  },
+  "situacao_profissional": {
+    "status": "empregado",
+    "nivel": "estagiário|júnior",
+    "aceita_estagio": "não",
+    "aceita_junior": "sim",
+    "aceita_pleno": "não",
+    "observacao": ""
+  }
+}

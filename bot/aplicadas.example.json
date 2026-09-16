@@ -1,0 +1,16 @@
+{
+  "_COMO_USAR": "Copie para aplicadas.json. É o ESTADO do robô (ele não lembra nada entre rodadas). Este arquivo NUNCA vai ao git.",
+  "aplicadas": [],
+  "bloqueados": {},
+  "bloqueados_arquivados": {},
+  "contas_criadas": {},
+  "descartes_listagem": { "nivel": 0, "modelo": 0, "stack": 0, "total": 0 },
+  "rodizio": {
+    "ordem": ["indeed", "linkedin", "gupy", "programathor", "trampardecasa", "geekhunter", "remotar", "infojobs", "vagas"],
+    "proximo": "indeed",
+    "ultima_rodada": ""
+  },
+  "pular_empresas": [],
+  "pular_tipos": ["ciência de dados", "BI", "QA/testes fora do perfil", "design/UX", "ERP/funcional", "SAP", "exclusiva PCD"],
+  "somente_remotas": true
+}

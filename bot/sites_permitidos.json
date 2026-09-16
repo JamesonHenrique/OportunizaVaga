@@ -1,0 +1,44 @@
+{
+  "_nota": "Allowlist de sites de vaga BR. Aplicada em DUAS camadas: (1) --allowed-origins no MCP playwright-chrome-real (bloqueio real: o browser nem faz a requisicao) e (2) regra 7 do prompt_loop.md. IMPORTANTE: cada dominio entra em DUAS formas, 'https://x.com' e 'https://*.x.com' — o wildcard sozinho NAO casa o dominio nu (coodesh.com foi bloqueado por esse motivo ate ser corrigido).",
+  "atualizado": "2026-09-14",
+  "generalistas_grandes": {
+    "linkedin.com": "maior volume; Candidatura Simplificada e o caminho mais rapido",
+    "br.indeed.com": "agregador; melhor filtro de remoto + sort=date",
+    "catho.com.br": "generalista grande, muita vaga CLT",
+    "infojobs.com.br": "generalista, bom volume junior",
+    "vagas.com.br": "generalista tradicional",
+    "glassdoor.com.br": "vagas + salarios",
+    "br.jooble.org": "agregador",
+    "empregos.com.br": "generalista",
+    "trabalhabrasil.com.br": "generalista, muito volume entrada",
+    "netvagas.com.br": "generalista"
+  },
+  "ats_onde_as_empresas_publicam": {
+    "gupy.io": "ATS mais usado no Brasil; conta Google ja existe. Alto retorno",
+    "solides.com.br": "ATS (ex-Kenoby); muitas vagas tech",
+    "abler.com.br": "ATS",
+    "inhire.io": "ATS focado em tech",
+    "talentify.in": "ATS",
+    "compleo.com.br": "ATS",
+    "99jobs.com": "ATS + portal"
+  },
+  "tech_e_remoto": {
+    "geekhunter.com.br": "so tech; conta ja criada",
+    "programathor.com.br": "so tech, muita vaga remota",
+    "trampardecasa.com.br": "so remoto",
+    "remotar.com.br": "so remoto",
+    "coodesh.com": "tech, processo por desafio",
+    "revelo.com.br": "tech",
+    "apinfo.com": "TI tradicional, muita vaga"
+  },
+  "auxiliares_necessarios": {
+    "google.com / gstatic.com / googleapis.com / googleusercontent.com": "login Google (Gupy) + reCAPTCHA + fontes",
+    "mail.google.com": "envio de CV por e-mail",
+    "licdn.com": "assets do LinkedIn",
+    "indeedassets.com / indeedcdn.com": "assets do Indeed",
+    "cloudfront.net / cloudflare.com / jsdelivr.net / recaptcha.net": "CDNs que esses sites usam"
+  },
+  "bloqueado_por_padrao": "TUDO o mais, incluindo sites gringos (navapbc.com, ziprecruiter, wellfound, etc). O browser nem chega a fazer a requisicao.",
+  "verificado_em": "2026-09-14 20:01 (Natal): indeed, coodesh, linkedin, gupy, geekhunter, remotar, trampardecasa carregaram; navapbc, ziprecruiter, wellfound bloqueados",
+  "como_reverter": "cp ~/.config/opencode/opencode.jsonc.bak-20260914-sites ~/.config/opencode/opencode.jsonc"
+}
