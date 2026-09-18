@@ -84,7 +84,7 @@ if ($null -ne $aplic) {
 if ($erros.Count -gt 0) {
     if ($json) {
         $out = @{ ok = $false; dry_run = $true; erros = @($erros) } | ConvertTo-Json -Depth 4
-        Write-Host $out
+        Write-Output $out   # JSON no stdout (capturavel); Write-Host iria so pro host
     } else {
         Write-Host 'dry-run: FALHOU — corrija antes de rodar o loop real:'
         foreach ($x in $erros) { Write-Host ("  [FALHA] {0}" -f $x) }
@@ -114,7 +114,7 @@ if ($json) {
         browser_aberto = $false
         candidaturas_enviadas = 0
     } | ConvertTo-Json -Depth 4
-    Write-Host $out
+    Write-Output $out   # JSON no stdout (capturavel); Write-Host iria so pro host
 } else {
     Write-Host 'dry-run: UMA rodada simulada (nada foi enviado, nenhum browser aberto).'
     Write-Host ("  JSONs validos: {0} | {1}" -f $dadosCaminho, $aplicCaminho)
