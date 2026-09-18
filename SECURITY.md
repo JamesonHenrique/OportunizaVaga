@@ -4,14 +4,13 @@
 
 **Do not open a public issue for security vulnerabilities.**
 
-Email **security@example.com** with:
+Email **jameson.henrique.dev@gmail.com** with:
 
 1. A description of the vulnerability and its impact.
 2. Steps to reproduce (proof of concept, logs, affected version/commit).
 3. Your contact for follow-up.
 
-> NOTE: `security@example.com` is a placeholder — replace it with your real
-> security contact address before publishing this repository.
+> NOTE: contato de segurança do mantenedor (`jameson.henrique.dev@gmail.com`).
 
 What to expect:
 

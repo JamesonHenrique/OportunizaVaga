@@ -60,10 +60,9 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at
-**conduct@example.com**.
+**jameson.henrique.dev@gmail.com**.
 
-> NOTE: `conduct@example.com` is a placeholder — replace it with your real
-> conduct contact address before publishing this repository.
+> NOTE: contato de conduta do mantenedor (`jameson.henrique.dev@gmail.com`).
 
 All complaints will be reviewed and investigated promptly and fairly. All
 community leaders are obligated to respect the privacy and security of the
