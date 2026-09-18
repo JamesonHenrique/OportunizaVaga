@@ -1,0 +1,48 @@
+{
+  // OportunizaVaga — variante 100% LOCAL/OFFLINE via Ollama.
+  // Copie para ~/.config/opencode/opencode.jsonc quando quiser rodar sem nenhuma
+  // API externa (privacidade máxima: seus dados e CV nunca saem da máquina).
+  //
+  // Pré-requisitos:
+  //   1. Instale o Ollama: https://ollama.com/download
+  //   2. Baixe um modelo com bom tool-calling, ex.:  ollama pull qwen2.5:14b
+  //   3. Confirme que o servidor responde:  curl http://localhost:11434/v1/models
+  //
+  // Ollama expõe uma API compatível com OpenAI em /v1 — por isso configuramos
+  // um provider "openai-compatible". Ajuste o nome do modelo ao que você baixou.
+  // A chave do schema de provider pode variar entre versões do OpenCode: confira
+  // https://opencode.ai/docs/ se algum campo abaixo não for aceito.
+
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen2.5:14b": { "name": "Qwen2.5 14B (local)" },
+        "llama3.1:8b": { "name": "Llama 3.1 8B (local)" }
+      }
+    }
+  },
+  // Modelo padrão local. Modelos maiores acertam mais tool-calls (abrir/clicar),
+  // mas exigem mais VRAM/RAM. 14B é um bom meio-termo; caia para 8B se faltar RAM.
+  "model": "ollama/qwen2.5:14b",
+  "small_model": "ollama/llama3.1:8b",
+
+  "compaction": { "auto": true, "prune": true, "reserved": 10000 },
+  "permission": "allow",
+  "watcher": {
+    "ignore": ["node_modules/**", "dist/**", "build/**", ".git/**", "*.log"]
+  },
+  // Browser real via CDP — igual ao setup padrão (config/opencode.jsonc.example).
+  // O adaptador de browser não muda ao trocar o modelo: só o "cérebro" fica local.
+  "mcp": {
+    "playwright-chrome-real": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp", "--cdp-endpoint", "http://127.0.0.1:9222", "--caps", "vision"],
+      "enabled": true
+    }
+  }
+}
