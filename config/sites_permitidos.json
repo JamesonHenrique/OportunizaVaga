@@ -14,7 +14,7 @@
     "netvagas.com.br": "generalista"
   },
   "ats_onde_as_empresas_publicam": {
-    "gupy.io": "ATS mais usado no Brasil; conta Google ja existe. Alto retorno",
+    "gupy.io": "ATS mais usado no Brasil; use sua conta Google. Alto retorno",
     "solides.com.br": "ATS (ex-Kenoby); muitas vagas tech",
     "abler.com.br": "ATS",
     "inhire.io": "ATS focado em tech",
@@ -39,6 +39,6 @@
     "cloudfront.net / cloudflare.com / jsdelivr.net / recaptcha.net": "CDNs que esses sites usam"
   },
   "bloqueado_por_padrao": "TUDO o mais, incluindo sites gringos (navapbc.com, ziprecruiter, wellfound, etc). O browser nem chega a fazer a requisicao.",
-  "verificado_em": "2026-09-14 20:01 (Natal): indeed, coodesh, linkedin, gupy, geekhunter, remotar, trampardecasa carregaram; navapbc, ziprecruiter, wellfound bloqueados",
-  "como_reverter": "cp ~/.config/opencode/opencode.jsonc.bak-20260914-sites ~/.config/opencode/opencode.jsonc"
+  "verificado_em": "verifique cada site na sua máquina após configurar a allowlist",
+  "como_reverter": "restaure o backup do seu opencode.jsonc (ex.: cp ~/.config/opencode/opencode.jsonc.bak ~/.config/opencode/opencode.jsonc)"
 }

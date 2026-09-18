@@ -1,33 +1,35 @@
 #!/bin/bash
 # Loop continuo de candidaturas (deixa o PC ligado). Sessao nova por rodada.
 # Estado duravel vive em aplicadas.json, nao na sessao do opencode.
-cd $HOME/candidaturas || exit 1
+BOT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$BOT_ROOT/bot" || exit 1
 
-# A maquina roda em America/New_York. Sem isto, todo log e toda data gravada saem
-# 1h atras de SUA_CIDADE — foi o que fez candidaturas das 21h46 de 13/09 virarem 14/09.
+# Ajuste TZ ao seu fuso (ex.: America/Sao_Paulo). Sem isto, logs e datas gravadas saem
+# com offset errado — foi o que fez candidaturas da noite virarem o dia seguinte.
 export TZ=America/Fortaleza
 
 # Binarios resolvidos explicitamente. O cron tem PATH minimo (/usr/bin:/bin) e NAO acha
 # opencode (~/.opencode/bin) nem node (fnm): quando o guardiao reinicia este loop pelo
 # cron, o `opencode`/`node` puro falha com "failed to execute opencode" -> status 69.
-# (Foi exatamente isso que derrubou o loop do LinkedIn.) Este loop so "funcionava"
+# (Foi exatamente isso que derrubava reinicios pelo cron.) Este loop so "funcionava"
 # porque o processo atual herdou o PATH interativo; um restart pelo cron quebraria.
 export PATH="$HOME/.opencode/bin:$HOME/.local/share/fnm/aliases/default/bin:$HOME/.local/bin:$PATH"
-OPENCODE_BIN=$HOME/.opencode/bin/opencode
-NODE_BIN=$HOME/.local/share/fnm/aliases/default/bin/node
+OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+NODE_BIN="$HOME/.local/share/fnm/aliases/default/bin/node"
 [ -x "$OPENCODE_BIN" ] || { echo "[$(date '+%F %T')] ERRO: opencode nao encontrado em $OPENCODE_BIN" >> loop.log; exit 1; }
 [ -x "$NODE_BIN" ]     || { echo "[$(date '+%F %T')] ERRO: node nao encontrado em $NODE_BIN" >> loop.log; exit 1; }
 
 # Chaves de provedores que exigem env (OpenRouter): o cron nao herda o ambiente
 # interativo, entao sem isto o segundo poco :free morre com erro de auth no cron.
 # Arquivo 600, so nesta maquina, nunca commitado nem publicado.
-[ -f $HOME/.config/opencode/cron.env ] && set -a && . $HOME/.config/opencode/cron.env && set +a
+[ -f "$HOME/.config/opencode/cron.env" ] && set -a && . "$HOME/.config/opencode/cron.env" && set +a
 
 RUN_TIMEOUT="20m"
 RETRY_BASE=300          # backoff exponencial: 5min, 10min, 20min, teto 30min
 RETRY_MAX=1800
 QUOTA_STEPS=(900 1800 3600)   # quota: 15min -> 30min -> 1h, reseta ao dar certo
-NORMAL_WAIT=1200
+NORMAL_WAIT=1200         # sleep base apos rodada ok (20min)
+VAZIA_BASE=3600           # backoff por rodada sem vaga nova: 1h na primeira
 # Cadeia de modelos GRATUITOS, em ordem de preferencia. Toda rodada comeca pelo
 # primeiro: por isso a volta ao preferido e automatica quando o limite dele passa,
 # sem precisar detectar recuperacao nem guardar estado.
@@ -57,36 +59,73 @@ MODELOS=(
   "opencode/ling-3.0-flash-fin-free"
 )
 
-# Segundo nivel entra so no fim da fila: a preferencia pelo Zen fica preservada.
+# Segundo nivel: :free do OpenRouter (NAO consome o credito da conta, limite e de
+# requisicoes/dia — medido cost=0). Ordem por capacidade de codigo.
 if [ "$USAR_OPENROUTER" = "1" ]; then
   MODELOS+=(
     "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
     "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
+    "openrouter/z-ai/glm-5.2:free"
+    "openrouter/poolside/laguna-s-2.1:free"
+    "openrouter/thinkingmachines/inkling:free"
     "openrouter/cohere/north-mini-code:free"
     "openrouter/nex-agi/nex-n2.5-pro:free"
+    "openrouter/dots-studio/dots-3-note-preview:free"
+    "openrouter/nvidia/nemotron-3.5-lightning:free"
   )
 fi
 
-# Terceiro nivel: NVIDIA direto (auth via auth.json, funciona no cron) e
-# GitHub Copilot (consome premium requests do Student: 0 = desligado por padrao,
-# ligue com USAR_COPILOT=1 se o resto secar; entra POR ULTIMO na fila).
+# Terceiro nivel: NVIDIA direto (auth via auth.json, funciona no cron).
 USAR_NVIDIA=1
-USAR_COPILOT=0
 [ "$USAR_NVIDIA" = "1" ] && MODELOS+=("nvidia/nvidia/nemotron-3-super-120b-a12b")
+
+# Quarto nivel: Groq (gratis, sem cartao; limite de req/dia por modelo).
+USAR_GROQ=1
+if [ "$USAR_GROQ" = "1" ]; then
+  MODELOS+=(
+    "groq/openai/gpt-oss-120b"
+    "groq/qwen/qwen3.8-27b"
+    "groq/openai/gpt-oss-20b"
+    "groq/meta-llama/llama-3.3-70b-versatile"
+  )
+fi
+
+# Quinto nivel: Cerebras (gratis; dois modelos open).
+USAR_CEREBRAS=1
+if [ "$USAR_CEREBRAS" = "1" ]; then
+  MODELOS+=(
+    "cerebras/gpt-oss-120b"
+    "cerebras/qwen-3.8-27b"
+  )
+fi
+
+# Sexto nivel: Hugging Face Inference Providers (gratis; inferencia serverless).
+USAR_HF=1
+if [ "$USAR_HF" = "1" ]; then
+  MODELOS+=(
+    "huggingface/deepseek-ai/DeepSeek-V4-Pro"
+    "huggingface/deepseek-ai/DeepSeek-V3.2"
+    "huggingface/google/gemma-3-27b-it"
+  )
+fi
+
+# Ultimo nivel: GitHub Copilot (consome premium requests do Student: 0 = desligado
+# por padrao, ligue com USAR_COPILOT=1 se o resto secar; entra POR ULTIMO na fila).
+USAR_COPILOT=0
 [ "$USAR_COPILOT" = "1" ] && MODELOS+=("github-copilot/claude-sonnet-4.6")
 
 WATCHDOG_AFTER=240        # limite maximo de espera do watchdog
 WATCHDOG_MIN_WAIT=45      # antes disso nao aborta: rodada boa pode demorar a produzir saida
 WATCHDOG_MIN_BYTES=800    # rodada que produziu menos que isso nao comecou de verdade
-MONITOR_URL="https://sua-url.vercel.app"
+MONITOR_URL="${MONITOR_URL:-https://sua-url.vercel.app}"
 LOG_MAX_BYTES=2097152   # 2MB -> rotaciona
 ROUNDS_KEPT=20          # quantos logs completos de rodada manter
-BROWSER_LOCK=/tmp/agent-chrome-9222.lock   # compartilhado com outro-robo/dia.sh
+BROWSER_LOCK=/tmp/agent-chrome-9222.lock   # lock do Chrome compartilhado entre agentes locais
 
 mkdir -p logs
 
 # Instancia unica deste loop
-exec 9>/tmp/candidaturas-loop.lock
+exec 9>/tmp/oportunizavaga-loop.lock
 if ! flock -n 9; then
   # Silencioso de proposito: o guardiao do cron chama este script a cada 5min so para
   # garantir que ele esta de pe. Quando ja esta, sair calado evita poluir o loop.log.
@@ -107,8 +146,8 @@ rotate_log() {
 
 log() {
   echo "[$(date '+%F %T')] $1" >> loop.log
-  MONITOR_URL="$MONITOR_URL" CANDIDATURAS_ROOT=$HOME/candidaturas \
-    "$NODE_BIN" $HOME/candidaturas/monitor/publish-once.mjs >/tmp/candidaturas-monitor.log 2>&1 9>&- &
+  MONITOR_URL="$MONITOR_URL" CANDIDATURAS_ROOT="$BOT_ROOT/bot" \
+    "$NODE_BIN" "$BOT_ROOT/monitor/publish-once.mjs" >/tmp/oportunizavaga-monitor.log 2>&1 9>&- &
 }
 
 ensure_chrome() {
@@ -116,15 +155,15 @@ ensure_chrome() {
     return 0
   fi
   log "Chrome CDP fora do ar, subindo novamente"
-  DISPLAY=:0 nohup $HOME/chrome-real.sh >/tmp/chrome-real.log 2>&1 9>&- &
+  DISPLAY=:0 nohup "$BOT_ROOT/browser/chrome-real.sh" >/tmp/chrome-real.log 2>&1 9>&- &
   sleep 6
   curl -s --max-time 5 http://127.0.0.1:9222/json/version >/dev/null
 }
 
 ensure_monitor() {
   pgrep -f "monitor/publish-status.mjs" >/dev/null && return 0
-  MONITOR_URL="$MONITOR_URL" CANDIDATURAS_ROOT=$HOME/candidaturas \
-    nohup "$NODE_BIN" $HOME/candidaturas/monitor/publish-status.mjs >/tmp/candidaturas-monitor.log 2>&1 9>&- &
+  MONITOR_URL="$MONITOR_URL" CANDIDATURAS_ROOT="$BOT_ROOT/bot" \
+    nohup "$NODE_BIN" "$BOT_ROOT/monitor/publish-status.mjs" >/tmp/oportunizavaga-monitor.log 2>&1 9>&- &
 }
 
 # Quota so conta quando vem de linha de erro do provider ou do sentinel do prompt.
@@ -137,7 +176,7 @@ is_quota() {
 # O opencode NAO imprime rate limit no stdout quando entra em retry silencioso:
 # a rodada simplesmente trava ate o timeout. O erro so existe no log interno.
 # Sem isto, rodada bloqueada por quota queima 20min de timeout + 5min de backoff, em loop.
-OC_LOG_DIR=$HOME/.local/share/opencode/log
+OC_LOG_DIR="$HOME/.local/share/opencode/log"
 quota_in_opencode_log() {   # $1 = timestamp ISO do inicio da rodada
   local f
   f=$(ls -t "$OC_LOG_DIR"/*.log 2>/dev/null | head -1)
@@ -151,6 +190,25 @@ quota_in_opencode_log() {   # $1 = timestamp ISO do inicio da rodada
     }
     END { exit(found ? 0 : 1) }
   ' "$f"
+}
+
+# Impressao digital do estado: soma de aplicadas + bloqueados + descartes da listagem.
+# Se nada disso mudou depois da rodada, NENHUMA vaga nova apareceu (nem p/ descarte) —
+# e o sinal para o backoff adaptativo. Mtime nao serve: o rodizio sempre regrava o arquivo.
+fingerprint() {
+  python3 -c "
+import json
+d=json.load(open('aplicadas.json'))
+print(len(d.get('aplicadas',[]))+len(d.get('bloqueados',{}))+d.get('descartes_listagem_total',0))
+" 2>/dev/null || echo -1
+}
+
+# Backoff por rodada vazia: 1h na primeira e dobra SEM TETO a cada rodada vazia
+# seguinte (3600 -> 7200 -> 14400 -> ...). Reseta ao achar vaga nova.
+vazia_wait() {   # $1 = rodadas vazias seguidas (1 = primeira)
+  local w=$VAZIA_BASE n=$(( $1 - 1 ))
+  while [ "$n" -gt 0 ]; do w=$((w * 2)); n=$((n - 1)); done
+  echo "$w"
 }
 
 is_broken_session() {
@@ -169,6 +227,7 @@ ensure_monitor
 
 FAILS=0
 QUOTA_HITS=0
+VAZIAS=0
 
 while true; do
   rotate_log
@@ -182,7 +241,8 @@ while true; do
   ensure_monitor
 
   ROUND_LOG="logs/rodada-$(date '+%Y%m%d-%H%M%S').log"
-  log "rodada iniciada"
+  FP_ANTES=$(fingerprint)
+  log "rodada iniciada (rodadas vazias seguidas: ${VAZIAS})"
 
   STATUS=0
   MODELO_OK=""
@@ -195,7 +255,7 @@ while true; do
   # Sessao nova a cada rodada: o historico nao carrega nada que aplicadas.json nao tenha.
   setsid timeout --kill-after=30s "$RUN_TIMEOUT" \
     flock -w 900 -E 75 "$BROWSER_LOCK" \
-    "$OPENCODE_BIN" run -m "$MODELO" --title "candidaturas-$(date '+%F-%H%M')" "$(cat prompt_loop.md)" \
+    "$OPENCODE_BIN" run -m "$MODELO" --title "candidaturas-$(date '+%F-%H%M')" "$(cat "$BOT_ROOT/bot/prompt_loop.md")" \
     </dev/null 9>&- >"$ROUND_LOG" 2>&1 &
   ROUND_PID=$!
 
@@ -267,8 +327,17 @@ while true; do
   else
     FAILS=0
     QUOTA_HITS=0
-    log "rodada ok, dormindo 20min"
-    sleep "$NORMAL_WAIT"
+    FP_DEPOIS=$(fingerprint)
+    if [ "$FP_ANTES" != "-1" ] && [ "$FP_DEPOIS" != "-1" ] && [ "$FP_ANTES" = "$FP_DEPOIS" ]; then
+      VAZIAS=$((VAZIAS + 1))
+      W=$(vazia_wait "$VAZIAS")
+      log "rodada ok, NENHUMA vaga nova (${VAZIAS}x seguidas), dormindo $((W / 60))min"
+      sleep "$W"
+    else
+      VAZIAS=0
+      log "rodada ok, vaga nova processada, dormindo 20min"
+      sleep "$NORMAL_WAIT"
+    fi
   fi
 
   if [ "$FAILS" -ge 8 ]; then

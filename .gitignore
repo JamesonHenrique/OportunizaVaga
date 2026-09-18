@@ -1,7 +1,10 @@
-# Dados pessoais — NUNCA commitar
-dados_candidato.json
-aplicadas.json
-cron.env
+# Dados pessoais — NUNCA commitar (vale em qualquer subdir)
+**/dados_candidato.json
+**/aplicadas.json
+**/quota-cache.json
+**/cron.env
+**/auth.json
+**/cron*.env
 *.pdf
 *.log
 logs/
@@ -10,6 +13,19 @@ logs/
 followup.log
 guardiao.log
 loop.log*
-# Perfil do browser (sessões logadas!)
+monitor-keepalive.log
+monitor-pull.log
+quota-daemon.log
+chrome-real.log
+candidaturas-monitor.log
+# Perfil do browser (sessões logadas!) + caches/artefatos
 .chrome-profile/
 chrome-profile/
+*-chrome-real/
+node_modules/
+.next/
+.vercel/
+.DS_Store
+# Backups de edição
+*.tmp
+*~

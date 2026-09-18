@@ -1,0 +1,80 @@
+{
+  // OportunizaVaga — exemplo de ~/.config/opencode/opencode.jsonc
+  // Copie para ~/.config/opencode/opencode.jsonc e ajuste os caminhos (~) e segredos.
+  // NUNCA commite este arquivo preenchido: segredos vao em cron.env (chmod 600) ou env.
+
+  "$schema": "https://opencode.ai/config.json",
+  // Modelo padrão: Muse Spark 1.3 via Zen — 100% grátis (tier contributor)
+  "model": "opencode/muse-spark-1.3-contributor-free",
+  // Tarefinhas internas (títulos, resumos): free de OUTRO provider p/ não gastar a cota do Zen
+  "small_model": "openrouter/google/gemma-4-26b-a4b-it:free",
+  // ESCADA FREE (troca manual em 1 comando via `omodel` — OpenCode não tem failover automático):
+  //   zen (padrão) -> openrouter/poolside/laguna-s-2.1:free -> nvidia/nvidia/nemotron-3-super-120b-a12b -> github-copilot/claude-sonnet-4.6
+  // Uso: omodel zen|openrouter|nvidia|copilot  (ou: omodel provider/model-id)
+  // Compactação agressiva: prune remove outputs velhos de ferramenta (default false)
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 10000
+  },
+  // Roteamento: tudo via Zen grátis (principal + tarefas internas)
+  "agent": {
+    "explore": {
+      "model": "opencode/muse-spark-1.3-contributor-free"
+    },
+    "scout": {
+      "model": "opencode/muse-spark-1.3-contributor-free"
+    },
+    "title": {
+      "model": "opencode/muse-spark-1.3-contributor-free"
+    },
+    "summary": {
+      "model": "opencode/muse-spark-1.3-contributor-free"
+    }
+  },
+  // Auto-aprovar tudo: sem pedir permissão (equivale ao modo automático do desktop)
+  "permission": "allow",
+  // Poda dinâmica de contexto (plugin da comunidade, estável v3.x)
+  "plugin": ["@tarquinen/opencode-dcp"],
+  // Não indexa lixo no watcher/snapshot
+  "watcher": {
+    "ignore": ["node_modules/**", "dist/**", "build/**", ".git/**", "*.log"]
+  },
+  "mcp": {
+    // Docs atualizadas de qualquer biblioteca — a IA consulta sozinha
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    // GitHub: issues, PRs, repos (usa $GITHUB_TOKEN do ambiente)
+    "github": {
+      "type": "remote",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": { "Authorization": "Bearer {env:GITHUB_TOKEN}" },
+      "oauth": false,
+      "enabled": true
+    },
+    // Memória persistente do Akita (servidor local 127.0.0.1:49374, zero LLM por padrão)
+    "ai-memory": {
+      "type": "remote",
+      "url": "http://127.0.0.1:49374/mcp",
+      "enabled": true
+    },
+    // Browser interno persistente (estilo Codex): Firefox isolado com perfil em disco, mantém login
+    "playwright-firefox": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp", "--browser", "firefox", "--caps", "vision", "--user-data-dir", "~/.config/pw-firefox-profile"],
+      "enabled": true
+    },
+    // Chrome real via CDP (perfil ~/.config/chrome-real, porta 9222): browser de verdade, sem flag de automação — vale pra tudo incluindo Google/LinkedIn
+    // --allowed-origins: bloqueio REAL de dominio, na camada de requisicao do browser.
+    // So sites de vaga BR (+ auxiliares de login/CDN) passam; o resto nem e requisitado.
+    // Lista documentada em config/sites_permitidos.json deste repo.
+    "playwright-chrome-real": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp", "--cdp-endpoint", "http://127.0.0.1:9222", "--caps", "vision",
+                  "--allowed-origins", "https://linkedin.com;https://*.linkedin.com;https://licdn.com;https://*.licdn.com;https://indeed.com;https://*.indeed.com;https://indeedassets.com;https://*.indeedassets.com;https://indeedcdn.com;https://*.indeedcdn.com;https://gupy.io;https://*.gupy.io;https://gupy.com.br;https://*.gupy.com.br;https://catho.com.br;https://*.catho.com.br;https://infojobs.com.br;https://*.infojobs.com.br;https://pandape.com;https://*.pandape.com;https://vagas.com.br;https://*.vagas.com.br;https://glassdoor.com.br;https://*.glassdoor.com.br;https://jooble.org;https://*.jooble.org;https://empregos.com.br;https://*.empregos.com.br;https://trabalhabrasil.com.br;https://*.trabalhabrasil.com.br;https://netvagas.com.br;https://*.netvagas.com.br;https://solides.com.br;https://*.solides.com.br;https://solides.com;https://*.solides.com;https://abler.com.br;https://*.abler.com.br;https://inhire.io;https://*.inhire.io;https://inhire.com.br;https://*.inhire.com.br;https://talentify.in;https://*.talentify.in;https://compleo.com.br;https://*.compleo.com.br;https://99jobs.com;https://*.99jobs.com;https://geekhunter.com.br;https://*.geekhunter.com.br;https://programathor.com.br;https://*.programathor.com.br;https://trampardecasa.com.br;https://*.trampardecasa.com.br;https://remotar.com.br;https://*.remotar.com.br;https://coodesh.com;https://*.coodesh.com;https://revelo.com.br;https://*.revelo.com.br;https://apinfo.com;https://*.apinfo.com;https://google.com;https://*.google.com;https://gstatic.com;https://*.gstatic.com;https://googleapis.com;https://*.googleapis.com;https://googleusercontent.com;https://*.googleusercontent.com;https://recaptcha.net;https://*.recaptcha.net;https://cloudfront.net;https://*.cloudfront.net;https://cloudflare.com;https://*.cloudflare.com;https://jsdelivr.net;https://*.jsdelivr.net"],
+      "enabled": true
+    }
+  }
+}

@@ -1,0 +1,17 @@
+# OportunizaVaga — exemplo de crontab. Ajuste BOT_DIR ao caminho do seu clone.
+# Edite com `crontab -e`. TZ fixo para logs e carimbos consistentes.
+TZ=America/Fortaleza
+BOT_DIR=$HOME/opensource/oportunizavaga
+
+# Supervisor: garante loop + Chrome de pe (a cada 5 min e no boot)
+@reboot                       $BOT_DIR/bot/guardiao.sh
+*/5 * * * *                   $BOT_DIR/bot/guardiao.sh
+
+# Publisher do monitor (opcional, so se usar monitor/): mantem o heartbeat no ar
+*/5 * * * *                   $BOT_DIR/scripts/monitor-keepalive.sh
+
+# "Correio" do monitor (opcional): atualiza o codigo do painel via git pull
+*/10 * * * *                  $BOT_DIR/scripts/pull-monitor.sh
+
+# Follow-up semanal das candidaturas (segundas 09:00)
+0 9 * * 1                     $BOT_DIR/bot/followup.sh >> $BOT_DIR/bot/followup.log 2>&1

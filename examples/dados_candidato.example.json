@@ -1,7 +1,7 @@
 {
   "_COMO_USAR": "Copie para dados_candidato.json e preencha com SEUS dados reais. Este arquivo NUNCA vai ao git (.gitignore). O robô NUNCA inventa: campo vazio = ele registra 'bloqueado' em vez de chutar.",
   "nome": "SEU NOME COMPLETO",
-  "email": "seu-email@gmail.com",
+  "email": "seu-email@example.com",
   "telefone": "+55 (00) 90000-0000",
   "linkedin": "https://www.linkedin.com/in/seu-perfil",
   "github": "https://github.com/seu-usuario",

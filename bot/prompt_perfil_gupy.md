@@ -1,21 +1,21 @@
 Tarefa AVULSA (não faz parte do loop de candidaturas): manutenção do perfil Gupy.
 Chrome real via CDP na porta 9222, já logado. Faça UM item por execução e pare.
 
-Página: https://SUA-EMPRESA.gupy.io/candidates/profile — aba "Meu currículo".
+Página: https://<sua-empresa>.gupy.io/candidates/profile (ou portal.gupy.io) — aba "Meu currículo".
 
-Regra: NUNCA invente dado. Fonte única = ~/candidaturas/dados_candidato.json.
+Regra: NUNCA invente dado. Fonte única = $BOT_ROOT/bot/dados_candidato.json.
 
-Itens pendentes (faça o primeiro que ainda não estiver feito, depois PARE e relate):
+($BOT_ROOT é a raiz do clone; os scripts exportam essa variável automaticamente.)
+Adapte os itens abaixo ao SEU perfil (os valores são EXEMPLO para um dev Java/Spring + Angular):
 
-1. HABILIDADES (bloqueado hoje — ver nota técnica abaixo). Adicionar, até o limite de 30:
-   Angular, APIs REST, PostgreSQL, JavaScript, Docker, Git, SQL, JUnit, n8n, Make.
-   Já cadastradas: Java, TypeScript, Spring Boot.
+1. HABILIDADES. Adicionar, até o limite de 30, as do seu dados_candidato.json
+   (EXEMPLO: Angular, APIs REST, PostgreSQL, JavaScript, Docker, Git, SQL, JUnit, n8n, Make).
 
-2. EXPERIÊNCIA: adicionar "SUA_EMPRESA (LegalOps) — Estagiário de Automação RPA,
-   ago/2026 até atual". Descrever por período, NUNCA por "X anos de experiência".
+2. EXPERIÊNCIA: adicionar "SEU_CARGO — SUA_EMPRESA, <período>".
+   Descrever por período, NUNCA por "X anos de experiência".
 
-3. IDIOMAS: conferir que está Português nativo, Inglês Intermediário, Espanhol Básico.
-   Alemão já foi removido em 2026-09-14 (era dado falso).
+3. IDIOMAS: conferir que estão os seus idiomas reais (EXEMPLO: Português nativo,
+   Inglês Intermediário, Espanhol Básico). NUNCA declare idioma que você não tem.
 
 NOTA TÉCNICA — por que o item 1 está travado (tentado em 2026-09-14, 4 estratégias falharam):
 o autocomplete #skills-search-autocomplete abre a listbox e lista opções ao digitar de verdade,
