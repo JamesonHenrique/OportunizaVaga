@@ -4,14 +4,19 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const TZ = process.env.BOT_TZ || 'America/Sao_Paulo';   // ajuste ao seu fuso (mesmo TZ dos scripts .sh).
+const TZ = process.env.BOT_TZ || 'America/Sao_Paulo';   // ajuste ao seu fuso (mesmo TZ dos scripts .sh/.ps1).
 // Fixa o fuso DESTE processo antes de qualquer Date: assim os carimbos sem offset
 // dos logs sao lidos no mesmo fuso em que os loops os escreveram, sem offset chutado.
+// Nota Windows: o Node no Windows ignora TZ com string IANA — os scripts .ps1 usam
+// a hora local com offset -03:00 documentado, e este snapshot exibe como recebido.
+// No Linux a linha abaixo fixa o fuso; no Windows e inofensiva (ignorada pelo Node).
 process.env.TZ = TZ;
-// Raiz dos dados: bot/aplicadas.json + bot/*.log. Via env no cron; fallback = bot/ do repo.
-const ROOT = process.env.CANDIDATURAS_ROOT
-  || path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'bot');
+// Raiz dos dados: bot/aplicadas.json + bot/*.log. Via env no cron/Task Scheduler;
+// fallback = bot/ do repo (fileURLToPath funciona em Linux e Windows).
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = process.env.CANDIDATURAS_ROOT || path.join(HERE, '..', 'bot');
 
 const readJson = (file, fallback) => {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }

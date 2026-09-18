@@ -43,4 +43,26 @@ Se persistir: `fuser -k /tmp/oportunizavaga-loop.lock` e deixe o cron subir de n
 
 **Funciona no Windows/macOS?**
 Os scripts são bash (Linux testado). No macOS, adapte `stat -c %s`, `fuser` e o
-caminho do Chrome. No Windows, use WSL2.
+caminho do Chrome. No Windows, use WSL2 (recomendado, guia Linux funciona dentro
+do WSL) ou os espelhos PowerShell nativos (`bot/*.ps1`, `scripts/*.ps1`,
+`browser/chrome-real.ps1` + `config/TaskScheduler.md`).
+
+**Windows: "não é possível carregar o script porque a execução de scripts foi desabilitada" (execution policy)?**
+O Windows bloqueia `.ps1` por padrão. Rode 1x como o seu usuário (não precisa de admin):
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, e execute com
+`powershell -ExecutionPolicy Bypass -File bot\loop.ps1`. Nunca use `Unrestricted`
+global — `RemoteSigned` no escopo do usuário basta.
+
+**Windows: como agendo o robô sem cron (schtasks)?**
+O equivalente ao `crontab.example` está em `config/TaskScheduler.md`, com comandos
+prontos: guardião a cada 5 min (`/SC MINUTE /MO 5`) + no logon (`/SC ONLOGON`),
+follow-up seg 09:00 (`/SC WEEKLY /D MON /ST 09:00`). Confira com
+`schtasks /Query /TN 'OportunizaVaga\Guardiao'` e remova com
+`schtasks /Delete /TN 'OportunizaVaga\Guardiao' /F`.
+
+**Windows: Chrome CDP não responde em 127.0.0.1:9222?**
+Suba com `powershell -ExecutionPolicy Bypass -File browser\chrome-real.ps1` e teste
+com `(New-Object Net.Sockets.TcpClient).BeginConnect('127.0.0.1', 9222, $null, $null).AsyncWaitHandle.WaitOne(5000)`.
+O perfil fica em `%LOCALAPPDATA%\oportunizavaga-chrome-real`. Agende as tarefas como
+o **seu usuário** (não SYSTEM): o Chrome precisa abrir na sua sessão para reaproveitar
+o login 1x. Se cair, `bot\guardiao.ps1` tenta subir sozinho (veja `bot\guardiao.log`).

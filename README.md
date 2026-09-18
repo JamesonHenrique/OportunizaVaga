@@ -44,18 +44,23 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
 oportunizavaga/
 ├── bot/
 │   ├── loop.sh                  # loop principal (1 rodada = 1 sessão nova do modelo)
+│   ├── loop.ps1                 # espelho Windows (PowerShell 5.1+, mesma lógica)
 │   ├── guardiao.sh              # supervisor via cron: loop + Chrome
+│   ├── guardiao.ps1             # espelho Windows (Task Scheduler)
 │   ├── followup.sh              # rotina semanal de status (só lê, nunca candidata)
+│   ├── followup.ps1             # espelho Windows
 │   ├── prompt_loop.md           # regras e passo a passo de cada rodada (o "cérebro")
 │   ├── prompt_followup.md       # prompt da rotina semanal
 │   └── prompt_perfil_gupy.md    # manutenção avulsa do perfil Gupy
 ├── browser/
 │   ├── chrome-real.sh           # Chrome persistente com CDP :9222
+│   ├── chrome-real.ps1          # espelho Windows (perfil em %LOCALAPPDATA%)
 │   └── README.md
 ├── config/
 │   ├── sites_permitidos.json    # allowlist de domínios BR (espelha o bloqueio do browser)
 │   ├── opencode.jsonc.example   # modelo do config do opencode (com a cascata de modelos)
-│   └── crontab.example          # cron sugerido (guardiao, keepalive, follow-up)
+│   ├── crontab.example          # cron sugerido (guardiao, keepalive, follow-up)
+│   └── TaskScheduler.md         # equivalente Windows (schtasks prontos)
 ├── monitor/                     # painel opcional (Vercel free, sem banco)
 │   ├── snapshot.mjs             # retrato a partir de bot/aplicadas.json + logs
 │   ├── publish-status.mjs       # heartbeat (daemon)
@@ -63,10 +68,10 @@ oportunizavaga/
 │   ├── quota-daemon.mjs         # cota diária OpenRouter :free
 │   ├── package.json / vercel.json / README.md
 ├── scripts/
-│   ├── setup.sh                 # instalador interativo (copia exemplos, valida deps)
+│   ├── setup.sh / setup.ps1    # instalador interativo (Linux / Windows)
 │   ├── sanitize.sh              # varredura pré-commit de segredos/dados pessoais
-│   ├── monitor-keepalive.sh     # mantém o publisher do painel no ar
-│   └── pull-monitor.sh          # atualiza o painel via git pull
+│   ├── monitor-keepalive.sh / .ps1  # mantém o publisher do painel no ar
+│   └── pull-monitor.sh / .ps1       # atualiza o painel via git pull
 ├── examples/
 │   ├── dados_candidato.example.json  # COPIE p/ bot/dados_candidato.json e preencha
 │   └── aplicadas.example.json        # COPIE p/ bot/aplicadas.json (estado inicial)
@@ -77,6 +82,8 @@ oportunizavaga/
 
 ## Setup resumido
 
+### Linux
+
 ```bash
 git clone <sua-fork> oportunizavaga && cd oportunizavaga
 ./scripts/setup.sh          # copia exemplos, valida deps, imprime crontab
@@ -85,6 +92,21 @@ git clone <sua-fork> oportunizavaga && cd oportunizavaga
 ./bot/loop.sh               # teste 1 rodada (Ctrl+C após o primeiro "ok")
 crontab -e                  # cole config/crontab.example
 ```
+
+### Windows (PowerShell nativo — alternativo; WSL2 recomendado)
+
+```powershell
+git clone <sua-fork> oportunizavaga; cd oportunizavaga
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+# preencha bot\dados_candidato.json com SEUS dados (nunca commite!)
+powershell -ExecutionPolicy Bypass -File browser\chrome-real.ps1  # login 1x nos sites
+powershell -ExecutionPolicy Bypass -File bot\loop.ps1             # teste 1 rodada (Ctrl+C após o primeiro "ok")
+# agende com os comandos em config\TaskScheduler.md (equivale ao crontab.example)
+```
+
+> **Windows:** WSL2 com o guia Linux é o caminho recomendado. O PowerShell nativo
+> funciona via espelhos `.ps1` (mesma lógica), com watchdog simplificado e carimbos
+> em hora local (-03:00 documentado) — veja `bot/loop.ps1` e `config/TaskScheduler.md`.
 
 Guia completo: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
 

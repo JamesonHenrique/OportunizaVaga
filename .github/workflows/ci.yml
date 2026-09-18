@@ -1,0 +1,70 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n (scripts intocados + espelhos não quebram nada)
+        run: |
+          bash -n bot/loop.sh
+          bash -n bot/guardiao.sh
+          bash -n bot/followup.sh
+          bash -n scripts/monitor-keepalive.sh
+          bash -n scripts/pull-monitor.sh
+          bash -n scripts/setup.sh
+          bash -n scripts/sanitize.sh
+          bash -n browser/chrome-real.sh
+      - name: shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: .
+          severity: error
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: node --check (monitor/*.mjs)
+        run: |
+          for f in monitor/*.mjs; do node --check "$f"; done
+      - name: JSON válido
+        run: |
+          python3 -m json.tool config/sites_permitidos.json > /dev/null
+          python3 -m json.tool monitor/package.json > /dev/null
+          python3 -m json.tool monitor/vercel.json > /dev/null
+          python3 -m json.tool examples/dados_candidato.example.json > /dev/null
+          python3 -m json.tool examples/aplicadas.example.json > /dev/null
+      - name: sanitize (sem segredos/dados pessoais)
+        run: ./scripts/sanitize.sh
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PSScriptAnalyzer (só erros)
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          $issues = Invoke-ScriptAnalyzer -Path . -Recurse -IncludeRule 'PS*' -Severity Error
+          if ($issues) { $issues | Format-Table -AutoSize; exit 1 }
+          Write-Host 'PSScriptAnalyzer: nenhum erro.'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: node --check (monitor/*.mjs)
+        shell: pwsh
+        run: |
+          Get-ChildItem monitor/*.mjs | ForEach-Object { node --check $_.FullName }
+      - name: JSON válido
+        shell: pwsh
+        run: |
+          Get-ChildItem config/sites_permitidos.json, monitor/package.json, monitor/vercel.json, examples/*.example.json | ForEach-Object {
+            Get-Content $_.FullName -Raw | ConvertFrom-Json | Out-Null
+          }
+      - name: sanitize via git-bash
+        shell: bash
+        run: ./scripts/sanitize.sh

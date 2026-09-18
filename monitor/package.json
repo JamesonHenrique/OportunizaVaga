@@ -4,7 +4,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "publish": "node publish-status.mjs",
+    "publish:once": "node publish-once.mjs",
+    "quota": "node quota-daemon.mjs"
   },
   "dependencies": {
     "next": "^15.5.25",

@@ -11,18 +11,29 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = process.env.CANDIDATURAS_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'bot');
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = process.env.CANDIDATURAS_ROOT || path.join(HERE, '..', 'bot');
 const OUT = path.join(ROOT, 'quota-cache.json');
-const CRON_ENV = path.join(os.homedir(), '.config/opencode/cron.env');
+// Chaves fora do repo, cross-platform: Linux ~/.config/opencode/cron.env;
+// Windows %USERPROFILE%\.config\opencode\cron.env ou %APPDATA%\opencode\cron.env.
+const CRON_ENV_CANDIDATES = [
+  process.env.CRON_ENV || null,
+  path.join(os.homedir(), '.config', 'opencode', 'cron.env'),
+  process.env.APPDATA ? path.join(process.env.APPDATA, 'opencode', 'cron.env') : null
+].filter(Boolean);
 const INTERVAL_MS = 60 * 60 * 1000; // 1h — a cota zera 1x/dia, nao muda em segundos.
 
 const readKey = () => {
-  try {
-    const raw = fs.readFileSync(CRON_ENV, 'utf8');
-    const m = /^OPENROUTER_API_KEY=(.+)$/m.exec(raw);
-    return m ? m[1].trim().replace(/^["']|["']$/g, '') : null;
-  } catch { return null; }
+  for (const file of CRON_ENV_CANDIDATES) {
+    try {
+      const raw = fs.readFileSync(file, 'utf8');
+      const m = /^OPENROUTER_API_KEY=(.+)$/m.exec(raw);
+      if (m) return m[1].trim().replace(/^["']|["']$/g, '');
+    } catch { /* tenta o proximo candidato */ }
+  }
+  return null;
 };
 
 const gravar = (obj) => {
