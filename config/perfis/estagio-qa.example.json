@@ -1,0 +1,12 @@
+{
+  "_COMO_USAR": "Exemplo de perfil. Copie para bot/perfil.json e ajuste termos/pular_tipos ao SEU stack. Este arquivo de exemplo NUNCA vai ao git com dados reais.",
+  "nome_perfil": "estagio-qa-exemplo",
+  "nivel": "estagio",
+  "termos": [
+    "estagio qa remoto",
+    "estagio testes de software",
+    "estagio qualidade de software remoto",
+    "trainee qa remoto"
+  ],
+  "pular_tipos": ["ciência de dados", "BI", "design/UX", "ERP/funcional", "exclusiva PCD"]
+}

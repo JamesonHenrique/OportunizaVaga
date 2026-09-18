@@ -48,6 +48,22 @@ similares JR (`experiencia.stacks_similares_jr`), pretensão (`SEU_VALOR_BASE`),
 respostas padrão de formulário. **Campo vazio = o robô registra "bloqueado" em vez
 de inventar.** Veja `docs/PROMPTS.md` para adaptar `bot/prompt_loop.md` ao seu stack.
 
+## Múltiplos perfis
+
+Exemplos mínimos em `config/perfis/` (`junior-backend.example.json`,
+`estagio-qa.example.json` — estrutura: `nome_perfil`, `termos[]`,
+`pular_tipos[]`, `nivel`):
+
+```bash
+cp config/perfis/junior-backend.example.json bot/perfil.json  # ou estagio-qa
+# edite termos/pular_tipos; os termos alimentam a seção TERMOS do prompt_loop
+```
+
+Aponte o perfil no loop via `$BOT_PERFIL` (caminho do JSON do perfil ativo).
+**Modo atual: manual** — `bot/loop.sh`/`bot/loop.ps1` NÃO leram `$BOT_PERFIL`
+automaticamente (lógica intacta por segurança); antes de cada rodada, copie o
+exemplo desejado para `bot/perfil.json` e confira `termos`/`pular_tipos`.
+
 ## 3. Chaves de API (fora do repo)
 
 ### Linux

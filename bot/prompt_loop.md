@@ -146,6 +146,12 @@ c-LinkedIn) LINKEDIN NO TODO (não só "Candidatura Simplificada"):
      o browser bloqueia — registre e siga, não insista.
    - Aplique as mesmas regras 1/3/4 e o PRÉ-FILTRO da listagem, igual aos outros sites.
 
+c2) TWO-TIER (opcional): para economizar quota do modelo forte, rode antes a
+   triagem barata de bot/prompt_triage.md: cole a listagem (cards/HTML) no
+   modelo barato, pegue o JSON {avaliar:[...]} de volta e abra SÓ os itens
+   "sim"/"talvez" (~10, ≤14 dias) com este prompt no modelo forte. O "nao"
+   soma em descartes_listagem, nunca em bloqueados.
+
 d) Anexe com o input file oculto via CDP quando necessário (input[name=Filedata] no Gmail).
 
 e) Registre CADA candidatura enviada em aplicadas.json -> aplicadas com estes campos:

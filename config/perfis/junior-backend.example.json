@@ -1,0 +1,12 @@
+{
+  "_COMO_USAR": "Exemplo de perfil. Copie para bot/perfil.json e ajuste termos/pular_tipos ao SEU stack. Este arquivo de exemplo NUNCA vai ao git com dados reais.",
+  "nome_perfil": "junior-backend-exemplo",
+  "nivel": "junior",
+  "termos": [
+    "desenvolvedor backend junior",
+    "backend junior remoto",
+    "desenvolvedor fullstack junior",
+    "trainee desenvolvedor remoto"
+  ],
+  "pular_tipos": ["ciência de dados", "BI", "design/UX", "ERP/funcional", "exclusiva PCD"]
+}
