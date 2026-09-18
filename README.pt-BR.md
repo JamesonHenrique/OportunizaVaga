@@ -1,4 +1,4 @@
-> 🇬🇧 English version: [README.md](README.md).
+> 🌐 Idiomas: 🇬🇧 [English](README.md) · 🇧🇷 Português · 🇪🇸 [Español](README.es.md)
 
 # OportunizaVaga 🤖🇧🇷
 
@@ -21,6 +21,19 @@ rodando no seu próprio PC a **custo zero** (modelos de IA gratuitos + sites de 
 > Gupy, Indeed e outros portais. Este código é publicado para estudo e automação pessoal;
 > **você assume o risco de bloqueio/suspensão das suas contas** ao usá-lo. Os autores não
 > se responsabilizam por contas suspensas, vagas perdidas ou qualquer dano decorrente do uso.
+> Leia [`docs/USO-ETICO.md`](docs/USO-ETICO.md) antes de escalar o uso.
+
+## Demo
+
+<!-- TODO(demo): trocar pelo GIF real. Grave ≤30s (asciinema/GIF) de uma rodada +
+     o monitor ao vivo, salve em assets/demo.gif e troque o placeholder abaixo.
+     É a maior alavanca de alcance do projeto — ver ROADMAP.md. -->
+<p align="center">
+  <img src="assets/demo.gif" alt="OportunizaVaga em ação: uma rodada + o monitor ao vivo" width="820">
+  <br><em>▶️ Demo (GIF em breve). Por ora: <code>./bot/dry-run.sh</code> mostra uma rodada simulada sem aplicar em nada.</em>
+</p>
+
+> 🔴 **Demo ao vivo** (monitor com dados fake): _em breve_ — ver [`monitor/README.md`](monitor/README.md).
 
 ## Como funciona
 
@@ -96,7 +109,7 @@ oportunizavaga/
 ```bash
 git clone <sua-fork> oportunizavaga && cd oportunizavaga
 ./scripts/setup.sh          # copia exemplos, valida deps, imprime crontab
-# preencha bot/dados_candidato.json com SEUS dados (nunca commite!)
+./scripts/setup-wizard.sh   # preenche bot/dados_candidato.json por perguntas (nunca commite!)
 ./browser/chrome-real.sh &  # login 1x nos sites
 ./bot/loop.sh               # teste 1 rodada (Ctrl+C após o primeiro "ok")
 crontab -e                  # cole config/crontab.example
@@ -107,7 +120,7 @@ crontab -e                  # cole config/crontab.example
 ```powershell
 git clone <sua-fork> oportunizavaga; cd oportunizavaga
 powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
-# preencha bot\dados_candidato.json com SEUS dados (nunca commite!)
+powershell -ExecutionPolicy Bypass -File scripts\setup-wizard.ps1  # preenche dados por perguntas (nunca commite!)
 powershell -ExecutionPolicy Bypass -File browser\chrome-real.ps1  # login 1x nos sites
 powershell -ExecutionPolicy Bypass -File bot\loop.ps1             # teste 1 rodada (Ctrl+C após o primeiro "ok")
 # agende com os comandos em config\TaskScheduler.md (equivale ao crontab.example)
@@ -134,7 +147,10 @@ rode `./scripts/sanitize.sh`. Vazou secret? **Rotacione imediatamente** no prove
 | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | do zero à primeira rodada em ~20 min |
 | [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) | diagrama, componentes, decisões-chave |
 | [`docs/CUSTO.md`](docs/CUSTO.md) | por que custa R$ 0 + a escada de modelos |
+| [`docs/MODELOS.md`](docs/MODELOS.md) | provider-agnóstico + 100% local (Ollama) |
+| [`docs/ADAPTERS.md`](docs/ADAPTERS.md) | adicionar um portal de vagas (jeito mais fácil de contribuir) |
 | [`docs/SEGURANCA.md`](docs/SEGURANCA.md) | segredos, gitignore, pre-commit, se vazar |
+| [`docs/USO-ETICO.md`](docs/USO-ETICO.md) | uso responsável, pacing, privacidade |
 | [`docs/FAQ.md`](docs/FAQ.md) | permissão dos portais, quota, locks, novos sites |
 | [`docs/PROMPTS.md`](docs/PROMPTS.md) | como adaptar stack, termos e filtros ao seu perfil |
 
