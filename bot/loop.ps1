@@ -77,12 +77,15 @@ if (Test-Path $CronEnv) {
     }
 }
 
-$RUN_TIMEOUT_SEC = 1200   # 20m, igual ao RUN_TIMEOUT="20m" do loop.sh
-$RETRY_BASE = 300         # backoff exponencial: 5min, 10min, 20min, teto 30min
-$RETRY_MAX = 1800
+# Ritmo (pacing) — configuravel por env (defaults preservam o comportamento).
+# Ver docs/USO-ETICO.md e config/pacing.example.env.
+function EnvInt($name, $def) { if ($env:$name) { return [int]$env:$name } else { return $def } }
+$RUN_TIMEOUT_SEC = EnvInt 'OV_RUN_TIMEOUT_SEC' 1200   # 20m, igual ao RUN_TIMEOUT do loop.sh
+$RETRY_BASE = EnvInt 'OV_RETRY_BASE' 300              # backoff exponencial: 5min, 10min, 20min, teto 30min
+$RETRY_MAX = EnvInt 'OV_RETRY_MAX' 1800
 $QUOTA_STEPS = @(900, 1800, 3600)  # quota: 15min -> 30min -> 1h, reseta ao dar certo
-$NORMAL_WAIT = 1200       # sleep base apos rodada ok (20min)
-$VAZIA_BASE = 3600        # backoff por rodada sem vaga nova: 1h na primeira
+$NORMAL_WAIT = EnvInt 'OV_NORMAL_WAIT' 1200           # sleep base apos rodada ok (20min)
+$VAZIA_BASE = EnvInt 'OV_VAZIA_BASE' 3600             # backoff por rodada sem vaga nova: 1h na primeira
 $MONITOR_URL = $env:MONITOR_URL
 if ([string]::IsNullOrWhiteSpace($MONITOR_URL)) { $MONITOR_URL = 'https://sua-url.vercel.app' }
 $LOG_MAX_BYTES = 2097152 # 2MB -> rotaciona

@@ -1,0 +1,22 @@
+name: gitleaks
+
+# Varredura de segredos no diff dos PRs e no histórico (push). Complementa o
+# scripts/sanitize.sh (que roda local/pré-commit) com verificação obrigatória no CI.
+# Config e allowlist de placeholders do projeto: .gitleaks.toml
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # histórico completo para a varredura em push
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          # Repositório público: gratuito, sem licença necessária.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
