@@ -24,7 +24,7 @@ jobs:
         with:
           scandir: .
           severity: error
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - name: node --check (monitor/*.mjs)
@@ -62,7 +62,7 @@ jobs:
           $issues = Invoke-ScriptAnalyzer -Path . -Recurse -IncludeRule 'PS*' -Severity Error
           if ($issues) { $issues | Format-Table -AutoSize; exit 1 }
           Write-Host 'PSScriptAnalyzer: nenhum erro.'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - name: node --check (monitor/*.mjs)
