@@ -24,12 +24,15 @@ NODE_BIN="$HOME/.local/share/fnm/aliases/default/bin/node"
 # Arquivo 600, so nesta maquina, nunca commitado nem publicado.
 [ -f "$HOME/.config/opencode/cron.env" ] && set -a && . "$HOME/.config/opencode/cron.env" && set +a
 
-RUN_TIMEOUT="20m"
-RETRY_BASE=300          # backoff exponencial: 5min, 10min, 20min, teto 30min
-RETRY_MAX=1800
+# Ritmo (pacing) — configuravel por env para uso mais "humano"/conservador.
+# Defaults preservam o comportamento historico. Ver docs/USO-ETICO.md e
+# config/pacing.example.env. Aumentar estes valores = menos requisicoes/hora.
+RUN_TIMEOUT="${OV_RUN_TIMEOUT:-20m}"
+RETRY_BASE="${OV_RETRY_BASE:-300}"          # backoff exponencial: 5min, 10min, 20min, teto 30min
+RETRY_MAX="${OV_RETRY_MAX:-1800}"
 QUOTA_STEPS=(900 1800 3600)   # quota: 15min -> 30min -> 1h, reseta ao dar certo
-NORMAL_WAIT=1200         # sleep base apos rodada ok (20min)
-VAZIA_BASE=3600           # backoff por rodada sem vaga nova: 1h na primeira
+NORMAL_WAIT="${OV_NORMAL_WAIT:-1200}"         # sleep base apos rodada ok (20min)
+VAZIA_BASE="${OV_VAZIA_BASE:-3600}"           # backoff por rodada sem vaga nova: 1h na primeira
 # Cadeia de modelos GRATUITOS, em ordem de preferencia. Toda rodada comeca pelo
 # primeiro: por isso a volta ao preferido e automatica quando o limite dele passa,
 # sem precisar detectar recuperacao nem guardar estado.

@@ -1,0 +1,22 @@
+# Config do gitleaks — estende as regras padrão e libera os placeholders oficiais
+# do projeto (os mesmos aceitos por scripts/sanitize.sh). Segredo real = comprometido.
+title = "OportunizaVaga gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders e arquivos de exemplo do projeto (nunca contêm segredo real)"
+paths = [
+  '''examples/.*\.example\.json''',
+  '''config/.*\.example\..*''',
+  '''config/pacing\.example\.env''',
+  '''docs/SEGURANCA\.md''',
+  '''scripts/sanitize\.sh''',
+]
+regexes = [
+  '''seu-email@example\.com''',
+  '''SEU_[A-Z_]+''',
+  '''SUA_[A-Z_]+''',
+  '''sua-url\.vercel\.app''',
+]
