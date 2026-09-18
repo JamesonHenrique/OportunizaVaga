@@ -37,6 +37,12 @@ jobs:
           python3 -m json.tool monitor/vercel.json > /dev/null
           python3 -m json.tool examples/dados_candidato.example.json > /dev/null
           python3 -m json.tool examples/aplicadas.example.json > /dev/null
+      - name: validate (schemas + novos .sh)
+        run: |
+          bash -n bot/dry-run.sh
+          bash -n bot/doctor.sh
+          bash -n scripts/validate.sh
+          bash scripts/validate.sh
       - name: sanitize (sem segredos/dados pessoais)
         run: ./scripts/sanitize.sh
 
@@ -65,6 +71,10 @@ jobs:
           Get-ChildItem config/sites_permitidos.json, monitor/package.json, monitor/vercel.json, examples/*.example.json | ForEach-Object {
             Get-Content $_.FullName -Raw | ConvertFrom-Json | Out-Null
           }
+      - name: validate (schemas)
+        shell: pwsh
+        run: |
+          .\scripts\validate.ps1
       - name: sanitize via git-bash
         shell: bash
         run: ./scripts/sanitize.sh

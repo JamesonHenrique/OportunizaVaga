@@ -128,3 +128,38 @@ export MONITOR_URL=https://sua-url.vercel.app
 ```
 
 Sem `MONITOR_URL`, o bot funciona normalmente — só não publica status.
+
+## Teste sem risco (dry-run)
+
+Antes de ligar o loop real, simule UMA rodada sem se candidatar (só lê
+arquivos — não abre browser, não aplica em nada):
+
+```bash
+./bot/dry-run.sh           # resumo humano do que a rodada faria
+./bot/dry-run.sh --json    # saída máquina (site, termos, limite 3, modelo)
+```
+
+Windows (PowerShell nativo):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1
+powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1 --json
+```
+
+## Diagnosticando (doctor)
+
+Checklist de ambiente com dicas de correção por item (saída colável em issue):
+
+```bash
+./bot/doctor.sh
+```
+
+Windows (PowerShell nativo):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File bot\doctor.ps1
+```
+
+Exit 0 = essencial ok (`[??]` são só avisos); exit 1 = falta algo essencial
+(veja os itens `[FALHA]`). Validação fina dos JSONs contra os schemas em
+`config/`: `bash scripts/validate.sh` (ou `scripts\validate.ps1`).

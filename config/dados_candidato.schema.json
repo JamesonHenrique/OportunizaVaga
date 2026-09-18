@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/oportunizavaga/dados_candidato.schema.json",
+  "title": "Dados do candidato",
+  "description": "Estrutura de bot/dados_candidato.json (derivado de examples/dados_candidato.example.json). Somente tipos e chaves — nenhum valor pessoal.",
+  "type": "object",
+  "required": ["nome", "email", "telefone", "linkedin", "local"],
+  "properties": {
+    "_COMO_USAR": { "type": "string" },
+    "nome": { "type": "string", "minLength": 1 },
+    "email": { "type": "string", "format": "email" },
+    "telefone": { "type": "string", "minLength": 1 },
+    "linkedin": { "type": "string", "format": "uri" },
+    "github": { "type": "string" },
+    "instagram": { "type": "string" },
+    "facebook": { "type": "string" },
+    "local": { "type": "string", "minLength": 1 },
+    "endereco": { "type": "string" },
+    "formacao": { "type": "string" },
+    "idiomas": { "type": "string" },
+    "resumo": { "type": "string" },
+    "objetivo": { "type": "string" },
+    "palavras_chave_ats": { "type": "array", "items": { "type": "string" } },
+    "contas": {
+      "type": "object",
+      "properties": {
+        "gupy": { "type": "string" },
+        "gmail": { "type": "string" },
+        "linkedin": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "disponibilidade": {
+      "type": "object",
+      "properties": {
+        "inicio": { "type": "string" },
+        "tipo_contrato": { "type": "array", "items": { "type": "string" } },
+        "jornada": { "type": "string" },
+        "modalidade": { "type": "string", "enum": ["remoto", "hibrido", "híbrido", "presencial", ""] },
+        "viagens": { "type": "string", "enum": ["sim", "não", "nao", ""] },
+        "observacao": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "experiencia": {
+      "type": "object",
+      "properties": {
+        "cargo_atual": { "type": "string" },
+        "empresa_atual": { "type": "string" },
+        "tecnologias": { "type": "array", "items": { "type": "string" } },
+        "stacks_similares_jr": { "type": "array", "items": { "type": "string" } },
+        "projetos_relevantes": { "type": "string" },
+        "certificacoes": { "type": "string" },
+        "portfolio": { "type": "string" },
+        "inicio_cargo_atual": { "type": "string" },
+        "anos": { "type": "string" },
+        "regra_tempo_experiencia": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "documentos": {
+      "type": "object",
+      "properties": {
+        "cpf": { "type": "string" },
+        "rg": { "type": "string" },
+        "cnh": { "type": "string" },
+        "pis": { "type": "string" },
+        "observacao": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "preferencias": {
+      "type": "object",
+      "properties": {
+        "salario": { "type": "string" },
+        "cidade": { "type": "string" },
+        "modalidade": { "type": "string" },
+        "horario": { "type": "string" },
+        "beneficios": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "respostas_padrao_gupy": {
+      "type": "object",
+      "properties": {
+        "nome_mae": { "type": "string" },
+        "estado_civil": { "type": "string" },
+        "pretensao_regra": { "type": "string" },
+        "data_nascimento": { "type": "string" },
+        "sexo": { "type": "string" },
+        "deficiencia": { "type": "string", "enum": ["sim", "não", "nao", ""] },
+        "pretensao_base": { "type": "number" },
+        "equipamento_proprio": { "type": "string", "enum": ["sim", "não", "nao", ""] },
+        "remuneracao_atual": { "type": "string" },
+        "beneficios": { "type": "string" },
+        "pretensao": { "type": "string" },
+        "indicacao": { "type": "string", "enum": ["sim", "não", "nao", ""] },
+        "trabalha_na_empresa": { "type": "string", "enum": ["sim", "não", "nao", ""] },
+        "cr_grade": { "type": "string" },
+        "area_interesse": { "type": "string" },
+        "nivel_candidato": { "type": "string" },
+        "frase_transferencia": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "situacao_profissional": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["empregado", "desempregado", "freelancer", "estudante", ""] },
+        "nivel": { "type": "string" },
+        "aceita_estagio": { "type": "string", "enum": ["sim", "não", "nao", ""] },
+        "aceita_junior": { "type": "string", "enum": ["sim", "não", "nao", ""] },
+        "aceita_pleno": { "type": "string", "enum": ["sim", "não", "nao", ""] },
+        "observacao": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

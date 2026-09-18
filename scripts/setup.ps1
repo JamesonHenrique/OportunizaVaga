@@ -92,5 +92,10 @@ Write-Host ('  schtasks /Create /TN "OportunizaVaga\Followup" /TR "powershell -E
 Write-Host ''
 Write-Host '  Guia completo em config\TaskScheduler.md (equivale ao config\crontab.example).'
 Write-Host ''
+Write-Host '-- 5) Validacao contra schemas (scripts\validate.ps1) --'
+& (Join-Path $BOT_ROOT 'scripts\validate.ps1')
+if ($LASTEXITCODE -eq 0) { Write-Ok 'JSONs conferem com os schemas em config/.' }
+else { Write-Bad 'validate.ps1 falhou (veja acima) — corrija antes de rodar o loop.'; $HAVE_ALL = $false }
+Write-Host ''
 if ($HAVE_ALL) { Write-Host 'Setup pronto. Proximo passo: docs/QUICKSTART.md (aba Windows).' }
 else { Write-Host 'Resolva os itens [!!] acima e rode de novo.' }

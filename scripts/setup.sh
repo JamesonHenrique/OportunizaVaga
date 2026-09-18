@@ -59,4 +59,12 @@ echo "   TZ=${BOT_TZ:-America/Sao_Paulo}"
 echo "   BOT_DIR=$BOT_ROOT"
 sed "s|\$HOME/opensource/oportunizavaga|$BOT_ROOT|; s|^TZ=.*|TZ=${BOT_TZ:-America/Sao_Paulo}|; s|^BOT_DIR=.*|BOT_DIR=$BOT_ROOT|" config/crontab.example
 echo
+echo "-- 6) Validação contra schemas (scripts/validate.sh) --"
+if bash scripts/validate.sh; then
+  ok "JSONs conferem com os schemas em config/."
+else
+  warn "validate.sh falhou (veja acima) — corrija antes de rodar o loop."
+  HAVE_ALL=0
+fi
+echo
 [ "$HAVE_ALL" -eq 1 ] && echo "Setup pronto. Próximo passo: docs/QUICKSTART.md" || echo "Resolva os itens [!!] acima e rode de novo."

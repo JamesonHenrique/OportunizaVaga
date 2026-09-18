@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/oportunizavaga/aplicadas.schema.json",
+  "title": "Estado do robo (aplicadas)",
+  "description": "Estrutura de bot/aplicadas.json (derivado de examples/aplicadas.example.json). Estado duravel entre rodadas. Somente tipos e chaves.",
+  "type": "object",
+  "required": ["aplicadas", "rodizio"],
+  "properties": {
+    "_COMO_USAR": { "type": "string" },
+    "aplicadas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["chave", "empresa", "vaga"],
+        "properties": {
+          "chave": { "type": "string" },
+          "empresa": { "type": "string" },
+          "vaga": { "type": "string" },
+          "remota": { "type": "boolean" },
+          "como": { "type": "string" },
+          "cv": { "type": "string" },
+          "data": { "type": "string" },
+          "enviada_em": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "bloqueados": { "type": "object" },
+    "bloqueados_arquivados": { "type": "object" },
+    "contas_criadas": { "type": "object" },
+    "descartes_listagem": {
+      "type": "object",
+      "properties": {
+        "nivel": { "type": "number" },
+        "modelo": { "type": "number" },
+        "stack": { "type": "number" },
+        "total": { "type": "number" }
+      },
+      "additionalProperties": true
+    },
+    "descartes_listagem_total": { "type": "number" },
+    "rodizio": {
+      "type": "object",
+      "required": ["proximo"],
+      "properties": {
+        "ordem": { "type": "array", "items": { "type": "string" } },
+        "proximo": { "type": "string", "minLength": 1 },
+        "ultima_rodada": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "pular_empresas": { "type": "array", "items": { "type": "string" } },
+    "pular_tipos": { "type": "array", "items": { "type": "string" } },
+    "somente_remotas": { "type": "boolean" },
+    "manutencao_gupy": { "type": "object" }
+  },
+  "additionalProperties": true
+}
