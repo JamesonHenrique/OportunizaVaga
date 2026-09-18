@@ -1,12 +1,17 @@
-# tests/validate.Tests.ps1 — espelho Pester (PowerShell 5.1+) de tests/test_validate.sh.
+# tests/validate.Tests.ps1 — espelho Pester (v5) de tests/test_validate.sh.
 # Cobre: scripts/validate.ps1 (exit 0 nos validos, exit !=0 nos invalidos)
 # e bot/dry-run.ps1 -json (saida parseavel com ok == true).
 # Uso (Windows): Invoke-Pester -Path tests/validate.Tests.ps1 -Output Detailed
 # Nao executa nada destrutivo: fixtures invalidas sao copiadas por cima dos
 # exemplos e restauradas em finally. Nao commite bot/*.json (dados locais).
+#
+# Pester v5 separa Discovery de Run: variaveis de caminho tem que ser definidas
+# em BeforeAll (fase Run), senao chegam $null dentro dos It.
 
-$RepoRoot = Split-Path -Parent $PSScriptRoot
-$FixDir = Join-Path $PSScriptRoot 'fixtures'
+BeforeAll {
+    $script:RepoRoot = Split-Path -Parent $PSScriptRoot
+    $script:FixDir = Join-Path $PSScriptRoot 'fixtures'
+}
 
 Describe 'validate.ps1' {
     Context 'exemplos validos' {
