@@ -30,3 +30,14 @@ node --check monitor/*.mjs
 
 Descreva o quê mudou e o porquê, marque se testou 1 rodada manual, confirme
 `sanitize.sh` verde. Sem dado pessoal nem segredo no diff — o revisor vai checar.
+
+## Templates, CoC e Security
+
+- Issues: use os forms em `.github/ISSUE_TEMPLATE/` (`bug_report.yml`,
+  `feature_request.yml`) — informe ambiente (Linux/Windows/WSL2) e cole só
+  logs sanitizados, sem dados pessoais.
+- PRs: siga `.github/pull_request_template.md` (checklist: `sanitize.sh`,
+  sem segredos, CI, docs, dry-run de 1 rodada se mexeu no bot).
+- Conduta: respeite o `CODE_OF_CONDUCT.md` (Contributor Covenant v2.1).
+- Segurança: nunca abra issue pública para vulnerabilidade — reporte conforme
+  o `SECURITY.md` e leia `docs/SEGURANCA.md` antes do primeiro commit.

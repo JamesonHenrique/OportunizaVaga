@@ -1,0 +1,60 @@
+name: Feature request
+description: Suggest an idea for this project
+title: "[feat]: "
+labels: ["enhancement"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! **Never include personal data or secrets** in your
+        proposal — use placeholders (`SEU_NOME`, `seu-email@example.com`).
+  - type: dropdown
+    id: os
+    attributes:
+      label: Environment / Ambiente
+      description: Which platform should this feature target?
+      options:
+        - Both (Linux + Windows)
+        - Linux only (bash/cron)
+        - Windows only (PowerShell/Task Scheduler)
+        - monitor/ (Vercel panel)
+        - docs only
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Problema
+      description: What problem does this solve? Who benefits?
+      placeholder: "As a job seeker running the bot, I want ... so that ..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution / Solucao proposta
+      description: Describe the change, affected components, and alternatives considered.
+      placeholder: |
+        Change bot/loop.sh to ...
+        Alternative: ...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context / logs
+      description: Sanitized logs or examples only — remove personal data first.
+      placeholder: "Optional redacted logs or links."
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Hygiene confirmation
+      options:
+        - label: I removed all personal data and secrets from this request
+        - label: I checked docs/FAQ.md for existing answers
+    validations:
+      required: true

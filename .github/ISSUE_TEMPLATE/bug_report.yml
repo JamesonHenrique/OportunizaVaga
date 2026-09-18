@@ -1,0 +1,78 @@
+name: Bug report
+description: Report a reproducible problem
+title: "[bug]: "
+labels: ["bug"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Never include personal data or secrets** (real CVs,
+        credentials, tokens, CPF, addresses). Sanitize logs first — see `docs/SEGURANCA.md`.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Environment / Ambiente
+      options:
+        - Linux (bash, cron)
+        - Windows PowerShell native (.ps1, Task Scheduler)
+        - Windows WSL2 (bash via WSL2, recommended)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: Tag or commit SHA you tested on.
+      placeholder: "e.g. 0.1.0 or abc1234"
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      multiple: false
+      options:
+        - bot/loop (application round)
+        - bot/guardiao (supervisor/cron)
+        - bot/followup (weekly status)
+        - browser/chrome-real (CDP)
+        - monitor/ (Vercel panel)
+        - scripts/setup or sanitize
+        - config (sites, crontab, TaskScheduler)
+        - docs
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / Passos para reproduzir
+      description: Numbered steps, expected vs actual behavior.
+      placeholder: |
+        1. Ran `./scripts/setup.sh` ...
+        2. Then `./bot/loop.sh` ...
+        Expected: one round completes.
+        Actual: exits with ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Paste REDACTED logs only. Remove names, emails, tokens, paths like $HOME, CPF/CEP, salary values.
+      placeholder: |
+        Paste output of the failing step here, AFTER replacing personal data
+        with SEU_NOME / seu-email@example.com / SUA_EMPRESA.
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Hygiene confirmation
+      options:
+        - label: I ran `./scripts/sanitize.sh` and it passes on my checkout
+        - label: I removed all personal data and secrets from this report
+    validations:
+      required: true

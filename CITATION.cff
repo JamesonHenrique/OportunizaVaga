@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+title: OportunizaVaga
+message: "If you use this software, please cite it as below."
+type: software
+license: MIT
+repository-code: "https://github.com/JamesonHenrique/OportunizaVaga"
+url: "https://github.com/JamesonHenrique/OportunizaVaga"
+abstract: "Open-source bot for automatic applications to junior/trainee remote jobs in Brazil, running on your own PC at zero cost."
+keywords:
+  - jobs
+  - automation
+  - brazil
+  - junior
+  - remote
+authors:
+  - family-names: SEU_SOBRENOME
+    given-names: SEU_NOME
+    email: seu-email@example.com
+version: 0.1.0
+date-released: 2026-09-01
