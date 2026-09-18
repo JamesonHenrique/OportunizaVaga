@@ -2,7 +2,7 @@
   "_COMO_USAR": "Fixture de teste: dados_candidato VALIDO (minimo exigido pelo schema). Nunca commitar dados reais.",
   "nome": "Candidata Exemplo",
   "email": "candidata@example.com",
-  "telefone": "+55 (84) 90000-0000",
+  "telefone": "+55 (00) 90000-0000",
   "linkedin": "https://www.linkedin.com/in/candidata-exemplo",
   "local": "Natal/RN"
 }

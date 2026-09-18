@@ -20,7 +20,9 @@ PATTERNS=(
 ALLOW='seu-email@example\.com|SEU_|SUA_|SUA-EMPRESA|<sua-empresa>|sua-url\.vercel\.app|\$HOME|\${BOT_ROOT}|\$BOT_ROOT|\$HOME/opensource|00000-0000|\(00\)|OPENROUTER_API_KEY=\(\.\+\)'
 
 FAILS=0
-TARGETS=$(git ls-files 2>/dev/null | grep -v -E '^(scripts/sanitize\.sh|docs/SEGURANCA\.md)$' || true)
+# Exclui do scan: o próprio scanner, docs que documentam padrões e os arquivos de
+# governança que trazem o contato PÚBLICO do mantenedor (CoC/Security) — de propósito.
+TARGETS=$(git ls-files 2>/dev/null | grep -v -E '^(scripts/sanitize\.sh|docs/SEGURANCA\.md|CODE_OF_CONDUCT\.md|SECURITY\.md)$' || true)
 [ -z "$TARGETS" ] && { echo "nada tracked — verificando árvore (sem gitignored)..."; TARGETS=$(git ls-files --others --cached --exclude-standard); }
 for pat in "${PATTERNS[@]}"; do
   HITS=$(echo "$TARGETS" | xargs -r grep -nE "$pat" 2>/dev/null | grep -vE "$ALLOW" || true)

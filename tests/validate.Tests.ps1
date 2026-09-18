@@ -12,7 +12,7 @@ Describe 'validate.ps1' {
     Context 'exemplos validos' {
         It 'exit 0 com os exemplos do repo' {
             & (Join-Path $RepoRoot 'scripts\validate.ps1')
-            $LASTEXITCODE | Should Be 0
+            $LASTEXITCODE | Should -Be 0
         }
     }
 
@@ -25,7 +25,7 @@ Describe 'validate.ps1' {
                 Copy-Item $alvo $bak -Force
                 Copy-Item $fix $alvo -Force
                 & (Join-Path $RepoRoot 'scripts\validate.ps1')
-                $LASTEXITCODE | Should Not Be 0
+                $LASTEXITCODE | Should -Not -Be 0
             }
             finally {
                 Copy-Item $bak $alvo -Force
@@ -41,7 +41,7 @@ Describe 'validate.ps1' {
                 Copy-Item $alvo $bak -Force
                 Copy-Item $fix $alvo -Force
                 & (Join-Path $RepoRoot 'scripts\validate.ps1')
-                $LASTEXITCODE | Should Not Be 0
+                $LASTEXITCODE | Should -Not -Be 0
             }
             finally {
                 Copy-Item $bak $alvo -Force
@@ -54,9 +54,9 @@ Describe 'validate.ps1' {
 Describe 'dry-run.ps1' {
     It '--json sai parseavel com ok true' {
         $saida = & (Join-Path $RepoRoot 'bot\dry-run.ps1') -json
-        $LASTEXITCODE | Should Be 0
+        $LASTEXITCODE | Should -Be 0
         $obj = ($saida | Out-String) | ConvertFrom-Json
-        $obj.ok | Should Be $true
-        $obj.dry_run | Should Be $true
+        $obj.ok | Should -Be $true
+        $obj.dry_run | Should -Be $true
     }
 }
