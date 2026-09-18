@@ -43,6 +43,10 @@ jobs:
           bash -n bot/doctor.sh
           bash -n scripts/validate.sh
           bash scripts/validate.sh
+      - name: suite bash (TAP)
+        run: bash tests/test_validate.sh
+      - name: node --test monitor/
+        run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)
         run: ./scripts/sanitize.sh
 
@@ -75,6 +79,11 @@ jobs:
         shell: pwsh
         run: |
           .\scripts\validate.ps1
+      - name: Pester (tests/validate.Tests.ps1)
+        shell: pwsh
+        run: |
+          $r = Invoke-Pester -Path ./tests/validate.Tests.ps1 -PassThru
+          if ($r.FailedCount -gt 0) { exit 1 }
       - name: sanitize via git-bash
         shell: bash
         run: ./scripts/sanitize.sh

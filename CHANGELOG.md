@@ -7,9 +7,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [0.1.0] - 2026-09-18
 ### Added
-- Renomeação / reestruturação open-source genérica (AplicaBot → OportunizaVaga).
-- Espelhos PowerShell (.ps1) + Task Scheduler como alternativa ao cron (WSL2 segue recomendado).
+- (A) Saúde comunitária: SECURITY, CODE_OF_CONDUCT, CONTRIBUTING, templates de issue/PR, FUNDING, CITATION.
+- (B) Validação por JSON Schema + dry-run/doctor (sh/ps1) integrados ao setup e ao CI.
+- (C) Onboarding global em inglês, instalador one-command, Dockerfile/devcontainer/compose demo.
+- (D) Adaptadores de sites, triagem two-tier, digest/funil, perfis de exemplo, prompts EN.
+- (E) Qualidade: suites TAP/Pester/node:test, CI com testes nos 2 OS, Dependabot mensal, docs/TESTES.md.
+- Renomeação open-source genérica (AplicaBot → OportunizaVaga) + espelhos PowerShell/Task Scheduler.
 - Painel monitor opcional (Vercel free, sem banco) + daemons de quota/keepalive.
-- Docs iniciais: QUICKSTART, ARQUITETURA, CUSTO, SEGURANCA, FAQ, PROMPTS + sanitize.sh.
+- Docs: QUICKSTART, ARQUITETURA, CUSTO, SEGURANCA, FAQ, PROMPTS + sanitize.sh.
 ### Notes / Notas
-- Estado atual: loop/guardiao/follow-up funcionais; saúde comunitária (Parte A) em progresso.
+- Pronto para tag v0.1.0: loop/guardião/follow-up funcionais; tag/release ainda não criadas.

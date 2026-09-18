@@ -1,0 +1,7 @@
+{
+  "_COMO_USAR": "Fixture de teste: dados_candidato INVALIDO (falta 'email', chave obrigatoria). validate.sh deve falhar.",
+  "nome": "Candidata Exemplo",
+  "telefone": "+55 (84) 90000-0000",
+  "linkedin": "https://www.linkedin.com/in/candidata-exemplo",
+  "local": "Natal/RN"
+}

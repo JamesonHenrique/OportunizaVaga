@@ -1,0 +1,11 @@
+# Dependabot — mantem dependencias e actions atualizadas (mensal).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /monitor
+    schedule:
+      interval: monthly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

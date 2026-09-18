@@ -1,0 +1,11 @@
+{
+  "_COMO_USAR": "Fixture de teste: aplicadas VALIDA (minimo exigido pelo schema).",
+  "aplicadas": [],
+  "bloqueados": {},
+  "descartes_listagem": { "nivel": 0, "modelo": 0, "stack": 0, "total": 0 },
+  "rodizio": {
+    "ordem": ["indeed", "linkedin", "gupy"],
+    "proximo": "indeed",
+    "ultima_rodada": ""
+  }
+}
