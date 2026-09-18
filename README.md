@@ -1,5 +1,9 @@
 # OportunizaVaga 🤖🇧🇷
 
+<p align="center">
+  <img src="assets/logo.svg" alt="OportunizaVaga logo" width="480">
+</p>
+
 [![CI](https://img.shields.io/github/actions/workflow/status/JamesonHenrique/OportunizaVaga/ci.yml?branch=main&label=CI)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux%7CWindows%7CWSL2-blue.svg)](docs/QUICKSTART.md)
