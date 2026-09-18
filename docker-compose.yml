@@ -1,0 +1,19 @@
+# Demo with sample data — never mounts your real bot/ directory.
+# The container copies examples/aplicadas.example.json to the expected
+# aplicadas.json name inside an ephemeral dir and serves the dashboard.
+services:
+  monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /work/monitor
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./examples:/demo:ro
+    environment:
+      CANDIDATURAS_ROOT: /tmp/demo
+    command: >
+      sh -c "mkdir -p /tmp/demo
+      && cp /demo/aplicadas.example.json /tmp/demo/aplicadas.json
+      && npm install && npm run dev"

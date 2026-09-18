@@ -24,6 +24,21 @@ MONITOR_URL=https://sua-url.vercel.app node publish-status.mjs
 
 Sem `MONITOR_URL`, o bot funciona normalmente — só não publica nada.
 
+## Rodando com Docker (demo)
+
+Demonstração com dados de exemplo — **nunca** monta seu `bot/` real:
+
+```bash
+docker compose up monitor   # http://localhost:3000
+```
+
+O serviço `monitor` (raiz: `docker-compose.yml`) usa a imagem do `Dockerfile`
+da raiz, monta só `examples/` como **read-only** (`/demo:ro`), copia
+`aplicadas.example.json` para o nome esperado (`aplicadas.json`) num diretório
+efêmero (`/tmp/demo`, via `CANDIDATURAS_ROOT`) e sobe `npm run dev`.
+Para dados reais, rode fora do Docker (`npm run dev` acima) apontando
+`CANDIDATURAS_ROOT` para o seu `bot/` local.
+
 ## Segurança
 
 O snapshot envia contadores, eventos e caudas de log — **nunca** documentos,

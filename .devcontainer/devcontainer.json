@@ -1,0 +1,16 @@
+{
+  "name": "OportunizaVaga",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": ".."
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.powershell",
+        "mads-hartmann.bash-ide-vscode"
+      ]
+    }
+  },
+  "remoteUser": "node"
+}

@@ -1,134 +1,131 @@
 # OportunizaVaga 🤖🇧🇷
 
+[![CI](https://img.shields.io/github/actions/workflow/status/JamesonHenrique/OportunizaVaga/ci.yml?branch=main&label=CI)](.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Shell](https://img.shields.io/badge/shell-bash-blue.svg)](bot/)
-[![Custo](https://img.shields.io/badge/custo-R%240%2Fm%C3%AAs-brightgreen.svg)](docs/CUSTO.md)
-[![Node](https://img.shields.io/badge/monitor-node%20%2B%20vercel-black.svg)](monitor/)
+[![Platform](https://img.shields.io/badge/platform-Linux%7CWindows%7CWSL2-blue.svg)](docs/QUICKSTART.md)
+[![Release](https://img.shields.io/github/v/release/JamesonHenrique/OportunizaVaga?label=release)](https://github.com/JamesonHenrique/OportunizaVaga/releases)
 
-Robô open-source de **candidaturas automáticas para vagas JR/trainee remotas no Brasil**,
-rodando no seu próprio PC a **custo zero** (modelos de IA gratuitos + sites de vaga BR).
+> 🇧🇷 Versão em português: [README.pt-BR.md](README.pt-BR.md).
 
-> ⚠️ **Aviso legal:** automatizar candidaturas pode violar os Termos de Uso de LinkedIn,
-> Gupy, Indeed e outros portais. Este código é publicado para estudo e automação pessoal;
-> **você assume o risco de bloqueio/suspensão das suas contas** ao usá-lo. Os autores não
-> se responsabilizam por contas suspensas, vagas perdidas ou qualquer dano decorrente do uso.
+Open-source bot that **auto-applies to junior/trainee remote jobs in Brazil**,
+running on your own PC at **zero cost** (free AI models + Brazilian job boards).
 
-## Como funciona
+> ⚠️ **Legal warning:** automating applications may violate the Terms of Use of
+> LinkedIn, Gupy, Indeed and other portals. This code is published for study and
+> personal automation; **you accept the risk of your accounts being blocked or
+> suspended** by using it. The authors are not liable for suspended accounts,
+> missed jobs, or any damage resulting from its use.
+
+## How it works
 
 ```
-cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ opencode run (modelo grátis)
+cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ opencode run (free model)
                                  │        │              │
-                                 │        │              └──▶ Chrome real (CDP :9222)
-                                 │        │                   1 site do rodízio por rodada
+                                 │        │              └──▶ Real Chrome (CDP :9222)
+                                 │        │                   1 site in rotation per round
                                  │        │                   (Indeed, LinkedIn, Gupy,
                                  │        │                    Programathor, GeekHunter…)
-                                 │        └──▶ estado em bot/aplicadas.json
-                                 │             (NUNCA na sessão do modelo)
-                                 └──▶ Chrome com CDP (sobe sozinho se cair)
+                                 │        └──▶ state in bot/aplicadas.json
+                                 │             (NEVER in the model session)
+                                 └──▶ Chrome over CDP (restarts on its own if it drops)
 ```
 
-- **1 site por rodada**, rodízio circular, dorme 20 min entre rodadas (backoff se vazio).
-- **Só JR/trainee + remoto + ≤14 dias** (tudo configurável no prompt).
-- **Nunca inventa dados:** tudo vem de `bot/dados_candidato.json`; o que falta vira
-  `bloqueado` com o motivo exato.
-- **Anti-ruído:** descarte de listagem vira contador, não polui bloqueios.
-- **Cascata de modelos gratuitos** (Zen → OpenRouter → NVIDIA → Groq → Cerebras → HF,
-  Copilot opcional): se um bater no rate limit, tenta o próximo — a volta ao preferido
-  é automática.
-- **Follow-up semanal** (segundas): recheca o status das vagas aplicadas.
-- **Monitor opcional** (`monitor/`): painel na Vercel free, sem banco.
+- **1 site per round**, circular rotation, 20 min sleep between rounds (backoff when empty).
+- **Junior/trainee + remote + ≤14 days only** (all configurable in the prompt).
+- **Never hallucinates data:** everything comes from `bot/dados_candidato.json`;
+  gaps become `bloqueado` entries with the exact reason.
+- **Noise-free:** listing discards become counters, never block entries.
+- **Free-model cascade** (Zen → OpenRouter → NVIDIA → Groq → Cerebras → HF,
+  optional Copilot): on rate limit it tries the next one — return to the
+  preferred model is automatic.
+- **Weekly follow-up** (Mondays): rechecks applied-job status.
+- **Optional monitor** (`monitor/`): free-tier dashboard, no database.
 
-## Estrutura
+## Quickstart (5 steps)
 
-```
-oportunizavaga/
-├── bot/
-│   ├── loop.sh                  # loop principal (1 rodada = 1 sessão nova do modelo)
-│   ├── loop.ps1                 # espelho Windows (PowerShell 5.1+, mesma lógica)
-│   ├── guardiao.sh              # supervisor via cron: loop + Chrome
-│   ├── guardiao.ps1             # espelho Windows (Task Scheduler)
-│   ├── followup.sh              # rotina semanal de status (só lê, nunca candidata)
-│   ├── followup.ps1             # espelho Windows
-│   ├── prompt_loop.md           # regras e passo a passo de cada rodada (o "cérebro")
-│   ├── prompt_followup.md       # prompt da rotina semanal
-│   └── prompt_perfil_gupy.md    # manutenção avulsa do perfil Gupy
-├── browser/
-│   ├── chrome-real.sh           # Chrome persistente com CDP :9222
-│   ├── chrome-real.ps1          # espelho Windows (perfil em %LOCALAPPDATA%)
-│   └── README.md
-├── config/
-│   ├── sites_permitidos.json    # allowlist de domínios BR (espelha o bloqueio do browser)
-│   ├── opencode.jsonc.example   # modelo do config do opencode (com a cascata de modelos)
-│   ├── crontab.example          # cron sugerido (guardiao, keepalive, follow-up)
-│   └── TaskScheduler.md         # equivalente Windows (schtasks prontos)
-├── monitor/                     # painel opcional (Vercel free, sem banco)
-│   ├── snapshot.mjs             # retrato a partir de bot/aplicadas.json + logs
-│   ├── publish-status.mjs       # heartbeat (daemon)
-│   ├── publish-once.mjs         # envio único por evento
-│   ├── quota-daemon.mjs         # cota diária OpenRouter :free
-│   ├── package.json / vercel.json / README.md
-├── scripts/
-│   ├── setup.sh / setup.ps1    # instalador interativo (Linux / Windows)
-│   ├── sanitize.sh              # varredura pré-commit de segredos/dados pessoais
-│   ├── monitor-keepalive.sh / .ps1  # mantém o publisher do painel no ar
-│   └── pull-monitor.sh / .ps1       # atualiza o painel via git pull
-├── examples/
-│   ├── dados_candidato.example.json  # COPIE p/ bot/dados_candidato.json e preencha
-│   └── aplicadas.example.json        # COPIE p/ bot/aplicadas.json (estado inicial)
-├── docs/                        # QUICKSTART, ARQUITETURA, CUSTO, SEGURANCA, FAQ, PROMPTS
-├── CONTRIBUTING.md / LICENSE (MIT)
-└── README.md
-```
-
-## Setup resumido
-
-### Linux
+### 1. Install
 
 ```bash
-git clone <sua-fork> oportunizavaga && cd oportunizavaga
-./scripts/setup.sh          # copia exemplos, valida deps, imprime crontab
-# preencha bot/dados_candidato.json com SEUS dados (nunca commite!)
-./browser/chrome-real.sh &  # login 1x nos sites
-./bot/loop.sh               # teste 1 rodada (Ctrl+C após o primeiro "ok")
-crontab -e                  # cole config/crontab.example
+curl -fsSL https://raw.githubusercontent.com/JamesonHenrique/OportunizaVaga/main/install.sh | bash
 ```
 
-### Windows (PowerShell nativo — alternativo; WSL2 recomendado)
+Windows (PowerShell):
 
 ```powershell
-git clone <sua-fork> oportunizavaga; cd oportunizavaga
-powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
-# preencha bot\dados_candidato.json com SEUS dados (nunca commite!)
-powershell -ExecutionPolicy Bypass -File browser\chrome-real.ps1  # login 1x nos sites
-powershell -ExecutionPolicy Bypass -File bot\loop.ps1             # teste 1 rodada (Ctrl+C após o primeiro "ok")
-# agende com os comandos em config\TaskScheduler.md (equivale ao crontab.example)
+irm https://raw.githubusercontent.com/JamesonHenrique/OportunizaVaga/main/install.ps1 | iex
 ```
 
-> **Windows:** WSL2 com o guia Linux é o caminho recomendado. O PowerShell nativo
-> funciona via espelhos `.ps1` (mesma lógica), com watchdog simplificado e carimbos
-> em hora local (-03:00 documentado) — veja `bot/loop.ps1` e `config/TaskScheduler.md`.
+Manual alternative: `git clone https://github.com/JamesonHenrique/OportunizaVaga oportunizavaga`
+(`scripts/setup.sh` on Linux, `scripts\setup.ps1` on Windows; WSL2 recommended).
+Full guide: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
 
-Guia completo: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
+### 2. Fill in YOUR data (never commit!)
 
-## Segurança — LEIA ANTES DE COMMITAR
+Setup copies `examples/` to `bot/dados_candidato.json` — edit it with your real
+info. **Empty field = the bot records "bloqueado" instead of inventing.**
+Adapt filters to your stack: [`docs/PROMPTS.md`](docs/PROMPTS.md).
 
-**Nunca** commite: `bot/dados_candidato.json`, `bot/aplicadas.json`, CVs em PDF,
-`cron.env`/`auth.json`, `*.log`, `logs/`, perfil do Chrome, backups `*.bak-*`.
-O `.gitignore` já bloqueia tudo isso — confira com `git status` antes de cada push e
-rode `./scripts/sanitize.sh`. Vazou secret? **Rotacione imediatamente** no provedor
-(remover do git não apaga o histórico). Detalhes em [`docs/SEGURANCA.md`](docs/SEGURANCA.md).
+### 3. Browser — start Chrome, log in once
+
+```bash
+./browser/chrome-real.sh &  # CDP on :9222; one login covers every site
+```
+
+Details: [`browser/README.md`](browser/README.md). Domain allowlist:
+[`config/sites_permitidos.json`](config/sites_permitidos.json).
+
+### 4. Safe test first, then one real round
+
+```bash
+./bot/dry-run.sh   # simulation: reads files only, applies to nothing
+./bot/loop.sh      # real round — Ctrl+C after the first "ok"
+./bot/doctor.sh    # environment checklist (exit 0 = essentials OK)
+```
+
+Windows mirrors: `bot\dry-run.ps1`, `bot\loop.ps1`, `bot\doctor.ps1`.
+
+### 5. Automate (cron | Task Scheduler)
+
+```bash
+crontab -e   # paste config/crontab.example, adjusting BOT_DIR
+```
+
+Windows: ready-made commands in [`config/TaskScheduler.md`](config/TaskScheduler.md).
+
+## Monitor (optional)
+
+```bash
+cd monitor && npm install && npm run dev   # or free deploy — see monitor/README.md
+```
+
+Docker demo with sample data (never your real data):
+
+```bash
+docker compose up monitor   # see monitor/README.md
+```
+
+Without `MONITOR_URL`, the bot works normally — it just publishes nothing.
+
+## Security — READ BEFORE COMMITTING
+
+**Never** commit: `bot/dados_candidato.json`, `bot/aplicadas.json`, PDF CVs,
+`cron.env`/`auth.json`, `*.log`, `logs/`, the Chrome profile, `*.bak-*` backups.
+`.gitignore` already blocks all of this — check `git status` before every push and
+run `./scripts/sanitize.sh`. Leaked a secret? **Rotate it immediately** at the
+provider (removing it from git does not erase history).
+Details: [`docs/SEGURANCA.md`](docs/SEGURANCA.md).
 
 ## Docs
 
-| Guia | O quê |
+| Guide | What |
 |---|---|
-| [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | do zero à primeira rodada em ~20 min |
-| [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) | diagrama, componentes, decisões-chave |
-| [`docs/CUSTO.md`](docs/CUSTO.md) | por que custa R$ 0 + a escada de modelos |
-| [`docs/SEGURANCA.md`](docs/SEGURANCA.md) | segredos, gitignore, pre-commit, se vazar |
-| [`docs/FAQ.md`](docs/FAQ.md) | permissão dos portais, quota, locks, novos sites |
-| [`docs/PROMPTS.md`](docs/PROMPTS.md) | como adaptar stack, termos e filtros ao seu perfil |
+| [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | zero to first round in ~20 min |
+| [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) | diagram, components, key decisions |
+| [`docs/CUSTO.md`](docs/CUSTO.md) | why it costs R$ 0 + the model ladder |
+| [`docs/SEGURANCA.md`](docs/SEGURANCA.md) | secrets, gitignore, pre-commit, if leaked |
+| [`docs/FAQ.md`](docs/FAQ.md) | portal permission, quota, locks, new sites |
+| [`docs/PROMPTS.md`](docs/PROMPTS.md) | adapt stack, terms and filters to your profile |
 
-## Licença
+## License
 
-MIT — veja [`LICENSE`](LICENSE). Contribuições: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+MIT — see [`LICENSE`](LICENSE). Contributions: [`CONTRIBUTING.md`](CONTRIBUTING.md).
