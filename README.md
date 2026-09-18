@@ -9,7 +9,7 @@
 [![Platform](https://img.shields.io/badge/platform-Linux%7CWindows%7CWSL2-blue.svg)](docs/QUICKSTART.md)
 [![Release](https://img.shields.io/github/v/release/JamesonHenrique/OportunizaVaga?label=release)](https://github.com/JamesonHenrique/OportunizaVaga/releases)
 
-> 🇧🇷 Versão em português: [README.pt-BR.md](README.pt-BR.md).
+> 🌐 Translations: 🇧🇷 [Português](README.pt-BR.md) · 🇪🇸 [Español](README.es.md)
 
 Open-source bot that **auto-applies to junior/trainee remote jobs in Brazil**,
 running on your own PC at **zero cost** (free AI models + Brazilian job boards).
@@ -19,6 +19,22 @@ running on your own PC at **zero cost** (free AI models + Brazilian job boards).
 > personal automation; **you accept the risk of your accounts being blocked or
 > suspended** by using it. The authors are not liable for suspended accounts,
 > missed jobs, or any damage resulting from its use.
+> Read [`docs/USO-ETICO.md`](docs/USO-ETICO.md) before scaling usage.
+
+## Demo
+
+<!-- TODO(demo): replace with a real recording.
+     Record a ≤30s asciinema/GIF of one round + the live monitor, save it as
+     assets/demo.gif, and swap the placeholder below. This is the single biggest
+     lever for the project's reach — see ROADMAP.md. -->
+<p align="center">
+  <img src="assets/demo.gif" alt="OportunizaVaga em ação: uma rodada + o monitor ao vivo" width="820">
+  <br><em>▶️ Demo (GIF em breve). Enquanto isso: <code>./bot/dry-run.sh</code> mostra uma rodada simulada sem aplicar em nada.</em>
+</p>
+
+<!-- TODO(live-demo): host the monitor with FAKE data on Vercel free-tier and link it here.
+     Never point a public demo at real dados_candidato.json / aplicadas.json. -->
+> 🔴 **Live demo** (monitor with sample data): _coming soon_ — see [`monitor/README.md`](monitor/README.md).
 
 ## How it works
 
@@ -65,8 +81,14 @@ Full guide: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
 
 ### 2. Fill in YOUR data (never commit!)
 
-Setup copies `examples/` to `bot/dados_candidato.json` — edit it with your real
-info. **Empty field = the bot records "bloqueado" instead of inventing.**
+Fastest path — interactive wizard (no JSON editing):
+
+```bash
+./scripts/setup-wizard.sh          # Windows: scripts\setup-wizard.ps1
+```
+
+Or copy `examples/` to `bot/dados_candidato.json` and edit by hand.
+**Empty field = the bot records "bloqueado" instead of inventing.**
 Adapt filters to your stack: [`docs/PROMPTS.md`](docs/PROMPTS.md).
 
 ### 3. Browser — start Chrome, log in once
@@ -126,7 +148,10 @@ Details: [`docs/SEGURANCA.md`](docs/SEGURANCA.md).
 | [`docs/QUICKSTART.md`](docs/QUICKSTART.md) | zero to first round in ~20 min |
 | [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) | diagram, components, key decisions |
 | [`docs/CUSTO.md`](docs/CUSTO.md) | why it costs R$ 0 + the model ladder |
+| [`docs/MODELOS.md`](docs/MODELOS.md) | provider-agnostic + 100% local (Ollama) |
+| [`docs/ADAPTERS.md`](docs/ADAPTERS.md) | add a job portal (easiest way to contribute) |
 | [`docs/SEGURANCA.md`](docs/SEGURANCA.md) | secrets, gitignore, pre-commit, if leaked |
+| [`docs/USO-ETICO.md`](docs/USO-ETICO.md) | responsible use, pacing, privacy |
 | [`docs/FAQ.md`](docs/FAQ.md) | portal permission, quota, locks, new sites |
 | [`docs/PROMPTS.md`](docs/PROMPTS.md) | adapt stack, terms and filters to your profile |
 

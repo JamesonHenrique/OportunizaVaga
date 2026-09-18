@@ -1,8 +1,9 @@
-# These are placeholders — uncomment and replace with your real sponsorship channels.
-# Do NOT invent a real username: replace SEU-USUARIO with the actual account.
-# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-funding-a-developer
-
-# github: [SEU-USUARIO]
+# Botão "Sponsor" do repositório.
+# github: usa seu handle real (JamesonHenrique). O botão só aparece depois de você
+# HABILITAR o GitHub Sponsors na conta: https://github.com/sponsors — sem isso o
+# link fica vazio. Descomente ko_fi/custom quando tiver esses canais.
+# Nunca coloque chave Pix/dado sensível aqui — linke uma página de doações.
+github: [JamesonHenrique]
 # ko_fi: SEU-USUARIO
-# Custom links (e.g. Pix key page — never put a real key here, link a donations page instead):
-# custom: ["https://sua-url.vercel.app/apoie", "PIX: use sua pagina de doacoes, nunca a chave direta"]
+# Custom links (ex.: página de doações — nunca a chave Pix direta):
+# custom: ["https://sua-url.vercel.app/apoie"]
