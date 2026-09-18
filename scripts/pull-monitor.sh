@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # pull-monitor.sh — "correio" do monitor via git.
 # Faz o fast-forward do dir monitor/ e, se o codigo mudou, derruba o publisher
 # para que o monitor-keepalive.sh (*/5) o ressuba com a versao nova.

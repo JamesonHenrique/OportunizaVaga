@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # monitor-keepalive.sh — mantem SO o publisher do monitor de pe.
 # Sem systemd na maquina, este cron (*/5) faz o papel de supervisor do publisher
 # — e SO do publisher.
