@@ -50,6 +50,8 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
 ```
 
 - **1 site por rodada**, rodízio circular, dorme 20 min entre rodadas (backoff se vazio).
+- **Estado isolado por perfil:** o perfil ativo guarda o próprio histórico em `bot/state/<perfil>/`.
+- **Modo reconhecimento:** `OV_RECONHECIMENTO=1` pontua vagas sem se candidatar.
 - **Só JR/trainee + remoto + ≤14 dias** (tudo configurável no prompt).
 - **Nunca inventa dados:** tudo vem de `bot/dados_candidato.json`; o que falta vira
   `bloqueado` com o motivo exato.
@@ -58,7 +60,8 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
   Copilot opcional): se um bater no rate limit, tenta o próximo — a volta ao preferido
   é automática.
 - **Follow-up semanal** (segundas): recheca o status das vagas aplicadas.
-- **Monitor opcional** (`monitor/`): painel na Vercel free, sem banco.
+- **Monitor opcional** (`monitor/`): painel na Vercel free, sem banco, com telemetria
+  agregada por padrão (detalhes brutos só com opt-in).
 
 ## Estrutura
 
@@ -66,14 +69,19 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
 oportunizavaga/
 ├── bot/
 │   ├── loop.sh                  # loop principal (1 rodada = 1 sessão nova do modelo)
+│   ├── dry-run.sh               # plano global sem risco (perfil, sites, limites)
 │   ├── loop.ps1                 # espelho Windows (PowerShell 5.1+, mesma lógica)
+│   ├── dry-run.ps1              # espelho Windows do plano sem risco
 │   ├── guardiao.sh              # supervisor via cron: loop + Chrome
 │   ├── guardiao.ps1             # espelho Windows (Task Scheduler)
 │   ├── followup.sh              # rotina semanal de status (só lê, nunca candidata)
 │   ├── followup.ps1             # espelho Windows
 │   ├── prompt_loop.md           # regras e passo a passo de cada rodada (o "cérebro")
 │   ├── prompt_followup.md       # prompt da rotina semanal
-│   └── prompt_perfil_gupy.md    # manutenção avulsa do perfil Gupy
+│   ├── prompt_perfil_gupy.md    # manutenção avulsa do perfil Gupy
+│   └── sites/                   # adaptadores descobertos automaticamente
+│       ├── lib.sh               # contrato comum (site_adapter_*)
+│       └── *.sh                 # indeed, gupy, linkedin, programathor, geekhunter, vagas
 ├── browser/
 │   ├── chrome-real.sh           # Chrome persistente com CDP :9222
 │   ├── chrome-real.ps1          # espelho Windows (perfil em %LOCALAPPDATA%)
@@ -134,11 +142,12 @@ Guia completo: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
 
 ## Segurança — LEIA ANTES DE COMMITAR
 
-**Nunca** commite: `bot/dados_candidato.json`, `bot/aplicadas.json`, CVs em PDF,
-`cron.env`/`auth.json`, `*.log`, `logs/`, perfil do Chrome, backups `*.bak-*`.
-O `.gitignore` já bloqueia tudo isso — confira com `git status` antes de cada push e
-rode `./scripts/sanitize.sh`. Vazou secret? **Rotacione imediatamente** no provedor
-(remover do git não apaga o histórico). Detalhes em [`docs/SEGURANCA.md`](docs/SEGURANCA.md).
+**Nunca** commite: `bot/dados_candidato.json`, `bot/aplicadas.json`, `bot/state/`,
+`bot/prompt_loop.runtime.md`, CVs em PDF, `cron.env`/`auth.json`, `*.log`, `logs/`,
+perfil do Chrome, backups `*.bak-*`. O `.gitignore` já bloqueia tudo isso — confira
+com `git status` antes de cada push e rode `./scripts/sanitize.sh`. Vazou secret?
+**Rotacione imediatamente** no provedor (remover do git não apaga o histórico).
+Detalhes em [`docs/SEGURANCA.md`](docs/SEGURANCA.md).
 
 ## Docs
 

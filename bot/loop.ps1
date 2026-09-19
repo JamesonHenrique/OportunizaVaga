@@ -99,6 +99,7 @@ $LOOP_LOCK = Join-Path $TEMP_DIR 'oportunizavaga-loop.lock'
 # modelo novo entra primeiro no loop.sh e depois e espelhado aqui.
 function Get-ModelList {
     $list = New-Object System.Collections.ArrayList
+    [void]$list.Add('openrouter/nex-agi/nex-n2.5-pro:free')
     [void]$list.Add('opencode/muse-spark-1.3-contributor-free')
     [void]$list.Add('opencode/nemotron-3-ultra-free')
     [void]$list.Add('opencode/nemotron-3.5-lightning-free')
@@ -149,6 +150,51 @@ function Get-ModelList {
 }
 
 if (-not (Test-Path 'logs')) { New-Item -ItemType Directory -Path 'logs' | Out-Null }
+
+# Perfil ativo e estado isolado (espelho do loop.sh).
+$PerfilFile = $env:BOT_PERFIL
+if ([string]::IsNullOrWhiteSpace($PerfilFile)) {
+    $candidate = Join-Path $BOT_ROOT 'bot\perfil.json'
+    if (Test-Path $candidate) { $PerfilFile = $candidate }
+}
+if ([string]::IsNullOrWhiteSpace($PerfilFile)) {
+    $PerfilFile = Join-Path $BOT_ROOT 'config\perfis\junior-backend.example.json'
+}
+if (-not (Test-Path $PerfilFile)) {
+    Add-Content -Path 'loop.log' -Value ("[{0}] ERRO: perfil nao encontrado: {1}" -f (Write-Stamp), $PerfilFile)
+    exit 1
+}
+try { $PerfilDoc = Get-Content $PerfilFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
+catch {
+    Add-Content -Path 'loop.log' -Value ("[{0}] ERRO: perfil invalido: {1}" -f (Write-Stamp), $_.Exception.Message)
+    exit 1
+}
+$PerfilNome = [string]$PerfilDoc.nome_perfil
+$PerfilSlug = ($PerfilNome.ToLowerInvariant() -replace '[^a-z0-9]+', '-').Trim('-')
+if ($PerfilSlug.Length -gt 48) { $PerfilSlug = $PerfilSlug.Substring(0, 48) }
+$PerfilExplicito = $false
+if ((-not [string]::IsNullOrWhiteSpace($env:BOT_PERFIL)) -or (Test-Path (Join-Path $BOT_ROOT 'bot\perfil.json'))) { $PerfilExplicito = $true }
+if ($PerfilFile -ne (Join-Path $BOT_ROOT 'config\perfis\junior-backend.example.json')) { $PerfilExplicito = $true }
+if ($PerfilExplicito) {
+    $StateDir = Join-Path $BOT_ROOT "bot\state\$PerfilSlug"
+} else {
+    $PerfilSlug = 'default'
+    $StateDir = Join-Path $BOT_ROOT 'bot'
+}
+$AplicadasFile = Join-Path $StateDir 'aplicadas.json'
+$DadosCandidatoFile = Join-Path $BOT_ROOT 'bot\dados_candidato.json'
+$RuntimePromptFile = Join-Path $StateDir 'prompt_loop.runtime.md'
+$ReconhecimentoFile = Join-Path $StateDir ("reconhecimento-{0}.json" -f (Get-Date).ToString('yyyyMMdd-HHmmss'))
+if (-not (Test-Path $StateDir)) { New-Item -ItemType Directory -Path $StateDir | Out-Null }
+if (-not (Test-Path $AplicadasFile)) {
+    Copy-Item (Join-Path $BOT_ROOT 'examples\aplicadas.example.json') $AplicadasFile -Force
+}
+$env:BOT_PERFIL = $PerfilFile
+$env:OV_RECONHECIMENTO = if ([string]::IsNullOrWhiteSpace($env:OV_RECONHECIMENTO)) { '0' } else { $env:OV_RECONHECIMENTO }
+$env:OV_MAX_CANDIDATURAS = if ([string]::IsNullOrWhiteSpace($env:OV_MAX_CANDIDATURAS)) { '3' } else { $env:OV_MAX_CANDIDATURAS }
+$env:OV_RECONHECIMENTO_LIMIT = if ([string]::IsNullOrWhiteSpace($env:OV_RECONHECIMENTO_LIMIT)) { '10' } else { $env:OV_RECONHECIMENTO_LIMIT }
+$env:OV_TELEMETRY_MODE = if ([string]::IsNullOrWhiteSpace($env:OV_TELEMETRY_MODE)) { 'aggregate' } else { $env:OV_TELEMETRY_MODE }
+$env:OV_MONITOR_INCLUDE_DETAILS = if ([string]::IsNullOrWhiteSpace($env:OV_MONITOR_INCLUDE_DETAILS)) { '0' } else { $env:OV_MONITOR_INCLUDE_DETAILS }
 
 # Instancia unica: lock exclusivo no arquivo. Se ja houver dono, sai calado
 # (o guardiao chama este script a cada 5min so para garantir que esta de pe).
@@ -237,7 +283,7 @@ function Test-BrokenSession([string]$file) {
 # Impressao digital do estado: aplicadas + bloqueados + descartes da listagem.
 function Get-Fingerprint {
     try {
-        $d = Get-Content 'aplicadas.json' -Raw -ErrorAction Stop | ConvertFrom-Json
+        $d = Get-Content $AplicadasFile -Raw -ErrorAction Stop | ConvertFrom-Json
         $a = 0; $b = 0; $desc = 0
         if ($d.aplicadas) { $a = @($d.aplicadas).Count }
         if ($d.bloqueados) {
@@ -261,6 +307,24 @@ function Get-FailWait([int]$n) {
     for ($i = 1; $i -lt $n; $i++) { $w = $w * 2 }
     if ($w -gt $RETRY_MAX) { $w = $RETRY_MAX }
     return $w
+}
+
+function Render-Prompt {
+    $source = Join-Path $BOT_ROOT 'bot\prompt_loop.md'
+    $text = Get-Content $source -Raw
+    $text = $text.Replace('$APLICADAS_FILE', $AplicadasFile)
+    $text = $text.Replace('$DADOS_CANDIDATO_FILE', $DadosCandidatoFile)
+    $text = $text.Replace('bot/perfil.json', $PerfilFile)
+    $text = $text.Replace('SEU_NOME', $PerfilNome)
+    $text = $text.Replace('YOUR_NAME', $PerfilNome)
+    $reconhecimento = @('1', 'true', 'True', 'sim', 'Sim') -contains $env:OV_RECONHECIMENTO
+    if ($reconhecimento) {
+        $text += "`n`nMODO RECONHECIMENTO (obrigatorio): NAO se candidate, NAO preencha formulario, NAO envie mensagem, NAO altere aplicadas.json. Avalie no maximo $env:OV_RECONHECIMENTO_LIMIT vagas recentes do site da rodada e grave somente $ReconhecimentoFile com schema compativel com config\reconhecimento.schema.json. Use chave estavel site+vaga, score 0-5, URL, empresa, vaga, remota, nivel, stack, motivos e observacoes; nunca inclua dados pessoais.`n"
+    } else {
+        $text += "`n`nPERFIL ATIVO: $PerfilNome. Use somente os termos, filtros e estado deste perfil. O limite desta rodada e $env:OV_MAX_CANDIDATURAS candidaturas novas.`n"
+    }
+    Set-Content -Path $RuntimePromptFile -Value $text -Encoding UTF8
+    return $text
 }
 
 # Roda o opencode com timeout (watchdog simplificado via Start-Job + Wait-Job).
@@ -307,7 +371,6 @@ $FAILS = 0
 $QUOTA_HITS = 0
 $VAZIAS = 0
 $MODELOS = Get-ModelList
-$PromptFile = Join-Path $BOT_ROOT 'bot\prompt_loop.md'
 
 while ($true) {
     Rotate-Log
@@ -322,8 +385,8 @@ while ($true) {
 
     $ROUND_LOG = 'logs/rodada-{0}.log' -f (Get-Date).ToString('yyyyMMdd-HHmmss')
     $FP_ANTES = Get-Fingerprint
-    Write-LoopLog ("rodada iniciada (rodadas vazias seguidas: {0})" -f $VAZIAS)
-    $prompt = Get-Content $PromptFile -Raw
+    Write-LoopLog ("rodada iniciada (perfil {0}, rodadas vazias seguidas: {1})" -f $PerfilNome, $VAZIAS)
+    $prompt = Render-Prompt
 
     $STATUS = 0
     $MODELO_OK = ''

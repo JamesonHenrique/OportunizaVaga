@@ -1,136 +1,218 @@
 #!/bin/bash
-# bot/dry-run.sh — simula UMA rodada sem se candidatar (teste sem risco).
-# So LE arquivos: valida os JSONs, mostra o site do rodozio e lista o que a
-# rodada FARIA (site, termos de busca, limite, modelo preferido). Nao abre
-# browser, nao chama o opencode, nao escreve nada, nao se candidata.
-# Requer apenas bash + python3 (funciona sem Chrome/opencode instalados).
-# Uso: ./bot/dry-run.sh [--json]   (--json = saida maquina em JSON)
+# bot/dry-run.sh — simula uma rodada global sem aplicar ou abrir browser.
 set -u
 
 JSON_OUT=0
-for a in "$@"; do
-  case "$a" in
-    --json) JSON_OUT=1 ;;
+SITE_FILTER=""
+PROFILE_FILE=""
+RECONHECIMENTO=0
+PERFIL_EXPLICITO=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --json) JSON_OUT=1; shift ;;
+    --site)
+      [ "$#" -lt 2 ] && { echo "opcao --site requer argumento" >&2; exit 2; }
+      SITE_FILTER="$2"; shift 2 ;;
+    --profile)
+      [ "$#" -lt 2 ] && { echo "opcao --profile requer argumento" >&2; exit 2; }
+      PROFILE_FILE="$2"; PERFIL_EXPLICITO=1; shift 2 ;;
+    --reconhecimento) RECONHECIMENTO=1; shift ;;
     -h|--help)
-      echo "Uso: bot/dry-run.sh [--json]"
-      echo "Simula uma rodada sem se candidatar. Exit 0 = rodada simulada ok."
+      echo "Uso: bot/dry-run.sh [--json] [--site SITE_ID] [--profile CAMINHO] [--reconhecimento]"
+      echo "Plano global: todos os adaptadores; nada e escrito, nenhum browser e aberto."
       exit 0 ;;
-    *) echo "opcao desconhecida: $a (use --help)" >&2; exit 2 ;;
+    *) echo "opcao desconhecida: $1 (use --help)" >&2; exit 2 ;;
   esac
 done
 
 BOT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$BOT_ROOT/bot" || exit 1
+source "$BOT_ROOT/bot/sites/lib.sh"
 
-command -v python3 >/dev/null 2>&1 || { echo "ERRO: python3 nao encontrado." >&2; exit 1; }
+if [ -z "$PROFILE_FILE" ]; then
+  PROFILE_FILE="${BOT_PERFIL:-}"
+fi
+if [ -z "$PROFILE_FILE" ] && [ -f "$BOT_ROOT/bot/perfil.json" ]; then
+  PROFILE_FILE="$BOT_ROOT/bot/perfil.json"
+fi
+if [ -z "$PROFILE_FILE" ]; then
+  PROFILE_FILE="$BOT_ROOT/config/perfis/junior-backend.example.json"
+fi
+[ -f "$PROFILE_FILE" ] || { echo "perfil nao encontrado: $PROFILE_FILE" >&2; exit 1; }
+[ "$PROFILE_FILE" != "$BOT_ROOT/config/perfis/junior-backend.example.json" ] && PERFIL_EXPLICITO=1
 
-# Modelo preferido = primeiro da escada em bot/loop.sh (fonte unica de verdade).
-MODELO_PREFERIDO="$(grep -oE '"opencode/[^"]+"' "$BOT_ROOT/bot/loop.sh" 2>/dev/null | head -1 | tr -d '"')"
-[ -z "$MODELO_PREFERIDO" ] && MODELO_PREFERIDO="opencode/muse-spark-1.3-contributor-free"
+DADOS_FILE="$BOT_ROOT/bot/dados_candidato.json"
+[ -f "$DADOS_FILE" ] || DADOS_FILE="$BOT_ROOT/examples/dados_candidato.example.json"
+APLICADAS_FILE="$BOT_ROOT/bot/aplicadas.json"
+if [ "$PERFIL_EXPLICITO" -eq 1 ]; then
+  PERFIL_NOME="$(python3 - "$PROFILE_FILE" <<'PY'
+import json, sys
+print(json.load(open(sys.argv[1], encoding='utf-8')).get('nome_perfil', 'perfil'))
+PY
+)"
+  PERFIL_SLUG="$(printf '%s' "$PERFIL_NOME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-48)"
+  [ -n "$PERFIL_SLUG" ] || PERFIL_SLUG="perfil"
+  STATE_DIR="$BOT_ROOT/bot/state/$PERFIL_SLUG"
+  [ -f "$STATE_DIR/aplicadas.json" ] && APLICADAS_FILE="$STATE_DIR/aplicadas.json"
+else
+  PERFIL_NOME="default"
+  PERFIL_SLUG="default"
+  STATE_DIR="$BOT_ROOT/bot"
+fi
+[ -f "$APLICADAS_FILE" ] || APLICADAS_FILE="$BOT_ROOT/examples/aplicadas.example.json"
 
-DADOS_REAIS=1
-[ -f "dados_candidato.json" ] || DADOS_REAIS=0
-APLIC_REAIS=1
-[ -f "aplicadas.json" ] || APLIC_REAIS=0
+TERMO_FILE="$(mktemp)"
+SITE_FILE="$(mktemp)"
+trap 'rm -f "$TERMO_FILE" "$SITE_FILE"' EXIT
 
-export DRY_MODELO="$MODELO_PREFERIDO" DRY_JSON="$JSON_OUT"
-export DRY_DADOS="$([ "$DADOS_REAIS" = "1" ] && echo dados_candidato.json || echo ../examples/dados_candidato.example.json)"
-export DRY_APLIC="$([ "$APLIC_REAIS" = "1" ] && echo aplicadas.json || echo ../examples/aplicadas.example.json)"
-export DRY_DADOS_REAIS="$DADOS_REAIS" DRY_APLIC_REAIS="$APLIC_REAIS"
+python3 - "$PROFILE_FILE" "$DADOS_FILE" "$APLICADAS_FILE" "$BOT_ROOT/bot/prompt_loop.md" "$TERMO_FILE" <<'PY'
+import json, os, re, sys
 
-python3 <<'PYEOF'
-import json, os
-
-def carrega(caminho, rotulo):
-    try:
-        with open(caminho, encoding="utf-8") as f:
-            return json.load(f), None
-    except Exception as e:
-        return None, "%s: JSON invalido ou ilegivel (%s)" % (rotulo, e)
-
-modelo = os.environ["DRY_MODELO"]
-saida_json = os.environ["DRY_JSON"] == "1"
-dados_caminho = os.environ["DRY_DADOS"]
-aplic_caminho = os.environ["DRY_APLIC"]
-dados_reais = os.environ["DRY_DADOS_REAIS"] == "1"
-aplic_reais = os.environ["DRY_APLIC_REAIS"] == "1"
-
+perfil_path, dados_path, aplic_path, prompt_path, out_path = sys.argv[1:]
 erros = []
-dados, e = carrega(dados_caminho, "dados_candidato")
-if e:
-    erros.append(e)
+try:
+    perfil = json.load(open(perfil_path, encoding='utf-8'))
+except Exception as exc:
+    perfil, perfil = {}, None
+    erros.append('perfil: JSON invalido ou ilegivel (%s)' % exc)
+if perfil is not None:
+    for key in ('nome_perfil', 'nivel', 'termos', 'pular_tipos'):
+        if key not in perfil:
+            erros.append('perfil: chave obrigatoria ausente: %s' % key)
+    if not isinstance(perfil.get('termos'), list) or not perfil.get('termos'):
+        erros.append('perfil: termos precisa ser uma lista nao vazia')
+    if not isinstance(perfil.get('pular_tipos'), list):
+        erros.append('perfil: pular_tipos precisa ser uma lista')
+
+try:
+    dados = json.load(open(dados_path, encoding='utf-8'))
+except Exception as exc:
+    dados, dados = {}, None
+    erros.append('dados_candidato: JSON invalido ou ilegivel (%s)' % exc)
+if dados is not None:
+    for key in ('nome', 'email', 'telefone', 'linkedin', 'local'):
+        if key not in dados:
+            erros.append('dados_candidato: chave obrigatoria ausente: %s' % key)
+
+try:
+    aplic = json.load(open(aplic_path, encoding='utf-8'))
+except Exception as exc:
+    aplic, aplic = {}, None
+    erros.append('aplicadas: JSON invalido ou ilegivel (%s)' % exc)
+if aplic is not None:
+    if not isinstance(aplic.get('aplicadas'), list):
+        erros.append('aplicadas: chave obrigatoria ausente: aplicadas')
+    rodizio = aplic.get('rodizio')
+    if not isinstance(rodizio, dict) or not rodizio.get('proximo'):
+        erros.append('aplicadas: chave obrigatoria ausente: rodizio.proximo')
+
+prompt = open(prompt_path, encoding='utf-8').read() if os.path.isfile(prompt_path) else ''
+termos_perfil = perfil.get('termos', []) if isinstance(perfil, dict) else []
+with open(out_path, 'w', encoding='utf-8') as out:
+    json.dump({'termos_perfil': termos_perfil, 'prompt': prompt, 'perfil': perfil,
+               'dados': dados, 'aplic': aplic, 'erros': erros}, out, ensure_ascii=False)
+PY
+
+if [ "$(python3 - "$TERMO_FILE" <<'PY'
+import json, sys
+print(len(json.load(open(sys.argv[1], encoding='utf-8')).get('erros', [])))
+PY
+)" -ne 0 ]; then
+  if [ "$JSON_OUT" -eq 1 ]; then
+    python3 - "$TERMO_FILE" <<'PY'
+import json, sys
+doc = json.load(open(sys.argv[1], encoding='utf-8'))
+print(json.dumps({'ok': False, 'dry_run': True, 'erros': doc['erros']}, ensure_ascii=False))
+PY
+  else
+    echo 'dry-run: FALHOU — corrija antes de rodar o loop real:'
+    python3 - "$TERMO_FILE" <<'PY'
+import json, sys
+for item in json.load(open(sys.argv[1], encoding='utf-8'))['erros']:
+    print('  [FALHA] ' + item)
+PY
+  fi
+  exit 1
+fi
+
+for site_id in $(site_adapter_list "$BOT_ROOT"); do
+  [ -n "$SITE_FILTER" ] && [ "$site_id" != "$SITE_FILTER" ] && continue
+  if ! site_adapter_source "$site_id" "$BOT_ROOT"; then
+    echo "adaptador invalido: $site_id" >&2
+    exit 1
+  fi
+  {
+    printf '%s\t%s\t%s\t' "$site_id" "${SITE_LABEL:-$site_id}" "${SITE_HOME:-}"
+    site_adapter_terms "$BOT_ROOT/bot/prompt_loop.md" | tr '\n' '|'
+    printf '\t'
+    url_busca="$(site_adapter_url "$(python3 - "$TERMO_FILE" <<'PY'
+import json, sys
+print(json.load(open(sys.argv[1], encoding='utf-8'))['termos_perfil'][0])
+PY
+)")"
+    printf '%s\n' "$url_busca"
+  } >> "$SITE_FILE"
+done
+
+python3 - "$TERMO_FILE" "$SITE_FILE" "$PROFILE_FILE" "$DADOS_FILE" "$APLICADAS_FILE" "$PERFIL_NOME" "$PERFIL_SLUG" "$STATE_DIR" "$JSON_OUT" "$RECONHECIMENTO" "$SITE_FILTER" <<'PY'
+import json, os, sys
+
+termo_path, site_path, perfil_path, dados_path, aplic_path, perfil_nome, perfil_slug, state_dir, json_out, reconhecimento, site_filter = sys.argv[1:]
+termo = json.load(open(termo_path, encoding='utf-8'))
+sites = []
+with open(site_path, encoding='utf-8') as fh:
+    for line in fh:
+        site_id, label, home, raw_terms, url = line.rstrip('\n').split('\t', 4)
+        terms = [x for x in raw_terms.split('|') if x]
+        if not terms:
+            terms = list(termo['perfil'].get('termos', []))
+        sites.append({
+            'site_id': site_id,
+            'label': label,
+            'home': home,
+            'termos': terms,
+            'url_busca': url,
+        })
+aplic = termo['aplic'] or {}
+rodizio = aplic.get('rodizio', {}) if isinstance(aplic, dict) else {}
+resultado = {
+    'ok': True,
+    'dry_run': True,
+    'global': not bool(site_filter),
+    'modo': 'reconhecimento' if reconhecimento == '1' else 'candidaturas',
+    'perfil': {
+        'nome': perfil_nome,
+        'slug': perfil_slug,
+        'arquivo': perfil_path,
+        'nivel': termo['perfil'].get('nivel'),
+        'termos': termo['perfil'].get('termos', []),
+        'pular_tipos': termo['perfil'].get('pular_tipos', []),
+    },
+    'estado': {
+        'diretorio': state_dir,
+        'arquivo_aplicadas': aplic_path,
+        'isolado': perfil_slug != 'default',
+        'aplicadas_registradas': len(aplic.get('aplicadas', [])) if isinstance(aplic, dict) else 0,
+        'proximo_site': rodizio.get('proximo'),
+    },
+    'sites': sites,
+    'site_count': len(sites),
+    'limite_candidaturas': int(os.environ.get('OV_MAX_CANDIDATURAS', '3')),
+    'limite_reconhecimento': int(os.environ.get('OV_RECONHECIMENTO_LIMIT', '10')),
+    'modelo_preferido': os.environ.get('OV_MODELO_PREFERIDO', 'openrouter/nex-agi/nex-n2.5-pro:free'),
+    'browser_aberto': False,
+    'candidaturas_enviadas': 0,
+    'telemetria': {
+        'modo': os.environ.get('OV_TELEMETRY_MODE', 'aggregate'),
+        'detalhes': os.environ.get('OV_MONITOR_INCLUDE_DETAILS', '0') == '1',
+    },
+}
+if json_out == '1':
+    print(json.dumps(resultado, ensure_ascii=False))
 else:
-    for k in ("nome", "email", "telefone", "linkedin", "local"):
-        if k not in dados:
-            erros.append("dados_candidato: chave obrigatoria ausente: '%s'" % k)
-
-aplic, e = carrega(aplic_caminho, "aplicadas")
-if e:
-    erros.append(e)
-    rodizio, ordem, proximo = {}, [], "?"
-else:
-    rodizio = aplic.get("rodizio", {}) if isinstance(aplic, dict) else {}
-    ordem = rodizio.get("ordem", [])
-    proximo = rodizio.get("proximo", "?")
-    if not isinstance(aplic, dict) or "aplicadas" not in aplic:
-        erros.append("aplicadas: chave obrigatoria ausente: 'aplicadas'")
-    if not proximo or proximo == "?":
-        erros.append("aplicadas: chave obrigatoria ausente: 'rodizio.proximo'")
-
-if ordem and proximo in ordem:
-    seguinte = ordem[(ordem.index(proximo) + 1) % len(ordem)]
-else:
-    seguinte = "?"
-
-# Termos espelham bot/prompt_loop.md (secao b, TERMOS) — a rodada real alterna
-# entre eles priorizando o stack real de dados_candidato.json.
-termos = [
-    "desenvolvedor fullstack junior",
-    "backend junior remoto",
-    "desenvolvedor junior remoto",
-    "trainee desenvolvedor remoto",
-]
-limite = 3  # regra 5 do prompt_loop.md: maximo 3 candidaturas novas por rodada
-n_aplic = len(aplic.get("aplicadas", [])) if isinstance(aplic, dict) else 0
-bloq = aplic.get("bloqueados", {}) if isinstance(aplic, dict) else {}
-n_bloq = len(bloq) if isinstance(bloq, dict) else 0
-
-if erros:
-    if saida_json:
-        print(json.dumps({"ok": False, "dry_run": True, "erros": erros},
-                         ensure_ascii=False))
-    else:
-        print("dry-run: FALHOU — corrija antes de rodar o loop real:")
-        for x in erros:
-            print("  [FALHA] " + x)
-    raise SystemExit(1)
-
-if saida_json:
-    print(json.dumps({
-        "ok": True,
-        "dry_run": True,
-        "site": proximo,
-        "site_seguinte": seguinte,
-        "ordem_rodizio": ordem,
-        "termos_busca": termos,
-        "limite_candidaturas": limite,
-        "modelo_preferido": modelo,
-        "dados_fonte": ("bot/dados_candidato.json"
-                        if dados_reais else "examples/dados_candidato.example.json"),
-        "estado_fonte": ("bot/aplicadas.json"
-                         if aplic_reais else "examples/aplicadas.example.json"),
-        "aplicadas_registradas": n_aplic,
-        "bloqueados_registrados": n_bloq,
-        "browser_aberto": False,
-        "candidaturas_enviadas": 0,
-    }, ensure_ascii=False))
-else:
-    print("dry-run: UMA rodada simulada (nada foi enviado, nenhum browser aberto).")
-    print("  JSONs validos: %s | %s" % (dados_caminho, aplic_caminho))
-    print("  site desta rodada (rodizio.proximo): %s" % proximo)
-    print("  site seguinte sera: %s" % seguinte)
-    print("  termos de busca que usaria: %s" % "; ".join(termos))
-    print("  limite: %d candidaturas novas (regra 5)" % limite)
-    print("  modelo preferido (1o da escada em bot/loop.sh): %s" % modelo)
-    print("  estado atual: %d aplicadas, %d bloqueados" % (n_aplic, n_bloq))
-PYEOF
+    print('dry-run global: plano de uma rodada (nada foi enviado, nenhum browser aberto).')
+    print('  perfil: %s | estado isolado: %s' % (perfil_nome, resultado['estado']['isolado']))
+    print('  sites: %d | proximo do rodizio: %s' % (len(sites), resultado['estado']['proximo_site'] or 'nao definido'))
+    for site in sites:
+        print('  - %s: %s' % (site['site_id'], site['url_busca']))
+PY

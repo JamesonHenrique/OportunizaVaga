@@ -8,6 +8,10 @@ nem aplica sozinho — quem faz isso é o modelo, dirigindo o Chrome real confor
 2. **Onde/como o portal marca "remoto"** (dica para o modelo confirmar na página);
 3. **Quais termos** daquela rodada valem para o site (lidos do `prompt_loop.md`).
 
+Adaptadores são **descobertos automaticamente**: todo `bot/sites/*.sh` que segue o
+contrato entra no plano do `dry-run` e no rodízio, sem registro manual. A
+descoberta e o contrato comum vivem em [`bot/sites/lib.sh`](../bot/sites/lib.sh).
+
 Adicionar um portal é a forma mais fácil de contribuir — e a que mais ajuda o
 projeto. Cada portal novo é um PR pequeno e autocontido.
 
@@ -24,6 +28,10 @@ Base para copiar: [`bot/sites/_template.sh`](../bot/sites/_template.sh).
 | `SITE_REMOTE_HINT` | — | como o portal expõe "remoto"/"home office" |
 | `site_url_busca TERMO` | ✅ | imprime a URL de busca com o termo aplicado |
 | `site_buscar_termos [PROMPT]` | ✅ | imprime, um por linha, os termos do site no `prompt_loop.md` |
+
+O `lib.sh` injeta uma implementação padrão de `site_buscar_termos`: cada
+adaptador só precisa declarar as variáveis do contrato; se quiser um parser
+próprio, pode sobrescrever a função depois do `source`.
 
 ### Regras (o CI cobra)
 
@@ -56,10 +64,12 @@ $EDITOR bot/sites/meuportal.sh          # ajuste SITE_ID, SEARCH_URL_TEMPLATE, d
 ```bash
 bash -n bot/sites/meuportal.sh                       # sintaxe
 shellcheck -S error bot/sites/meuportal.sh           # lint
-source bot/sites/meuportal.sh
+source bot/sites/lib.sh
+site_adapter_source meuportal "$(pwd)"              # carrega e valida o contrato
 site_url_busca "desenvolvedor java junior"           # confere a URL montada
 site_buscar_termos                                   # confere os termos lidos do prompt
-./bot/dry-run.sh                                      # simulação: não aplica em nada
+./bot/dry-run.sh                                      # plano global: não aplica em nada
+./bot/dry-run.sh --site meuportal --json             # plano só do portal novo
 ```
 
 ## Adaptadores que já existem

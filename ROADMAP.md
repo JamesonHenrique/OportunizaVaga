@@ -17,6 +17,11 @@ Discussions do repositório.
 - [x] Monitor opcional (dashboard sem banco).
 - [x] Scaffold OSS: CI, testes, docs, templates, segurança.
 - [x] Contrato de adaptadores de site + template ([`docs/ADAPTERS.md`](docs/ADAPTERS.md)).
+- [x] Adaptadores descobertos automaticamente via [`bot/sites/lib.sh`](bot/sites/lib.sh).
+- [x] Estado isolado por perfil (`bot/state/<perfil>/aplicadas.json`).
+- [x] Dry-run global com `--site`, `--profile` e `--reconhecimento`.
+- [x] Modo reconhecimento (`OV_RECONHECIMENTO=1`) sem alterar `aplicadas.json`.
+- [x] Telemetria agregada e anônima por padrão no monitor.
 - [x] Modo 100% local com Ollama ([`docs/MODELOS.md`](docs/MODELOS.md)).
 - [x] Wizard de setup (`scripts/setup-wizard.sh`).
 - [x] Pacing configurável + guia de uso ético ([`docs/USO-ETICO.md`](docs/USO-ETICO.md)).
@@ -29,7 +34,7 @@ Discussions do repositório.
 - [ ] **Demo ao vivo** do monitor com dados fake, linkada no README.
 - [ ] **Perfis prontos** por área (backend, frontend, dados, QA) em `config/perfis/`.
 - [ ] **Relatório de funil** exportável (aplicadas → convites → entrevistas).
-- [ ] Cobertura de testes dos adaptadores (URL montada por `site_url_busca`).
+- [x] Cobertura de testes dos adaptadores (URL montada por `site_url_busca`).
 
 ## Depois / ideias
 

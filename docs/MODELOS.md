@@ -38,6 +38,10 @@ os grandes da cascata free. Prefira ≥14B se o hardware permitir e valide com
 A cascata é controlada por flags `USAR_*` (ver `docs/CUSTO.md`). Para plugar um
 provider novo:
 
+> **Preferido atual:** `openrouter/nex-agi/nex-n2.5-pro:free` é o primeiro da
+> escada enquanto `muse-spark-1.3` estiver no limite — a volta ao preferido
+> histórico é automática quando a cota dele reseta.
+
 1. Garanta que o OpenCode conhece o provider (via `~/.config/opencode/opencode.jsonc`).
 2. Adicione os IDs de modelo na lista de cascata do `bot/loop.sh`, na posição de
    preferência desejada.

@@ -51,6 +51,8 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
 ```
 
 - **1 sitio por ronda**, rotación circular, 20 min de espera entre rondas (retroceso cuando está vacío).
+- **Estado aislado por perfil:** el perfil activo guarda su historial en `bot/state/<perfil>/`.
+- **Modo reconocimiento:** `OV_RECONHECIMENTO=1` puntúa vacantes sin postularse.
 - **Solo junior/trainee + remoto + ≤14 días** (todo configurable en el prompt).
 - **Nunca alucina datos:** todo proviene de `bot/dados_candidato.json`;
   los vacíos se convierten en entradas `bloqueado` con la razón exacta.
@@ -59,7 +61,8 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
   Copilot opcional): al llegar al límite de velocidad intenta el siguiente — la
   vuelta al modelo preferido es automática.
 - **Seguimiento semanal** (lunes): verifica nuevamente el estado de empleos solicitados.
-- **Monitor opcional** (`monitor/`): dashboard de nivel gratuito, sin base de datos.
+- **Monitor opcional** (`monitor/`): dashboard de nivel gratuito, sin base de datos,
+  con telemetría agregada por defecto (detalles solo con opt-in).
 
 ## Inicio rápido (5 pasos)
 
@@ -103,7 +106,9 @@ Detalles: [`browser/README.md`](browser/README.md). Lista de dominios permitidos
 ### 4. Prueba segura primero, luego una ronda real
 
 ```bash
-./bot/dry-run.sh   # simulation: reads files only, applies to nothing
+./bot/dry-run.sh            # plan global: solo lee archivos, no aplica nada
+./bot/dry-run.sh --json
+./bot/dry-run.sh --json --site indeed
 ./bot/loop.sh      # real round — Ctrl+C after the first "ok"
 ./bot/doctor.sh    # environment checklist (exit 0 = essentials OK)
 ```
@@ -134,12 +139,12 @@ Sin `MONITOR_URL`, el bot funciona normalmente — simplemente no publica nada.
 
 ## Seguridad — LEE ANTES DE HACER COMMIT
 
-**Nunca** hagas commit: `bot/dados_candidato.json`, `bot/aplicadas.json`, PDF de CVs,
-`cron.env`/`auth.json`, `*.log`, `logs/`, el perfil de Chrome, `*.bak-*` copias de seguridad.
-`.gitignore` ya bloquea todo esto — comprueba `git status` antes de cada push y
-ejecuta `./scripts/sanitize.sh`. ¿Filtraste un secreto? **Rótalo inmediatamente** en el
-proveedor (eliminarlo de git no borra el historial).
-Detalles: [`docs/SEGURANCA.md`](docs/SEGURANCA.md).
+**Nunca** hagas commit: `bot/dados_candidato.json`, `bot/aplicadas.json`, `bot/state/`,
+`bot/prompt_loop.runtime.md`, PDF de CVs, `cron.env`/`auth.json`, `*.log`, `logs/`,
+el perfil de Chrome, copias de seguridad `*.bak-*`. `.gitignore` ya bloquea todo esto —
+comprueba `git status` antes de cada push y ejecuta `./scripts/sanitize.sh`.
+¿Filtraste un secreto? **Rótalo inmediatamente** en el proveedor (eliminarlo de git
+no borra el historial). Detalles: [`docs/SEGURANCA.md`](docs/SEGURANCA.md).
 
 ## Documentación
 

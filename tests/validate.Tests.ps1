@@ -57,11 +57,47 @@ Describe 'validate.ps1' {
 }
 
 Describe 'dry-run.ps1' {
-    It '--json sai parseavel com ok true' {
+    It '--json sai parseavel com ok true e plano global' {
         $saida = & (Join-Path $RepoRoot 'bot\dry-run.ps1') -json
         $LASTEXITCODE | Should -Be 0
         $obj = ($saida | Out-String) | ConvertFrom-Json
         $obj.ok | Should -Be $true
         $obj.dry_run | Should -Be $true
+        $obj.global | Should -Be $true
+        $obj.site_count | Should -Be 6
+        $obj.perfil.slug | Should -Be 'default'
+        $obj.estado.isolado | Should -Be $false
+    }
+
+    It '-Profile cria slug e estado isolado a partir do nome do perfil' {
+        $tmp = [System.IO.Path]::GetTempFileName()
+        @'
+{
+  "nome_perfil": "Frontend Teste",
+  "nivel": "junior",
+  "termos": ["frontend junior remoto"],
+  "pular_tipos": ["design/UX"]
+}
+'@ | Set-Content -Path $tmp -Encoding UTF8
+        try {
+            $saida = & (Join-Path $RepoRoot 'bot\dry-run.ps1') -json -Profile $tmp
+            $LASTEXITCODE | Should -Be 0
+            $obj = ($saida | Out-String) | ConvertFrom-Json
+            $obj.perfil.slug | Should -Be 'frontend-teste'
+            $obj.estado.isolado | Should -Be $true
+            $obj.estado.diretorio | Should -BeLike '*state\frontend-teste'
+        }
+        finally {
+            Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It '-Site indeed restrige o plano a um adaptador' {
+        $saida = & (Join-Path $RepoRoot 'bot\dry-run.ps1') -json -Site indeed
+        $LASTEXITCODE | Should -Be 0
+        $obj = ($saida | Out-String) | ConvertFrom-Json
+        $obj.global | Should -Be $false
+        $obj.site_count | Should -Be 1
+        $obj.sites[0].site_id | Should -Be 'indeed'
     }
 }
