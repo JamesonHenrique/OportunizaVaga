@@ -51,6 +51,8 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
 ```
 
 - **1 site per round**, circular rotation, 20 min sleep between rounds (backoff when empty).
+- **Profile isolation:** active profile keeps its own state in `bot/state/<perfil>/`.
+- **Recognition mode:** `OV_RECONHECIMENTO=1` scores jobs without applying.
 - **Junior/trainee + remote + ≤14 days only** (all configurable in the prompt).
 - **Never hallucinates data:** everything comes from `bot/dados_candidato.json`;
   gaps become `bloqueado` entries with the exact reason.
@@ -59,7 +61,8 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
   optional Copilot): on rate limit it tries the next one — return to the
   preferred model is automatic.
 - **Weekly follow-up** (Mondays): rechecks applied-job status.
-- **Optional monitor** (`monitor/`): free-tier dashboard, no database.
+- **Optional monitor** (`monitor/`): free-tier dashboard, no database, aggregate
+  telemetry by default (raw details are explicit opt-in).
 
 ## Quickstart (5 steps)
 
@@ -134,11 +137,12 @@ Without `MONITOR_URL`, the bot works normally — it just publishes nothing.
 
 ## Security — READ BEFORE COMMITTING
 
-**Never** commit: `bot/dados_candidato.json`, `bot/aplicadas.json`, PDF CVs,
-`cron.env`/`auth.json`, `*.log`, `logs/`, the Chrome profile, `*.bak-*` backups.
-`.gitignore` already blocks all of this — check `git status` before every push and
-run `./scripts/sanitize.sh`. Leaked a secret? **Rotate it immediately** at the
-provider (removing it from git does not erase history).
+**Never** commit: `bot/dados_candidato.json`, `bot/aplicadas.json`, `bot/state/`,
+`bot/prompt_loop.runtime.md`, PDF CVs, `cron.env`/`auth.json`, `*.log`, `logs/`,
+the Chrome profile, `*.bak-*` backups. `.gitignore` already blocks all of this —
+check `git status` before every push and run `./scripts/sanitize.sh`. Leaked a
+secret? **Rotate it immediately** at the provider (removing it from git does not
+erase history).
 Details: [`docs/SEGURANCA.md`](docs/SEGURANCA.md).
 
 ## Docs

@@ -41,6 +41,8 @@ Para dados reais, rode fora do Docker (`npm run dev` acima) apontando
 
 ## Segurança
 
-O snapshot envia contadores, eventos e caudas de log — **nunca** documentos,
-CPF ou segredos. Proteja o endpoint com `MONITOR_SECRET` (header `x-monitor-secret`)
-se expor o painel.
+O snapshot publica agregados por padrão (contadores, estados, perfis e totais).
+Detalhes brutos (aplicadas, bloqueadas, eventos, caudas de log) só saem quando
+`MONITOR_INCLUDE_DETAILS=1` for definido explicitamente — nada de CPF, documentos,
+segredos, host/pid ou caminho local. Proteja o endpoint com `MONITOR_SECRET`
+(header `x-monitor-secret`) se expor o painel.

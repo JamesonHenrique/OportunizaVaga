@@ -16,6 +16,14 @@ PARES=(
   "bot/dados_candidato.json|config/dados_candidato.schema.json|0"
   "bot/aplicadas.json|config/aplicadas.schema.json|0"
 )
+for perfil in config/perfis/*.example.json; do
+  [ -f "$perfil" ] || continue
+  PARES+=("$perfil|config/perfil.schema.json|1")
+done
+for estado in bot/state/*/aplicadas.json; do
+  [ -f "$estado" ] || continue
+  PARES+=("$estado|config/aplicadas.schema.json|0")
+done
 
 ARGS=()
 for p in "${PARES[@]}"; do

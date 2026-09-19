@@ -2,6 +2,9 @@
 **/dados_candidato.json
 **/aplicadas.json
 **/quota-cache.json
+**/state/*/
+**/prompt_loop.runtime.md
+**/reconhecimento-*.json
 **/cron.env
 **/auth.json
 **/cron*.env

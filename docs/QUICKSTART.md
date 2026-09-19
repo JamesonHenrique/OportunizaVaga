@@ -59,10 +59,18 @@ cp config/perfis/junior-backend.example.json bot/perfil.json  # ou estagio-qa
 # edite termos/pular_tipos; os termos alimentam a seção TERMOS do prompt_loop
 ```
 
-Aponte o perfil no loop via `$BOT_PERFIL` (caminho do JSON do perfil ativo).
-**Modo atual: manual** — `bot/loop.sh`/`bot/loop.ps1` NÃO leram `$BOT_PERFIL`
-automaticamente (lógica intacta por segurança); antes de cada rodada, copie o
-exemplo desejado para `bot/perfil.json` e confira `termos`/`pular_tipos`.
+Aponte o perfil no loop via `$BOT_PERFIL` (caminho do JSON do perfil ativo) ou
+deixe `bot/perfil.json` no lugar. O loop resolve o perfil sozinho e cria um
+estado isolado em `bot/state/<perfil>/aplicadas.json` — cada perfil mantém o
+próprio rodízio, bloqueados e candidaturas, sem misturar histórico.
+
+Para validar o plano sem se candidatar:
+
+```bash
+BOT_PERFIL=config/perfis/junior-backend.example.json ./bot/dry-run.sh --json
+./bot/dry-run.sh --json --site indeed       # plano só do Indeed
+OV_RECONHECIMENTO=1 ./bot/dry-run.sh --json # modo reconhecimento (não aplica)
+```
 
 ## 3. Chaves de API (fora do repo)
 
@@ -147,19 +155,22 @@ Sem `MONITOR_URL`, o bot funciona normalmente — só não publica status.
 
 ## Teste sem risco (dry-run)
 
-Antes de ligar o loop real, simule UMA rodada sem se candidatar (só lê
-arquivos — não abre browser, não aplica em nada):
+Antes de ligar o loop real, simule o plano sem se candidatar (só lê arquivos —
+não abre browser, não aplica em nada):
 
 ```bash
-./bot/dry-run.sh           # resumo humano do que a rodada faria
-./bot/dry-run.sh --json    # saída máquina (site, termos, limite 3, modelo)
+./bot/dry-run.sh            # plano humano: todos os sites, termos e URLs
+./bot/dry-run.sh --json    # saída máquina (sites, perfil, limites, telemetria)
+./bot/dry-run.sh --json --site indeed
+./bot/dry-run.sh --json --reconhecimento
 ```
 
 Windows (PowerShell nativo):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1
-powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1 --json
+powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1 -json
+powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1 -json -Site indeed
 ```
 
 ## Diagnosticando (doctor)

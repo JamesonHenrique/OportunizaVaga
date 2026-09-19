@@ -41,8 +41,8 @@ VAZIA_BASE="${OV_VAZIA_BASE:-3600}"           # backoff por rodada sem vaga nova
 # esgotado seria pior que esperar um limite que reseta sozinho.
 # Limite e POR MODELO e transitorio (medido: mimo dava 429 enquanto
 # nemotron-3.5-lightning respondia normal) — e o que faz cascatear valer a pena.
-# muse-spark-1.3 vem primeiro: e o unico com historico de completar rodadas reais
-# (as 7 candidaturas de 13-14/09 sairam com ele).
+# nex-n2.5-pro vem primeiro enquanto muse-spark-1.3 estiver no limite; a volta
+# ao preferido historico e automatica quando a cota dele reseta.
 # Todos rodam por API: consumo de RAM local = zero (a maquina tem 7.7G e ja usa swap).
 # Ordem = capacidade decrescente. Navegar formulario (Gupy, LinkedIn) e onde
 # modelo fraco erra, entao o maior vem primeiro; os menores sao rede de seguranca.
@@ -54,6 +54,7 @@ VAZIA_BASE="${OV_VAZIA_BASE:-3600}"           # backoff por rodada sem vaga nova
 USAR_OPENROUTER=1
 
 MODELOS=(
+  "openrouter/nex-agi/nex-n2.5-pro:free"
   "opencode/muse-spark-1.3-contributor-free"
   "opencode/nemotron-3-ultra-free"
   "opencode/nemotron-3.5-lightning-free"
@@ -125,6 +126,44 @@ LOG_MAX_BYTES=2097152   # 2MB -> rotaciona
 ROUNDS_KEPT=20          # quantos logs completos de rodada manter
 BROWSER_LOCK=/tmp/agent-chrome-9222.lock   # lock do Chrome compartilhado entre agentes locais
 
+# Perfil ativo e estado isolado. Sem BOT_PERFIL/perfil.json, o comportamento
+# historico permanece em bot/aplicadas.json.
+PERFIL_FILE="${BOT_PERFIL:-}"
+if [ -z "$PERFIL_FILE" ] && [ -f "$BOT_ROOT/bot/perfil.json" ]; then
+  PERFIL_FILE="$BOT_ROOT/bot/perfil.json"
+fi
+if [ -n "$PERFIL_FILE" ] && [ ! -f "$PERFIL_FILE" ]; then
+  echo "[$(date '+%F %T')] ERRO: perfil nao encontrado: $PERFIL_FILE" >> loop.log
+  exit 1
+fi
+if [ -n "$PERFIL_FILE" ]; then
+  PERFIL_NOME="$(python3 - "$PERFIL_FILE" <<'PY'
+import json, sys
+print(json.load(open(sys.argv[1], encoding='utf-8')).get('nome_perfil', 'perfil'))
+PY
+)"
+  PERFIL_SLUG="$(printf '%s' "$PERFIL_NOME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-48)"
+  [ -n "$PERFIL_SLUG" ] || PERFIL_SLUG="perfil"
+  STATE_DIR="$BOT_ROOT/bot/state/$PERFIL_SLUG"
+else
+  PERFIL_NOME="default"
+  PERFIL_SLUG="default"
+  STATE_DIR="$BOT_ROOT/bot"
+fi
+APLICADAS_FILE="$STATE_DIR/aplicadas.json"
+DADOS_CANDIDATO_FILE="$BOT_ROOT/bot/dados_candidato.json"
+RUNTIME_PROMPT="$STATE_DIR/prompt_loop.runtime.md"
+RECONHECIMENTO_FILE="$STATE_DIR/reconhecimento-$(date '+%Y%m%d-%H%M%S').json"
+export BOT_PERFIL="$PERFIL_FILE" PERFIL_FILE PERFIL_NOME PERFIL_SLUG STATE_DIR APLICADAS_FILE DADOS_CANDIDATO_FILE RUNTIME_PROMPT RECONHECIMENTO_FILE
+export OV_RECONHECIMENTO="${OV_RECONHECIMENTO:-0}"
+export OV_MAX_CANDIDATURAS="${OV_MAX_CANDIDATURAS:-3}"
+export OV_RECONHECIMENTO_LIMIT="${OV_RECONHECIMENTO_LIMIT:-10}"
+export OV_TELEMETRY_MODE="${OV_TELEMETRY_MODE:-aggregate}"
+export OV_MONITOR_INCLUDE_DETAILS="${OV_MONITOR_INCLUDE_DETAILS:-0}"
+mkdir -p "$STATE_DIR"
+if [ ! -f "$APLICADAS_FILE" ]; then
+  cp "$BOT_ROOT/examples/aplicadas.example.json" "$APLICADAS_FILE"
+fi
 mkdir -p logs
 
 # Instancia unica deste loop
@@ -199,11 +238,34 @@ quota_in_opencode_log() {   # $1 = timestamp ISO do inicio da rodada
 # Se nada disso mudou depois da rodada, NENHUMA vaga nova apareceu (nem p/ descarte) —
 # e o sinal para o backoff adaptativo. Mtime nao serve: o rodizio sempre regrava o arquivo.
 fingerprint() {
-  python3 -c "
-import json
-d=json.load(open('aplicadas.json'))
-print(len(d.get('aplicadas',[]))+len(d.get('bloqueados',{}))+d.get('descartes_listagem_total',0))
-" 2>/dev/null || echo -1
+  python3 - "$1" <<'PY'
+import json, sys
+try:
+    d=json.load(open(sys.argv[1], encoding='utf-8'))
+    print(len(d.get('aplicadas',[]))+len(d.get('bloqueados',{}))+d.get('descartes_listagem_total',0))
+except Exception:
+    print('-1')
+PY
+}
+
+render_prompt() {
+  python3 - "$BOT_ROOT/bot/prompt_loop.md" "$RUNTIME_PROMPT" "$APLICADAS_FILE" "$DADOS_CANDIDATO_FILE" "$PERFIL_FILE" "$PERFIL_NOME" "$RECONHECIMENTO_FILE" "$OV_RECONHECIMENTO" "$OV_MAX_CANDIDATURAS" "$OV_RECONHECIMENTO_LIMIT" <<'PY'
+from pathlib import Path
+import sys
+
+source, target, aplicadas, dados, perfil, perfil_nome, reconhecimento, modo, limite, limite_reconhecimento = sys.argv[1:]
+text = Path(source).read_text(encoding='utf-8')
+text = text.replace('$APLICADAS_FILE', aplicadas)
+text = text.replace('$DADOS_CANDIDATO_FILE', dados)
+text = text.replace('bot/perfil.json', perfil)
+text = text.replace('SEU_NOME', perfil_nome)
+text = text.replace('YOUR_NAME', perfil_nome)
+if modo in {'1', 'true', 'True', 'sim', 'Sim'}:
+    text += '''\n\nMODO RECONHECIMENTO (obrigatorio): NAO se candidate, NAO preencha formulario, NAO envie mensagem, NAO altere aplicadas.json. Avalie no maximo %s vagas recentes do site da rodada e grave somente %s com schema compativel com config/reconhecimento.schema.json. Use chave estavel site+vaga, score 0-5, URL, empresa, vaga, remota, nivel, stack, motivos e observacoes; nunca inclua dados pessoais.\n''' % (limite_reconhecimento, reconhecimento)
+else:
+    text += '''\n\nPERFIL ATIVO: %s. Use somente os termos, filtros e estado deste perfil. O limite desta rodada e %s candidaturas novas.\n''' % (perfil_nome, limite)
+Path(target).write_text(text, encoding='utf-8')
+PY
 }
 
 # Backoff por rodada vazia: 1h na primeira e dobra SEM TETO a cada rodada vazia
@@ -244,8 +306,9 @@ while true; do
   ensure_monitor
 
   ROUND_LOG="logs/rodada-$(date '+%Y%m%d-%H%M%S').log"
-  FP_ANTES=$(fingerprint)
-  log "rodada iniciada (rodadas vazias seguidas: ${VAZIAS})"
+  render_prompt
+  FP_ANTES=$(fingerprint "$APLICADAS_FILE")
+  log "rodada iniciada (perfil ${PERFIL_NOME}, rodadas vazias seguidas: ${VAZIAS})"
 
   STATUS=0
   MODELO_OK=""
@@ -258,7 +321,7 @@ while true; do
   # Sessao nova a cada rodada: o historico nao carrega nada que aplicadas.json nao tenha.
   setsid timeout --kill-after=30s "$RUN_TIMEOUT" \
     flock -w 900 -E 75 "$BROWSER_LOCK" \
-    "$OPENCODE_BIN" run -m "$MODELO" --title "candidaturas-$(date '+%F-%H%M')" "$(cat "$BOT_ROOT/bot/prompt_loop.md")" \
+    "$OPENCODE_BIN" run -m "$MODELO" --title "candidaturas-$(date '+%F-%H%M')" "$(cat "$RUNTIME_PROMPT")" \
     </dev/null 9>&- >"$ROUND_LOG" 2>&1 &
   ROUND_PID=$!
 
@@ -330,7 +393,7 @@ while true; do
   else
     FAILS=0
     QUOTA_HITS=0
-    FP_DEPOIS=$(fingerprint)
+    FP_DEPOIS=$(fingerprint "$APLICADAS_FILE")
     if [ "$FP_ANTES" != "-1" ] && [ "$FP_DEPOIS" != "-1" ] && [ "$FP_ANTES" = "$FP_DEPOIS" ]; then
       VAZIAS=$((VAZIAS + 1))
       W=$(vazia_wait "$VAZIAS")

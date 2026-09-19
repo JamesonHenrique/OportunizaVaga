@@ -10,6 +10,8 @@ Segredo visto = **comprometido**: rotacione imediatamente no provedor e migre pa
 ## Nunca entra no repo
 
 - `bot/dados_candidato.json`, `bot/aplicadas.json` (seus dados + estado)
+- `bot/state/`, `bot/prompt_loop.runtime.md`, `bot/reconhecimento-*.json`
+  (estado por perfil, prompt renderizado e rascunhos de reconhecimento)
 - `cron.env`, `auth.json` e qualquer arquivo com chave/token (só `.example`)
 - CVs em PDF (`CV_*.pdf`), logs (`*.log`, `logs/`)
 - Perfil do browser (`chrome-real` user-data-dir: sessões logadas!)
@@ -36,8 +38,9 @@ ln -s ../../scripts/sanitize.sh .git/hooks/pre-commit
   com o motivo — nunca chute CPF, RG, tempo de experiência ou idioma.
 - **Allowlist de domínios**: o browser só acessa sites de vaga BR
   (`config/sites_permitidos.json` + `--allowed-origins`); o resto nem é requisitado.
-- **Monitor sem dado sensível**: o snapshot envia contadores, eventos e caudas de log
-  — nunca CPF, documentos ou segredos.
+- **Monitor sem dado sensível**: o snapshot publica agregados por padrão (contadores,
+  estados, perfis e totais); detalhes brutos só saem com `MONITOR_INCLUDE_DETAILS=1`.
+  Nada de CPF, documentos, segredos, host/pid ou caminho local.
 
 ## Se vazar
 

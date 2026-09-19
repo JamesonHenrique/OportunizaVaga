@@ -1,15 +1,16 @@
 # bot/dry-run.ps1 — espelho Windows (PowerShell 5.1+) de bot/dry-run.sh.
-# Simula UMA rodada sem se candidatar (teste sem risco). So LE arquivos:
-# valida os JSONs, mostra o site do rodizio e lista o que a rodada FARIA
-# (site, termos de busca, limite, modelo preferido). Nao abre browser, nao
-# chama o opencode, nao escreve nada, nao se candidata.
-# Requer apenas PowerShell (funciona sem Chrome/opencode instalados).
-# Uso: powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1 [--json]
+# Simula UMA rodada global sem se candidatar (teste sem risco). So LE arquivos:
+# valida os JSONs, monta o plano por site e mostra o que a rodada FARIA.
+# Nao abre browser, nao chama o opencode, nao escreve nada, nao se candidata.
+# Uso: powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1 [-json] [-Site indeed] [-Profile caminho] [-Reconhecimento]
 
 [CmdletBinding()]
 param(
     [switch]$json,
-    [switch]$help
+    [switch]$help,
+    [string]$Site,
+    [string]$Profile,
+    [switch]$Reconhecimento
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,112 +18,149 @@ $BOT_ROOT = Split-Path -Parent $PSScriptRoot
 Set-Location (Join-Path $BOT_ROOT 'bot')
 
 if ($help) {
-    Write-Host 'Uso: bot\dry-run.ps1 [--json]'
-    Write-Host 'Simula uma rodada sem se candidatar. Exit 0 = rodada simulada ok.'
+    Write-Host 'Uso: bot\dry-run.ps1 [-json] [-Site SITE_ID] [-Profile CAMINHO] [-Reconhecimento]'
+    Write-Host 'Plano global: todos os adaptadores; nada e escrito, nenhum browser e aberto.'
     exit 0
 }
 
-# Modelo preferido = primeiro da escada em bot/loop.ps1 (fonte unica de verdade).
-$ModeloPreferido = 'opencode/muse-spark-1.3-contributor-free'
-try {
-    $hit = Select-String -Path (Join-Path $BOT_ROOT 'bot\loop.ps1') -Pattern "Add\('([^']+)'\)" -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($hit -and $hit.Matches[0].Groups[1].Value) { $ModeloPreferido = $hit.Matches[0].Groups[1].Value }
-} catch { }
+function Resolve-Profile {
+    param([string]$ExplicitProfile)
 
-$dadosCaminho = 'dados_candidato.json'
-$dadosReais = $true
-if (-not (Test-Path $dadosCaminho)) { $dadosCaminho = Join-Path $BOT_ROOT 'examples\dados_candidato.example.json'; $dadosReais = $false }
-$aplicCaminho = 'aplicadas.json'
-$aplicReais = $true
-if (-not (Test-Path $aplicCaminho)) { $aplicCaminho = Join-Path $BOT_ROOT 'examples\aplicadas.example.json'; $aplicReais = $false }
+    $profilePath = $ExplicitProfile
+    if ([string]::IsNullOrWhiteSpace($profilePath)) { $profilePath = $env:BOT_PERFIL }
+    if ([string]::IsNullOrWhiteSpace($profilePath)) {
+        $candidate = Join-Path $BOT_ROOT 'bot\perfil.json'
+        if (Test-Path $candidate) { $profilePath = $candidate }
+    }
+    if ([string]::IsNullOrWhiteSpace($profilePath)) {
+        $profilePath = Join-Path $BOT_ROOT 'config\perfis\junior-backend.example.json'
+    }
+    if (-not (Test-Path $profilePath)) {
+        throw "perfil nao encontrado: $profilePath"
+    }
+    return $profilePath
+}
 
-$erros = New-Object System.Collections.ArrayList
+function Get-Slug {
+    param([string]$Name)
+    $slug = $Name.ToLowerInvariant() -replace '[^a-z0-9]+', '-'
+    $slug = $slug.Trim('-')
+    if ($slug.Length -gt 48) { $slug = $slug.Substring(0, 48) }
+    return $slug
+}
 
-try { $dados = Get-Content $dadosCaminho -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
-catch { $dados = $null; [void]$erros.Add(('dados_candidato: JSON invalido ou ilegivel ({0})' -f $_.Exception.Message)) }
-if ($null -ne $dados) {
-    foreach ($k in @('nome', 'email', 'telefone', 'linkedin', 'local')) {
-        if ($null -eq $dados.PSObject.Properties[$k]) { [void]$erros.Add(("dados_candidato: chave obrigatoria ausente: '{0}'" -f $k)) }
+$ProfileFile = Resolve-Profile $Profile
+$ExplicitProfile = $false
+if ((-not [string]::IsNullOrWhiteSpace($Profile)) -or (-not [string]::IsNullOrWhiteSpace($env:BOT_PERFIL)) -or (Test-Path (Join-Path $BOT_ROOT 'bot\perfil.json'))) {
+    $ExplicitProfile = $true
+}
+if ($ProfileFile -ne (Join-Path $BOT_ROOT 'config\perfis\junior-backend.example.json')) {
+    $ExplicitProfile = $true
+}
+
+$PerfilDoc = $null
+try { $PerfilDoc = Get-Content $ProfileFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
+catch { throw "perfil: JSON invalido ou ilegivel ($($_.Exception.Message))" }
+
+foreach ($key in @('nome_perfil', 'nivel', 'termos', 'pular_tipos')) {
+    if ($null -eq $PerfilDoc.PSObject.Properties[$key]) { throw "perfil: chave obrigatoria ausente: '$key'" }
+}
+if (-not $PerfilDoc.termos -or @($PerfilDoc.termos).Count -eq 0) { throw 'perfil: termos precisa ser uma lista nao vazia' }
+
+$PerfilNome = [string]$PerfilDoc.nome_perfil
+$PerfilSlug = Get-Slug $PerfilNome
+if ($ExplicitProfile) { $StateDir = Join-Path $BOT_ROOT "bot\state\$PerfilSlug" } else { $PerfilSlug = 'default'; $StateDir = Join-Path $BOT_ROOT 'bot' }
+$AplicadasFile = Join-Path $StateDir 'aplicadas.json'
+if (-not (Test-Path $AplicadasFile)) { $AplicadasFile = Join-Path $BOT_ROOT 'examples\aplicadas.example.json' }
+$DadosFile = Join-Path $BOT_ROOT 'bot\dados_candidato.json'
+if (-not (Test-Path $DadosFile)) { $DadosFile = Join-Path $BOT_ROOT 'examples\dados_candidato.example.json' }
+
+$DadosDoc = $null
+try { $DadosDoc = Get-Content $DadosFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
+catch { throw "dados_candidato: JSON invalido ou ilegivel ($($_.Exception.Message))" }
+foreach ($key in @('nome', 'email', 'telefone', 'linkedin', 'local')) {
+    if ($null -eq $DadosDoc.PSObject.Properties[$key]) { throw "dados_candidato: chave obrigatoria ausente: '$key'" }
+}
+
+$AplicDoc = $null
+try { $AplicDoc = Get-Content $AplicadasFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
+catch { throw "aplicadas: JSON invalido ou ilegivel ($($_.Exception.Message))" }
+if ($null -eq $AplicDoc.PSObject.Properties['aplicadas']) { throw "aplicadas: chave obrigatoria ausente: 'aplicadas'" }
+if ($null -eq $AplicDoc.rodizio -or [string]::IsNullOrWhiteSpace([string]$AplicDoc.rodizio.proximo)) {
+    throw "aplicadas: chave obrigatoria ausente: 'rodizio.proximo'"
+}
+
+$Sites = New-Object System.Collections.ArrayList
+$adapterDir = Join-Path $BOT_ROOT 'bot\sites'
+foreach ($file in (Get-ChildItem $adapterDir -Filter '*.sh' | Sort-Object Name)) {
+    if ($file.Name -eq '_template.sh' -or $file.Name -eq 'lib.sh') { continue }
+    $text = Get-Content $file.FullName -Raw
+    $siteId = [regex]::Match($text, 'SITE_ID="([^"]+)"').Groups[1].Value
+    if ([string]::IsNullOrWhiteSpace($siteId)) { continue }
+    if ((-not [string]::IsNullOrWhiteSpace($Site)) -and ($siteId -ne $Site)) { continue }
+    $label = [regex]::Match($text, 'SITE_LABEL="([^"]+)"').Groups[1].Value
+    if ([string]::IsNullOrWhiteSpace($label)) { $label = $siteId }
+    $home = [regex]::Match($text, 'SITE_HOME="([^"]+)"').Groups[1].Value
+    $template = [regex]::Match($text, 'SEARCH_URL_TEMPLATE="([^"]+)"').Groups[1].Value
+    if ([string]::IsNullOrWhiteSpace($template)) { throw "adaptador invalido: $siteId (sem SEARCH_URL_TEMPLATE)" }
+    $term = [string]@($PerfilDoc.termos)[0]
+    $encoded = if ($template -like '*vagas-de-*') { $term.Replace(' ', '-') } else { $term.Replace(' ', '%20') }
+    $url = $template.Replace('SEU_TERMO', $encoded)
+    [void]$Sites.Add([ordered]@{
+        site_id = $siteId
+        label = $label
+        home = $home
+        termos = @($PerfilDoc.termos)
+        url_busca = $url
+    })
+}
+
+$ModeloPreferido = 'openrouter/nex-agi/nex-n2.5-pro:free'
+$ProximoSite = $null
+if ($null -ne $AplicDoc.rodizio) { $ProximoSite = [string]$AplicDoc.rodizio.proximo }
+
+$Result = [ordered]@{
+    ok = $true
+    dry_run = $true
+    global = [string]::IsNullOrWhiteSpace($Site)
+    modo = if ($Reconhecimento) { 'reconhecimento' } else { 'candidaturas' }
+    perfil = [ordered]@{
+        nome = $PerfilNome
+        slug = $PerfilSlug
+        arquivo = $ProfileFile
+        nivel = [string]$PerfilDoc.nivel
+        termos = @($PerfilDoc.termos)
+        pular_tipos = @($PerfilDoc.pular_tipos)
+    }
+    estado = [ordered]@{
+        diretorio = $StateDir
+        arquivo_aplicadas = $AplicadasFile
+        isolado = ($PerfilSlug -ne 'default')
+        aplicadas_registradas = @($AplicDoc.aplicadas).Count
+        proximo_site = $ProximoSite
+    }
+    sites = @($Sites)
+    site_count = $Sites.Count
+    limite_candidaturas = 3
+    limite_reconhecimento = 10
+    modelo_preferido = $ModeloPreferido
+    browser_aberto = $false
+    candidaturas_enviadas = 0
+    telemetria = [ordered]@{
+        modo = 'aggregate'
+        detalhes = $false
     }
 }
-
-try { $aplic = Get-Content $aplicCaminho -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
-catch { $aplic = $null; [void]$erros.Add(('aplicadas: JSON invalido ou ilegivel ({0})' -f $_.Exception.Message)) }
-$ordem = @(); $proximo = '?'
-if ($null -ne $aplic) {
-    if ($null -ne $aplic.rodizio) {
-        if ($null -ne $aplic.rodizio.ordem) { $ordem = @($aplic.rodizio.ordem) }
-        if ($null -ne $aplic.rodizio.proximo) { $proximo = [string]$aplic.rodizio.proximo }
-    }
-    if ($null -eq $aplic.PSObject.Properties['aplicadas']) { [void]$erros.Add("aplicadas: chave obrigatoria ausente: 'aplicadas'") }
-    if ([string]::IsNullOrWhiteSpace($proximo) -or $proximo -eq '?') { [void]$erros.Add("aplicadas: chave obrigatoria ausente: 'rodizio.proximo'") }
-}
-
-$seguinte = '?'
-if ($ordem.Count -gt 0 -and $ordem -contains $proximo) {
-    $seguinte = $ordem[([Array]::IndexOf($ordem, $proximo) + 1) % $ordem.Count]
-}
-
-# Termos espelham bot/prompt_loop.md (secao b, TERMOS) — a rodada real alterna
-# entre eles priorizando o stack real de dados_candidato.json.
-$termos = @(
-    'desenvolvedor fullstack junior',
-    'backend junior remoto',
-    'desenvolvedor junior remoto',
-    'trainee desenvolvedor remoto'
-)
-$limite = 3  # regra 5 do prompt_loop.md: maximo 3 candidaturas novas por rodada
-$nAplic = 0; $nBloq = 0
-if ($null -ne $aplic) {
-    if ($null -ne $aplic.aplicadas) { $nAplic = @($aplic.aplicadas).Count }
-    if ($null -ne $aplic.bloqueados) {
-        if ($aplic.bloqueados -is [System.Collections.IDictionary]) { $nBloq = $aplic.bloqueados.Count }
-        else { $nBloq = @($aplic.bloqueados | Get-Member -MemberType NoteProperty).Count }
-    }
-}
-
-if ($erros.Count -gt 0) {
-    if ($json) {
-        $out = @{ ok = $false; dry_run = $true; erros = @($erros) } | ConvertTo-Json -Depth 4
-        Write-Output $out   # JSON no stdout (capturavel); Write-Host iria so pro host
-    } else {
-        Write-Host 'dry-run: FALHOU — corrija antes de rodar o loop real:'
-        foreach ($x in $erros) { Write-Host ("  [FALHA] {0}" -f $x) }
-    }
-    exit 1
-}
-
-$dadosFonte = 'examples/dados_candidato.example.json'
-if ($dadosReais) { $dadosFonte = 'bot/dados_candidato.json' }
-$aplicFonte = 'examples/aplicadas.example.json'
-if ($aplicReais) { $aplicFonte = 'bot/aplicadas.json' }
 
 if ($json) {
-    $out = [ordered]@{
-        ok = $true
-        dry_run = $true
-        site = $proximo
-        site_seguinte = $seguinte
-        ordem_rodizio = @($ordem)
-        termos_busca = @($termos)
-        limite_candidaturas = $limite
-        modelo_preferido = $ModeloPreferido
-        dados_fonte = $dadosFonte
-        estado_fonte = $aplicFonte
-        aplicadas_registradas = $nAplic
-        bloqueados_registrados = $nBloq
-        browser_aberto = $false
-        candidaturas_enviadas = 0
-    } | ConvertTo-Json -Depth 4
-    Write-Output $out   # JSON no stdout (capturavel); Write-Host iria so pro host
+    $out = $Result | ConvertTo-Json -Depth 6
+    Write-Output $out
 } else {
-    Write-Host 'dry-run: UMA rodada simulada (nada foi enviado, nenhum browser aberto).'
-    Write-Host ("  JSONs validos: {0} | {1}" -f $dadosCaminho, $aplicCaminho)
-    Write-Host ("  site desta rodada (rodizio.proximo): {0}" -f $proximo)
-    Write-Host ("  site seguinte sera: {0}" -f $seguinte)
-    Write-Host ("  termos de busca que usaria: {0}" -f ($termos -join '; '))
-    Write-Host ("  limite: {0} candidaturas novas (regra 5)" -f $limite)
-    Write-Host ("  modelo preferido (1o da escada em bot/loop.ps1): {0}" -f $ModeloPreferido)
-    Write-Host ("  estado atual: {0} aplicadas, {1} bloqueados" -f $nAplic, $nBloq)
+    Write-Host 'dry-run global: plano de uma rodada (nada foi enviado, nenhum browser aberto).'
+    Write-Host ("  perfil: {0} | estado isolado: {1}" -f $PerfilNome, $Result.estado.isolado)
+    Write-Host ("  sites: {0} | proximo do rodizio: {1}" -f $Sites.Count, $ProximoSite)
+    foreach ($site in $Sites) {
+        Write-Host ("  - {0}: {1}" -f $site.site_id, $site.url_busca)
+    }
 }
 exit 0

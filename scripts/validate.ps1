@@ -18,6 +18,13 @@ $pairs = @(
     @('bot\aplicadas.json', 'config\aplicadas.schema.json', $false)
 )
 
+foreach ($perfil in (Get-ChildItem (Join-Path $BOT_ROOT 'config\perfis') -Filter '*.example.json' -ErrorAction SilentlyContinue)) {
+    $pairs += ,@(("config\perfis\{0}" -f $perfil.Name), 'config\perfil.schema.json', $true)
+}
+foreach ($estado in (Get-ChildItem (Join-Path $BOT_ROOT 'bot\state') -Filter 'aplicadas.json' -Recurse -ErrorAction SilentlyContinue)) {
+    $pairs += ,@($estado.FullName, 'config\aplicadas.schema.json', $false)
+}
+
 $check = @()
 foreach ($p in $pairs) {
     $f = $p[0]; $s = $p[1]; $req = $p[2]

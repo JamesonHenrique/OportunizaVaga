@@ -39,10 +39,11 @@ Out of scope:
 
 ## Secret Hygiene (binding)
 
-- **Never commit** `bot/dados_candidato.json`, `bot/aplicadas.json`, `*.log`,
-  `logs/`, `cron.env` (`**/cron.env`, `**/cron*.env`), `**/auth.json`, PDFs
-  (`*.pdf`), browser profiles or `*.bak-*` files. They are blocked by
-  `.gitignore` — verify with `git status` before every push.
+- **Never commit** `bot/dados_candidato.json`, `bot/aplicadas.json`, `bot/state/`,
+  `bot/prompt_loop.runtime.md`, `bot/reconhecimento-*.json`, `*.log`, `logs/`,
+  `cron.env` (`**/cron.env`, `**/cron*.env`), `**/auth.json`, PDFs (`*.pdf`),
+  browser profiles or `*.bak-*` files. They are blocked by `.gitignore` — verify
+  with `git status` before every push.
 - Run `./scripts/sanitize.sh` before each commit/push. It is blocking
   (exit 1 on match). Recommended as a pre-commit hook:
   `ln -s ../../scripts/sanitize.sh .git/hooks/pre-commit`.

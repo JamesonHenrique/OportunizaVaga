@@ -12,8 +12,11 @@ jobs:
       - name: bash -n (scripts intocados + espelhos não quebram nada)
         run: |
           bash -n bot/loop.sh
+          bash -n bot/dry-run.sh
           bash -n bot/guardiao.sh
           bash -n bot/followup.sh
+          bash -n bot/sites/lib.sh
+          for f in bot/sites/*.sh; do bash -n "$f"; done
           bash -n scripts/monitor-keepalive.sh
           bash -n scripts/pull-monitor.sh
           bash -n scripts/setup.sh
@@ -44,7 +47,9 @@ jobs:
           bash -n scripts/validate.sh
           bash scripts/validate.sh
       - name: suite bash (TAP)
-        run: bash tests/test_validate.sh
+        run: |
+          bash tests/test_validate.sh
+          bash tests/test_dry_run.sh
       - name: node --test monitor/
         run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)
