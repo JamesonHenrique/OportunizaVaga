@@ -100,7 +100,7 @@ foreach ($file in (Get-ChildItem $adapterDir -Filter '*.sh' | Sort-Object Name))
     if ((-not [string]::IsNullOrWhiteSpace($Site)) -and ($siteId -ne $Site)) { continue }
     $label = [regex]::Match($text, 'SITE_LABEL="([^"]+)"').Groups[1].Value
     if ([string]::IsNullOrWhiteSpace($label)) { $label = $siteId }
-    $home = [regex]::Match($text, 'SITE_HOME="([^"]+)"').Groups[1].Value
+    $siteHome = [regex]::Match($text, 'SITE_HOME="([^"]+)"').Groups[1].Value
     $template = [regex]::Match($text, 'SEARCH_URL_TEMPLATE="([^"]+)"').Groups[1].Value
     if ([string]::IsNullOrWhiteSpace($template)) { throw "adaptador invalido: $siteId (sem SEARCH_URL_TEMPLATE)" }
     $term = [string]@($PerfilDoc.termos)[0]
@@ -109,7 +109,7 @@ foreach ($file in (Get-ChildItem $adapterDir -Filter '*.sh' | Sort-Object Name))
     [void]$Sites.Add([ordered]@{
         site_id = $siteId
         label = $label
-        home = $home
+        home = $siteHome
         termos = @($PerfilDoc.termos)
         url_busca = $url
     })
