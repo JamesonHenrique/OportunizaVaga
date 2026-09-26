@@ -67,13 +67,16 @@
       "enabled": true
     },
     // Chrome real via CDP (perfil ~/.config/chrome-real, porta 9222): browser de verdade, sem flag de automação — vale pra tudo incluindo Google/LinkedIn
-    // --allowed-origins: bloqueio REAL de dominio, na camada de requisicao do browser.
-    // So sites de vaga BR (+ auxiliares de login/CDN) passam; o resto nem e requisitado.
-    // Lista documentada em config/sites_permitidos.json deste repo.
+    // --blocked-origins: bloqueio REAL de dominio, na camada de requisicao do browser.
+    // Em vez de uma allowlist fechada de sites de vaga, bloqueia so os agregadores
+    // estrangeiros/spam (a candidatura pode seguir p/ QUALQUER ATS/site de carreira —
+    // inhire.app, rippling, greenhouse, lever, factorialhr, site proprio... — desde
+    // que a vaga seja BR/PT/remota, filtro que fica a cargo da regra 7 do prompt).
+    // Lista documentada em config/sites_permitidos.json deste repo (bloqueados_no_browser).
     "playwright-chrome-real": {
       "type": "local",
       "command": ["npx", "-y", "@playwright/mcp", "--cdp-endpoint", "http://127.0.0.1:9222", "--caps", "vision",
-                  "--allowed-origins", "https://linkedin.com;https://*.linkedin.com;https://licdn.com;https://*.licdn.com;https://indeed.com;https://*.indeed.com;https://indeedassets.com;https://*.indeedassets.com;https://indeedcdn.com;https://*.indeedcdn.com;https://gupy.io;https://*.gupy.io;https://gupy.com.br;https://*.gupy.com.br;https://catho.com.br;https://*.catho.com.br;https://infojobs.com.br;https://*.infojobs.com.br;https://pandape.com;https://*.pandape.com;https://vagas.com.br;https://*.vagas.com.br;https://glassdoor.com.br;https://*.glassdoor.com.br;https://jooble.org;https://*.jooble.org;https://empregos.com.br;https://*.empregos.com.br;https://trabalhabrasil.com.br;https://*.trabalhabrasil.com.br;https://netvagas.com.br;https://*.netvagas.com.br;https://solides.com.br;https://*.solides.com.br;https://solides.com;https://*.solides.com;https://abler.com.br;https://*.abler.com.br;https://inhire.io;https://*.inhire.io;https://inhire.com.br;https://*.inhire.com.br;https://talentify.in;https://*.talentify.in;https://compleo.com.br;https://*.compleo.com.br;https://99jobs.com;https://*.99jobs.com;https://geekhunter.com.br;https://*.geekhunter.com.br;https://programathor.com.br;https://*.programathor.com.br;https://trampardecasa.com.br;https://*.trampardecasa.com.br;https://remotar.com.br;https://*.remotar.com.br;https://coodesh.com;https://*.coodesh.com;https://revelo.com.br;https://*.revelo.com.br;https://apinfo.com;https://*.apinfo.com;https://google.com;https://*.google.com;https://gstatic.com;https://*.gstatic.com;https://googleapis.com;https://*.googleapis.com;https://googleusercontent.com;https://*.googleusercontent.com;https://recaptcha.net;https://*.recaptcha.net;https://cloudfront.net;https://*.cloudfront.net;https://cloudflare.com;https://*.cloudflare.com;https://jsdelivr.net;https://*.jsdelivr.net"],
+                  "--blocked-origins", "https://ziprecruiter.com;https://*.ziprecruiter.com;https://wellfound.com;https://*.wellfound.com;https://angel.co;https://*.angel.co;https://dice.com;https://*.dice.com;https://weworkremotely.com;https://*.weworkremotely.com;https://remoteok.com;https://*.remoteok.com;https://remoteok.io;https://*.remoteok.io;https://jobgether.com;https://*.jobgether.com;https://turing.com;https://*.turing.com;https://crossover.com;https://*.crossover.com;https://toptal.com;https://*.toptal.com;https://upwork.com;https://*.upwork.com;https://fiverr.com;https://*.fiverr.com;https://monster.com;https://*.monster.com;https://careerbuilder.com;https://*.careerbuilder.com;https://simplyhired.com;https://*.simplyhired.com;https://talent.com;https://*.talent.com;https://jobrapido.com;https://*.jobrapido.com;https://adzuna.com;https://*.adzuna.com;https://remote.co;https://*.remote.co;https://flexjobs.com;https://*.flexjobs.com;https://himalayas.app;https://*.himalayas.app;https://workingnomads.com;https://*.workingnomads.com;https://otta.com;https://*.otta.com"],
       "enabled": true
     }
   }

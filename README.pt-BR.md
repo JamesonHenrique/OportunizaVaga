@@ -87,7 +87,7 @@ oportunizavaga/
 │   ├── chrome-real.ps1          # espelho Windows (perfil em %LOCALAPPDATA%)
 │   └── README.md
 ├── config/
-│   ├── sites_permitidos.json    # allowlist de domínios BR (espelha o bloqueio do browser)
+│   ├── sites_permitidos.json    # blocklist de agregadores gringos/spam (espelha o bloqueio do browser)
 │   ├── opencode.jsonc.example   # modelo do config do opencode (com a cascata de modelos)
 │   ├── crontab.example          # cron sugerido (guardiao, keepalive, follow-up)
 │   └── TaskScheduler.md         # equivalente Windows (schtasks prontos)
