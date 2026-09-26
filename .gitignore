@@ -3,6 +3,7 @@
 **/aplicadas.json
 **/quota-cache.json
 **/state/*/
+**/backups/
 **/prompt_loop.runtime.md
 **/reconhecimento-*.json
 **/cron.env

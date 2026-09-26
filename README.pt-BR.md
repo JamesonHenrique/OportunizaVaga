@@ -101,7 +101,10 @@ oportunizavaga/
 │   ├── setup.sh / setup.ps1    # instalador interativo (Linux / Windows)
 │   ├── sanitize.sh              # varredura pré-commit de segredos/dados pessoais
 │   ├── monitor-keepalive.sh / .ps1  # mantém o publisher do painel no ar
-│   └── pull-monitor.sh / .ps1       # atualiza o painel via git pull
+│   ├── pull-monitor.sh / .ps1       # atualiza o painel via git pull
+│   ├── digest.sh / .ps1             # resumo diário + alertas de anomalia no loop.log
+│   ├── notificar.sh / .ps1          # push genérico ao Telegram (dedupe 6h)
+│   └── backup-jsons.sh / .ps1       # cópia rotativa (14x) dos JSONs de estado
 ├── examples/
 │   ├── dados_candidato.example.json  # COPIE p/ bot/dados_candidato.json e preencha
 │   └── aplicadas.example.json        # COPIE p/ bot/aplicadas.json (estado inicial)

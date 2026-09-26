@@ -21,6 +21,9 @@ jobs:
           bash -n scripts/pull-monitor.sh
           bash -n scripts/setup.sh
           bash -n scripts/sanitize.sh
+          bash -n scripts/digest.sh
+          bash -n scripts/notificar.sh
+          bash -n scripts/backup-jsons.sh
           bash -n browser/chrome-real.sh
       - name: shellcheck
         uses: ludeeus/action-shellcheck@2.0.0

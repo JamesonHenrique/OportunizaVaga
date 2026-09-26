@@ -56,6 +56,9 @@
 | `monitor/quota-daemon.mjs` | Mede cota diária OpenRouter `:free` (único provider com API de uso) |
 | `scripts/monitor-keepalive.sh` | Dono único do publisher (sobe se cair) |
 | `scripts/pull-monitor.sh` | Fast-forward do painel + restart do publisher se o código mudou |
+| `scripts/digest.sh` | Resumo diário (aplicadas/bloqueadas + alertas de anomalia no `loop.log`) |
+| `scripts/notificar.sh` | Push genérico ao Telegram (dedupe de 6h); usado por `digest`/`followup`/`rodizio-saude` |
+| `scripts/backup-jsons.sh` | Cópia rotativa (14x) de `aplicadas.json`/`dados_candidato.json`, raiz + cada perfil |
 
 ## Decisões-chave
 
