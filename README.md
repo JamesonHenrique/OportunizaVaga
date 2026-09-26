@@ -11,7 +11,8 @@
 
 > 🌐 Translations: 🇧🇷 [Português](README.pt-BR.md) · 🇪🇸 [Español](README.es.md)
 
-Open-source bot that **auto-applies to junior/trainee remote jobs in Brazil**,
+Open-source bot that **auto-applies to remote jobs in Brazil, for any level and any field**
+(internship to C-level; tech, legal, marketing, healthcare...),
 running on your own PC at **zero cost** (free AI models + Brazilian job boards).
 
 > ⚠️ **Legal warning:** automating applications may violate the Terms of Use of
@@ -47,7 +48,8 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
 - **1 site per round**, circular rotation, 20 min sleep between rounds (backoff when empty).
 - **Profile isolation:** active profile keeps its own state in `bot/state/<perfil>/`.
 - **Recognition mode:** `OV_RECONHECIMENTO=1` scores jobs without applying.
-- **Junior/trainee + remote + ≤14 days only** (all configurable in the prompt).
+- **Any level, any field:** accepted levels (`niveis`), field (`area`), search terms and
+  experience ceiling come from your profile (`bot/perfil.json`); remote + ≤14 days by default.
 - **Never hallucinates data:** everything comes from `bot/dados_candidato.json`;
   gaps become `bloqueado` entries with the exact reason.
 - **Noise-free:** listing discards become counters, never block entries.

@@ -11,7 +11,8 @@
 
 > 🌐 Traducciones / Translations: 🇬🇧 [English](README.md) · 🇧🇷 [Português](README.pt-BR.md) · 🇪🇸 Español
 
-Bot de código abierto que **aplica automáticamente a empleos remotos junior/trainee en Brasil**,
+Bot de código abierto que **aplica automáticamente a empleos remotos en Brasil, de cualquier nivel y área**
+(de pasantía a dirección; tecnología, jurídico, marketing, salud...),
 ejecutándose en tu propia PC a **costo cero** (modelos de IA gratuitos + portales de empleos brasileños).
 
 > ⚠️ **Aviso legal:** automatizar solicitudes puede violar los Términos de Servicio de
@@ -47,7 +48,8 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
 - **1 sitio por ronda**, rotación circular, 20 min de espera entre rondas (retroceso cuando está vacío).
 - **Estado aislado por perfil:** el perfil activo guarda su historial en `bot/state/<perfil>/`.
 - **Modo reconocimiento:** `OV_RECONHECIMENTO=1` puntúa vacantes sin postularse.
-- **Solo junior/trainee + remoto + ≤14 días** (todo configurable en el prompt).
+- **Cualquier nivel y área:** niveles aceptados (`niveis`), área (`area`), términos de búsqueda y
+  tope de experiencia vienen de tu perfil (`bot/perfil.json`); remoto + ≤14 días por defecto.
 - **Nunca alucina datos:** todo proviene de `bot/dados_candidato.json`;
   los vacíos se convierten en entradas `bloqueado` con la razón exacta.
 - **Sin ruido:** los listados descartados se convierten en contadores, nunca bloquean entradas.

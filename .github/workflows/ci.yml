@@ -49,6 +49,7 @@ jobs:
           python3 -m py_compile bot/estado.py
           python3 -m py_compile bot/arquivar-logs-rodada.py
           python3 -m py_compile bot/rodizio-saude.py
+          python3 -m py_compile bot/perfil_render.py
       - name: validate (schemas + novos .sh)
         run: |
           bash -n bot/dry-run.sh
@@ -61,6 +62,7 @@ jobs:
           bash tests/test_dry_run.sh
           bash tests/test_estado.sh
           bash tests/test_rodizio_saude.sh
+          bash tests/test_perfil_render.sh
       - name: node --test monitor/
         run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)

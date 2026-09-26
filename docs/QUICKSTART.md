@@ -44,19 +44,29 @@ cp examples/aplicadas.example.json bot/aplicadas.json
 ```
 
 Edite `bot/dados_candidato.json`: nome, e-mail, stack real (`experiencia.tecnologias`),
-similares JR (`experiencia.stacks_similares_jr`), pretensão (`SEU_VALOR_BASE`),
+similares (`experiencia.stacks_similares`), pretensão (`SEU_VALOR_BASE`),
 respostas padrão de formulário. **Campo vazio = o robô registra "bloqueado" em vez
 de inventar.** Veja `docs/PROMPTS.md` para adaptar `bot/prompt_loop.md` ao seu stack.
 
 ## Múltiplos perfis
 
-Exemplos mínimos em `config/perfis/` (`junior-backend.example.json`,
-`estagio-qa.example.json` — estrutura: `nome_perfil`, `termos[]`,
-`pular_tipos[]`, `nivel`):
+Exemplos em `config/perfis/` para níveis e áreas diferentes:
+
+| Arquivo | Níveis | Área |
+|---|---|---|
+| `junior-backend.example.json` | trainee, júnior | tecnologia (backend) |
+| `estagio-qa.example.json` | estágio, trainee | tecnologia (QA) |
+| `senior-techlead.example.json` | sênior, especialista, líder | tecnologia (liderança técnica) |
+| `pleno-marketing.example.json` | pleno, sênior | marketing digital |
+| `estagio-direito.example.json` | estágio | jurídico |
+
+Estrutura: `nome_perfil`, `niveis[]`, `area`, `termos[]`, `pular_tipos[]` e, opcionais,
+`experiencia_max_anos` e `sites_pular` (schema em `config/perfil.schema.json`).
 
 ```bash
-cp config/perfis/junior-backend.example.json bot/perfil.json  # ou estagio-qa
-# edite termos/pular_tipos; os termos alimentam a seção TERMOS do prompt_loop
+cp config/perfis/senior-techlead.example.json bot/perfil.json  # ou qualquer outro
+# edite niveis/area/termos/pular_tipos: o loop injeta tudo no prompt ({{NIVEIS}}, {{AREA}}, {{TERMOS}}...)
+python3 bot/perfil_render.py info bot/perfil.json  # confere o que o robô vai aceitar/recusar
 ```
 
 Aponte o perfil no loop via `$BOT_PERFIL` (caminho do JSON do perfil ativo) ou

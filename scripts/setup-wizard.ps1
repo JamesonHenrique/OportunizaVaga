@@ -29,10 +29,10 @@ $github   = Ask "URL do GitHub"
 $local    = Ask "Cidade/UF"
 $formacao = Ask "Formacao (curso - instituicao - periodo)"
 $idiomas  = Ask "Idiomas (so o real, ex.: Portugues nativo; Ingles intermediario)"
-$objetivo = Ask "Objetivo (ex.: desenvolvedor junior remoto)"
+$objetivo = Ask "Objetivo (ex.: tech lead remoto, advogado pleno remoto)"
 $resumo   = Ask "Resumo profissional (3-4 linhas verdadeiras)"
 $techs    = Ask "Tecnologias que voce domina (separadas por virgula)"
-$nivel    = Ask "Nivel (ex.: junior)"
+$nivel    = Ask "Nivel (estagio, trainee, junior, pleno, senior, especialista, lider, gestor, diretor)"
 
 $d = Get-Content $Exemplo -Raw | ConvertFrom-Json
 

@@ -2,10 +2,12 @@ Você é o filtro barato da listagem (SEM browser, SEM candidatura).
 
 REGRAS FIXAS (espelham bot/prompt_loop.md, regras 1/3/4):
 1. SOMENTE remoto. Card com presencial/híbrido → descarte (match "nao").
-2. SOMENTE JR/júnior/trainee. Pleno/mid/sênior/staff/lead/II/III sem jr → descarte.
-   Card AMBÍGUO (sem nível) → marque "avaliar" (match "talvez"), nunca descarte.
-3. Stack: compare com dados_candidato.json (REAL + SIMILAR-JR). Fora dos dois
-   como OBRIGATÓRIO → descarte. Como DESEJÁVEL → "avaliar".
+2. Nível (do perfil ativo). ACEITOS: {{NIVEIS}}. RECUSADOS: {{NIVEIS_RECUSADOS}}.
+   Título só com nível recusado → descarte. Card AMBÍGUO (sem nível) → marque "avaliar"
+   (match "talvez"), nunca descarte.
+3. Área {{AREA}} e stack/competências: compare com dados_candidato.json (REAL + SIMILAR).
+   Card de outra área, ou competência fora dos dois como OBRIGATÓRIA → descarte.
+   Como DESEJÁVEL → "avaliar". Pule também: {{PULAR_TIPOS}}.
 4. NUNCA invente dado. Na dúvida entre descartar e avaliar, AVALIE.
 5. Descarte de listagem NÃO é bloqueio: só classifique, não explique bloqueio.
 
@@ -24,7 +26,8 @@ CARDS:
 ---
 ## Como usar no two-tier
 
-1. Cole a listagem (cards/HTML) em CARDS: e rode este prompt no modelo BARATO.
+1. Renderize os placeholders do perfil (`python3 bot/perfil_render.py render bot/perfil.json
+   bot/prompt_triage.md /tmp/triage.md`), cole a listagem em CARDS: e rode no modelo BARATO.
 2. Pegue o JSON de volta e abra SÓ os itens com match "sim"/"talvez"
    (máximo ~10, mais recentes primeiro, janela ≤14 dias).
 3. Aplique neles o fluxo normal de bot/prompt_loop.md no modelo FORTE

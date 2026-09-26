@@ -1,11 +1,16 @@
 {
   "_nota": "Sites de BUSCA do rodizio (onde o agente procura vaga) + blocklist do browser. NAO e mais allowlist: o MCP playwright-chrome-real usa --blocked-origins (lista em bloqueados_no_browser), entao a candidatura pode seguir para QUALQUER ATS/site de carreira (inhire.app, rippling, greenhouse, lever, factorialhr, recrutei, site proprio...) desde que a vaga seja no Brasil, em portugues, remota e com contratacao brasileira (regra 7 do prompt_loop.md). IMPORTANTE: cada dominio de bloqueados_no_browser entra em DUAS formas, 'https://x.com' e 'https://*.x.com' — o wildcard sozinho NAO casa o dominio nu.",
   "atualizado": "2026-09-25 (allowlist do browser trocada por blocklist; apply liberado p/ qualquer ATS)",
+  "restrito_a_area": {
+    "_nota": "id do rodizio -> area exigida. Perfil cuja area nao e tech pula estes sites (bot/perfil_render.py; override: perfil.sites_pular).",
+    "programathor": "tech",
+    "geekhunter": "tech"
+  },
   "generalistas_grandes": {
     "linkedin.com": "maior volume; Candidatura Simplificada e o caminho mais rapido",
     "br.indeed.com": "agregador; melhor filtro de remoto + sort=date",
     "catho.com.br": "generalista grande, muita vaga CLT",
-    "infojobs.com.br": "generalista, bom volume junior",
+    "infojobs.com.br": "generalista, bom volume em todos os niveis",
     "vagas.com.br": "generalista tradicional",
     "glassdoor.com.br": "vagas + salarios",
     "br.jooble.org": "agregador",
@@ -15,7 +20,7 @@
   },
   "ats_onde_as_empresas_publicam": {
     "gupy.io": "ATS mais usado no Brasil; use sua conta Google. Alto retorno",
-    "solides.com.br": "ATS (ex-Kenoby); muitas vagas tech",
+    "solides.com.br": "ATS (ex-Kenoby); todas as areas",
     "abler.com.br": "ATS",
     "inhire.io": "ATS focado em tech",
     "talentify.in": "ATS",

@@ -6,7 +6,8 @@ nem aplica sozinho — quem faz isso é o modelo, dirigindo o Chrome real confor
 
 1. **Como montar a URL de busca** (com filtro remoto quando o portal permite);
 2. **Onde/como o portal marca "remoto"** (dica para o modelo confirmar na página);
-3. **Quais termos** daquela rodada valem para o site (lidos do `prompt_loop.md`).
+3. **Quais termos** daquela rodada valem para o site (do bloco do site no `prompt_loop.md`;
+   sem bloco, valem os `termos[]` do perfil ativo).
 
 Adaptadores são **descobertos automaticamente**: todo `bot/sites/*.sh` que segue o
 contrato entra no plano do `dry-run` e no rodízio, sem registro manual. A
@@ -54,8 +55,10 @@ $EDITOR bot/sites/meuportal.sh          # ajuste SITE_ID, SEARCH_URL_TEMPLATE, d
 3. **`site_url_busca`**: já vem pronto no template (troca espaços por `%20`); se o
    portal usa hífen no path (como Vagas.com.br), troque por `-` — veja
    [`bot/sites/vagas.sh`](../bot/sites/vagas.sh).
-4. **Termos no prompt**: em `bot/prompt_loop.md`, adicione um bloco `- meuportal:`
-   com os termos que fazem sentido nesse site.
+4. **Termos**: por padrão o portal usa os `termos[]` do perfil. Só se o site precisar de termos
+   próprios, adicione um bloco `- meuportal:` com termos entre aspas no `bot/prompt_loop.md`.
+   Portal só de uma área (ex.: só tech)? Registre em `config/sites_permitidos.json` ->
+   `restrito_a_area` para ele sair do rodízio de perfis de outras áreas.
 5. **Rodízio**: inclua o `SITE_ID` na lista de rodízio (campo `rodizio` do
    `aplicadas.json` / seção de rodízio do prompt).
 
@@ -66,7 +69,7 @@ bash -n bot/sites/meuportal.sh                       # sintaxe
 shellcheck -S error bot/sites/meuportal.sh           # lint
 source bot/sites/lib.sh
 site_adapter_source meuportal "$(pwd)"              # carrega e valida o contrato
-site_url_busca "desenvolvedor java junior"           # confere a URL montada
+site_url_busca "analista financeiro pleno"           # confere a URL montada
 site_buscar_termos                                   # confere os termos lidos do prompt
 ./bot/dry-run.sh                                      # plano global: não aplica em nada
 ./bot/dry-run.sh --site meuportal --json             # plano só do portal novo

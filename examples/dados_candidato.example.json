@@ -32,7 +32,7 @@
     "cargo_atual": "SEU CARGO REAL",
     "empresa_atual": "SUA EMPRESA REAL",
     "tecnologias": ["Java", "Spring Boot", "Angular", "PostgreSQL"],
-    "stacks_similares_jr": ["React básico", "Vue básico", "NestJS", "FastAPI"],
+    "stacks_similares": ["React básico", "Vue básico", "NestJS", "FastAPI"],
     "projetos_relevantes": "DESCREVA 2-3 PROJETOS REAIS",
     "certificacoes": "",
     "portfolio": "",
@@ -79,6 +79,8 @@
     "aceita_estagio": "não",
     "aceita_junior": "sim",
     "aceita_pleno": "não",
+    "aceita_senior": "não",
+    "aceita_lideranca": "não",
     "observacao": ""
   }
 }
