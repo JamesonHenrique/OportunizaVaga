@@ -92,3 +92,23 @@ jobs:
       - name: sanitize via git-bash
         shell: bash
         run: ./scripts/sanitize.sh
+
+  monitor:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monitor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+      - name: next build (painel + /api/status)
+        run: npx next build
+      - name: demo responde com dados fictícios
+        run: |
+          MONITOR_DEMO=1 npx next start -p 3100 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3100/api/status -o /tmp/s.json && break; sleep 1; done
+          node -e "const s=require('/tmp/s.json'); if(!s._demo||!s.applied.length) process.exit(1); console.log('demo ok:', s.applied.length, 'candidaturas')"
