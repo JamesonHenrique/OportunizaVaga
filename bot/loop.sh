@@ -120,6 +120,7 @@ USAR_COPILOT=0
 
 WATCHDOG_AFTER=240        # limite maximo de espera do watchdog
 WATCHDOG_MIN_WAIT=45      # antes disso nao aborta: rodada boa pode demorar a produzir saida
+WATCHDOG_STALL="${OV_WATCHDOG_STALL:-90}"   # quota no meio da rodada + saida parada ha Ns -> aborta e cascateia
 WATCHDOG_MIN_BYTES=800    # rodada que produziu menos que isso nao comecou de verdade
 MONITOR_URL="${MONITOR_URL:-https://sua-url.vercel.app}"
 LOG_MAX_BYTES=2097152   # 2MB -> rotaciona
@@ -324,8 +325,22 @@ while true; do
   STATUS=0
   MODELO_OK=""
   TODOS_NO_LIMITE=1
+  IMPRODUTIVA=0
 
-  for MODELO in "${MODELOS[@]}"; do
+  # Cooldown por modelo (evita recascatear pelo mesmo modelo esgotado a cada rodada,
+  # cada tentativa custa ~dezenas de segundos so p/ redescobrir o mesmo limite).
+  COOLDOWN_FILE="$STATE_DIR/model_cooldown"
+  AGORA_S=$(date +%s)
+  CASCATA=()
+  for M in "${MODELOS[@]}"; do
+    ATE=$(awk -v m="$M" '$1==m {print $2}' "$COOLDOWN_FILE" 2>/dev/null | tail -1)
+    [ -n "$ATE" ] && [ "$ATE" -gt "$AGORA_S" ] && continue
+    CASCATA+=("$M")
+  done
+  [ "${#CASCATA[@]}" -eq 0 ] && CASCATA=("${MODELOS[@]}")   # todos em resfriamento: tenta assim mesmo
+  [ "${#CASCATA[@]}" -lt "${#MODELOS[@]}" ] && log "cascata sem $(( ${#MODELOS[@]} - ${#CASCATA[@]} )) modelo(s) em resfriamento"
+
+  for MODELO in "${CASCATA[@]}"; do
   ROUND_START=$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')
   # </dev/null: opencode le stdin; sem TTY isso gerava "EBADF: bad file descriptor".
   # 9>&-: nao vaza o fd do flock para o filho.
@@ -337,19 +352,23 @@ while true; do
   ROUND_PID=$!
 
   # Watchdog: em rate limit o opencode trava calado e a rodada so morreria no timeout de 20min.
-  # Se depois de WATCHDOG_AFTER o log interno acusar quota E a rodada nao tiver produzido nada,
-  # aborta ja — recupera em 4min em vez de 20.
+  # Aborta cedo em dois casos: (1) quota cedo e a rodada nao produziu nada ainda; (2) quota no
+  # MEIO da rodada com a saida parada ha WATCHDOG_STALL segundos (ficaria pendurado ate o timeout).
   (
     # O erro de rate limit aparece no log interno em menos de 1s. Em vez de dormir o
     # periodo inteiro, checa de 15 em 15s a partir de WATCHDOG_MIN_WAIT: rodada bloqueada
-    # morre em ~45s em vez de 4min, o que torna viavel cascatear para o proximo modelo.
+    # morre bem antes do timeout, o que torna viavel cascatear para o proximo modelo.
     esperado=0
+    ultimo_tam=0
+    parado=0
     while [ "$esperado" -lt "$WATCHDOG_AFTER" ]; do
       sleep 15
       esperado=$((esperado + 15))
+      tam=$(stat -c %s "$ROUND_LOG" 2>/dev/null || echo 0)
+      if [ "$tam" -eq "$ultimo_tam" ]; then parado=$((parado + 15)); else parado=0; ultimo_tam=$tam; fi
       [ "$esperado" -lt "$WATCHDOG_MIN_WAIT" ] && continue
-      if quota_in_opencode_log "$ROUND_START" \
-         && [ "$(stat -c %s "$ROUND_LOG" 2>/dev/null || echo 0)" -lt "$WATCHDOG_MIN_BYTES" ]; then
+      if { [ "$tam" -lt "$WATCHDOG_MIN_BYTES" ] || [ "$parado" -ge "$WATCHDOG_STALL" ]; } \
+         && quota_in_opencode_log "$ROUND_START"; then
         kill -TERM -- "-$ROUND_PID" 2>/dev/null || kill -TERM "$ROUND_PID" 2>/dev/null
         break
       fi
@@ -364,8 +383,24 @@ while true; do
 
     if is_quota "$ROUND_LOG" || quota_in_opencode_log "$ROUND_START"; then
       log "modelo ${MODELO} no limite, cascateando para o proximo"
+      mkdir -p "$STATE_DIR"
+      echo "$MODELO $(( $(date +%s) + 5400 ))" >> "$COOLDOWN_FILE"
+      tail -n 50 "$COOLDOWN_FILE" > "$COOLDOWN_FILE.tmp" && mv "$COOLDOWN_FILE.tmp" "$COOLDOWN_FILE"
       continue
     fi
+    # Sessao improdutiva = falha do modelo, nao "rodada vazia" (modelo fraco que encerra sem
+    # navegar ou imprime a tool-call como texto): nao deve contar no backoff de 1h+ de vaga
+    # nova nem pausar site por falta de retorno.
+    if [ "$STATUS" -ne 75 ] && ! grep -q "browser_navigate" "$ROUND_LOG" 2>/dev/null; then
+      if grep -qE "<tool_call>|<function=|<parameter=" "$ROUND_LOG" 2>/dev/null; then
+        log "modelo ${MODELO} quebrou o formato de tool-call, cascateando para o proximo"
+      else
+        log "modelo ${MODELO} encerrou sem navegar (sessao improdutiva), cascateando para o proximo"
+      fi
+      IMPRODUTIVA=1
+      continue
+    fi
+    IMPRODUTIVA=0
     MODELO_OK="$MODELO"
     TODOS_NO_LIMITE=0
     break
@@ -375,6 +410,10 @@ while true; do
 
   # loop.log fica legivel: so o fim da rodada. Dump completo vive em logs/.
   { echo "--- saida da rodada (completa em ${ROUND_LOG}) ---"; tail -n 40 "$ROUND_LOG"; } >> loop.log
+
+  # O agente as vezes grava log_rodada_* em aplicadas.json; arquiva pra logs/rodadas.jsonl
+  # (o resumo de estado nao precisa cargar esse historico a cada rodada).
+  python3 "$BOT_ROOT/bot/arquivar-logs-rodada.py" "$APLICADAS_FILE" "$BOT_ROOT/bot/logs/rodadas.jsonl" >> loop.log 2>&1 || true
 
   if is_broken_session "$ROUND_LOG"; then
     FAILS=$((FAILS + 1))
@@ -386,7 +425,11 @@ while true; do
     [ "$IDX" -ge "${#QUOTA_STEPS[@]}" ] && IDX=$((${#QUOTA_STEPS[@]} - 1))
     W=${QUOTA_STEPS[$IDX]}
     QUOTA_HITS=$((QUOTA_HITS + 1))
-    log "quota/limite: TODOS os ${#MODELOS[@]} modelos gratuitos no teto (${QUOTA_HITS}x seguidas), rechecando em ${W}s"
+    if [ "$IMPRODUTIVA" -eq 1 ]; then
+      log "nenhum modelo produtivo agora (quota ou sessao sem navegar em todos), rechecando em ${W}s"
+    else
+      log "quota/limite: TODOS os ${#MODELOS[@]} modelos gratuitos no teto (${QUOTA_HITS}x seguidas), rechecando em ${W}s"
+    fi
     sleep "$W"
   elif [ "$STATUS" -eq 124 ] || [ "$STATUS" -eq 137 ] || [ "$STATUS" -eq 143 ]; then
     FAILS=$((FAILS + 1))
