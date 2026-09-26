@@ -327,6 +327,38 @@ function Get-FailWait([int]$n) {
     return $w
 }
 
+function Expand-PerfilPlaceholders([string]$text) {
+    # Nivel/area/termos do perfil ativo -> placeholders {{...}}. Canonico: bot/perfil_render.py;
+    # sem python, fallback nativo com os mesmos valores basicos.
+    if ($Py) {
+        $tmpIn = [IO.Path]::GetTempFileName(); $tmpOut = [IO.Path]::GetTempFileName()
+        try {
+            Set-Content -Path $tmpIn -Value $text -Encoding UTF8 -NoNewline
+            & $Py (Join-Path $BOT_ROOT 'bot\perfil_render.py') render $PerfilFile $tmpIn $tmpOut 2>$null
+            if ($LASTEXITCODE -eq 0) { return (Get-Content $tmpOut -Raw -Encoding UTF8) }
+        } finally { Remove-Item $tmpIn, $tmpOut -ErrorAction SilentlyContinue }
+    }
+    $perfil = $null
+    try { $perfil = Get-Content $PerfilFile -Raw -Encoding UTF8 | ConvertFrom-Json } catch { }
+    $niveis = @()
+    if ($perfil -and $perfil.niveis) { $niveis = @($perfil.niveis) } elseif ($perfil -and $perfil.nivel) { $niveis = @($perfil.nivel) } else { $niveis = @('junior', 'trainee') }
+    $termos = @(); if ($perfil -and $perfil.termos) { $termos = @($perfil.termos) }
+    $pular = @(); if ($perfil -and $perfil.pular_tipos) { $pular = @($perfil.pular_tipos) }
+    $area = if ($perfil -and $perfil.area) { [string]$perfil.area } else { 'tecnologia' }
+    $map = [ordered]@{
+        '{{NIVEIS}}' = ($niveis -join ' | ')
+        '{{NIVEIS_RECUSADOS}}' = '(todos os que nao estao entre os aceitos)'
+        '{{AREA}}' = $area
+        '{{TERMOS}}' = (($termos | ForEach-Object { '"' + $_ + '"' }) -join ', ')
+        '{{TERMO_PRINCIPAL}}' = $(if ($termos.Count) { [string]$termos[0] } else { '' })
+        '{{PULAR_TIPOS}}' = ($pular -join ', ')
+        '{{REGRA_EXPERIENCIA}}' = 'compare o tempo pedido com dados_candidato.json; nunca afirme tempo que nao tem'
+        '{{SITES_PULAR}}' = '(nenhum)'
+    }
+    foreach ($k in $map.Keys) { $text = $text.Replace($k, [string]$map[$k]) }
+    return $text
+}
+
 function Render-Prompt {
     $source = Join-Path $BOT_ROOT 'bot\prompt_loop.md'
     $text = Get-Content $source -Raw
@@ -336,6 +368,7 @@ function Render-Prompt {
     $text = $text.Replace('bot/perfil.json', $PerfilFile)
     $text = $text.Replace('SEU_NOME', $PerfilNome)
     $text = $text.Replace('YOUR_NAME', $PerfilNome)
+    $text = Expand-PerfilPlaceholders $text
     $reconhecimento = @('1', 'true', 'True', 'sim', 'Sim') -contains $env:OV_RECONHECIMENTO
     if ($reconhecimento) {
         $text += "`n`nMODO RECONHECIMENTO (obrigatorio): NAO se candidate, NAO preencha formulario, NAO envie mensagem, NAO altere aplicadas.json. Avalie no maximo $env:OV_RECONHECIMENTO_LIMIT vagas recentes do site da rodada e grave somente $ReconhecimentoFile com schema compativel com config\reconhecimento.schema.json. Use chave estavel site+vaga, score 0-5, URL, empresa, vaga, remota, nivel, stack, motivos e observacoes; nunca inclua dados pessoais.`n"
@@ -418,7 +451,7 @@ while ($true) {
     if ($Py) {
         try {
             $rodizioScript = Join-Path $BOT_ROOT 'bot\rodizio-saude.py'
-            $out = & $Py $rodizioScript pre $AplicadasFile 2>&1
+            $out = & $Py $rodizioScript pre $AplicadasFile --perfil $PerfilFile 2>&1
             if ($out) { Add-Content -Path 'loop.log' -Value $out }
         } catch { }
     }

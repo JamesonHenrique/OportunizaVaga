@@ -49,7 +49,8 @@
         "cargo_atual": { "type": "string" },
         "empresa_atual": { "type": "string" },
         "tecnologias": { "type": "array", "items": { "type": "string" } },
-        "stacks_similares_jr": { "type": "array", "items": { "type": "string" } },
+        "stacks_similares": { "type": "array", "items": { "type": "string" }, "description": "Competências próximas que você topa usar sem afirmar domínio (qualquer nível/área)." },
+        "stacks_similares_jr": { "type": "array", "items": { "type": "string" }, "description": "LEGADO: use stacks_similares." },
         "projetos_relevantes": { "type": "string" },
         "certificacoes": { "type": "string" },
         "portfolio": { "type": "string" },
@@ -112,6 +113,8 @@
         "aceita_estagio": { "type": "string", "enum": ["sim", "não", "nao", ""] },
         "aceita_junior": { "type": "string", "enum": ["sim", "não", "nao", ""] },
         "aceita_pleno": { "type": "string", "enum": ["sim", "não", "nao", ""] },
+        "aceita_senior": { "type": "string", "enum": ["sim", "não", "nao", ""] },
+        "aceita_lideranca": { "type": "string", "enum": ["sim", "não", "nao", ""] },
         "observacao": { "type": "string" }
       },
       "additionalProperties": true

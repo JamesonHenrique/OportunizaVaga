@@ -14,7 +14,8 @@
 [![Custo](https://img.shields.io/badge/custo-R%240%2Fm%C3%AAs-brightgreen.svg)](docs/CUSTO.md)
 [![Node](https://img.shields.io/badge/monitor-node%20%2B%20vercel-black.svg)](monitor/)
 
-Robô open-source de **candidaturas automáticas para vagas JR/trainee remotas no Brasil**,
+Robô open-source de **candidaturas automáticas para vagas remotas no Brasil, de qualquer nível e área**
+(do estágio à diretoria; tecnologia, jurídico, marketing, saúde...),
 rodando no seu próprio PC a **custo zero** (modelos de IA gratuitos + sites de vaga BR).
 
 > ⚠️ **Aviso legal:** automatizar candidaturas pode violar os Termos de Uso de LinkedIn,
@@ -49,7 +50,8 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
 - **1 site por rodada**, rodízio circular, dorme 20 min entre rodadas (backoff se vazio).
 - **Estado isolado por perfil:** o perfil ativo guarda o próprio histórico em `bot/state/<perfil>/`.
 - **Modo reconhecimento:** `OV_RECONHECIMENTO=1` pontua vagas sem se candidatar.
-- **Só JR/trainee + remoto + ≤14 dias** (tudo configurável no prompt).
+- **Qualquer nível e área:** níveis aceitos (`niveis`), área (`area`), termos de busca e teto de
+  experiência vêm do seu perfil (`bot/perfil.json`); remoto + ≤14 dias por padrão.
 - **Nunca inventa dados:** tudo vem de `bot/dados_candidato.json`; o que falta vira
   `bloqueado` com o motivo exato.
 - **Anti-ruído:** descarte de listagem vira contador, não polui bloqueios.

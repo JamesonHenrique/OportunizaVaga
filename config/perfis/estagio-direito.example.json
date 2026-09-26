@@ -1,0 +1,18 @@
+{
+  "_COMO_USAR": "Exemplo de perfil. Copie para bot/perfil.json e ajuste niveis/area/termos/pular_tipos ao SEU caso. Este arquivo de exemplo NUNCA vai ao git com dados reais.",
+  "nome_perfil": "estagio-direito-exemplo",
+  "niveis": [
+    "estagio"
+  ],
+  "area": "jurídico (direito)",
+  "termos": [
+    "estagio direito remoto",
+    "estagiario juridico",
+    "estagio escritorio de advocacia",
+    "estagio contencioso"
+  ],
+  "pular_tipos": [
+    "vaga exclusiva para bacharel com OAB",
+    "correspondente jurídico avulso"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "_COMO_USAR": "Exemplo de perfil. Copie para bot/perfil.json e ajuste niveis/area/termos/pular_tipos ao SEU caso. Este arquivo de exemplo NUNCA vai ao git com dados reais.",
+  "nome_perfil": "pleno-marketing-exemplo",
+  "niveis": [
+    "pleno",
+    "senior"
+  ],
+  "area": "marketing digital",
+  "termos": [
+    "analista de marketing digital pleno",
+    "analista de performance",
+    "social media pleno",
+    "analista de crm marketing",
+    "growth marketing"
+  ],
+  "pular_tipos": [
+    "vendas porta a porta",
+    "telemarketing",
+    "comissão sem fixo"
+  ]
+}

@@ -2,7 +2,8 @@
 """Adaptive rotation: pauses for 48h a site that goes PAUSE_AFTER rounds in a row without any
 new application, so rounds are not wasted re-scanning dry sites. Deterministic, no LLM.
 
-  rodizio-saude.py pre  [APLICADAS]   before the round: skip paused sites in rodizio.proximo
+  rodizio-saude.py pre  [APLICADAS] [--perfil PERFIL]   before the round: skip paused sites in
+                                     rodizio.proximo (and, with --perfil, sites outside the profile's area)
   rodizio-saude.py pos  [APLICADAS]   after a successful round: update the site's streak
 
 State: rodizio_saude.json next to APLICADAS (same state dir as the profile, so each
@@ -52,7 +53,18 @@ def paused(site_info, now):
     return bool(until) and datetime.fromisoformat(until) > now
 
 
-def main(cmd, aplicadas_path):
+def sites_fora_do_perfil(perfil_path):
+    if not perfil_path:
+        return set()
+    try:
+        sys.path.insert(0, str(SCRIPT_DIR))
+        import perfil_render
+        return set(perfil_render.resolver(perfil_render.carregar(perfil_path))["sites_pular"])
+    except Exception:
+        return set()
+
+
+def main(cmd, aplicadas_path, perfil_path=None):
     now = datetime.now()
     saude_path = Path(aplicadas_path).resolve().parent / "rodizio_saude.json"
     saude = load(saude_path, {"sites": {}})
@@ -70,8 +82,9 @@ def main(cmd, aplicadas_path):
         if not (isinstance(pos, int) and 0 <= pos < len(ordem) and ordem[pos] == atual):
             pos = ordem.index(atual) if atual in ordem else 0
         pulados = []
+        fora = sites_fora_do_perfil(perfil_path)
         for _ in range(len(ordem)):
-            if not paused(sites.get(ordem[pos], {}), now):
+            if not paused(sites.get(ordem[pos], {}), now) and ordem[pos] not in fora:
                 break
             pulados.append(ordem[pos])
             pos = (pos + 1) % len(ordem)
@@ -81,7 +94,7 @@ def main(cmd, aplicadas_path):
         if pulados and ordem:
             rod["proximo"], rod["pos"] = ordem[pos], pos
             save(aplicadas_path, d)
-            print(f"rodizio-saude: pulando {','.join(pulados)} (pausados), rodada vai em {ordem[pos]}")
+            print(f"rodizio-saude: pulando {','.join(pulados)} (pausados/fora da area), rodada vai em {ordem[pos]}")
         q = d.get("quase_la") or {}
         saude["rodada_atual"] = {"site": rod.get("proximo"), "pos": rod.get("pos"), "aplicadas_antes": len(d.get("aplicadas", [])),
                                  "quase_la_antes": sorted(q) if isinstance(q, dict) else []}
@@ -125,4 +138,10 @@ if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in ("pre", "pos"):
         print(__doc__)
         sys.exit(2)
-    sys.exit(main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else str(DEFAULT_APLICADAS)))
+    args = sys.argv[2:]
+    perfil = None
+    if "--perfil" in args:
+        i = args.index("--perfil")
+        perfil = args[i + 1] if i + 1 < len(args) else None
+        del args[i:i + 2]
+    sys.exit(main(sys.argv[1], args[0] if args else str(DEFAULT_APLICADAS), perfil))

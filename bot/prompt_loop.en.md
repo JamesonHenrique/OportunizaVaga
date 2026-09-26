@@ -8,46 +8,43 @@ $DADOS_CANDIDATO_FILE for the active profile before the round starts.)
 FIXED RULES:
 1. REMOTE (home office) jobs ONLY. Never on-site/hybrid.
 2. NEVER companies from $APLICADAS_FILE (pular_empresas field) nor jobs already in aplicadas.json.
-3. JR/junior or trainee level ONLY. NEVER internships (candidate preference),
-   NEVER mid-level, senior, staff, lead or architect.
-   The OFFICIAL job title counts: if the page says "Mid-level", discard even if the text mentions "Junior/Mid".
-   (The rule stays NEVER internships, no exception: even with no JR that day, do not apply to internships.)
-   SKIP TYPES (candidate preference — treat like internships: do NOT evaluate, do NOT open, do NOT log a block):
-   data science/BI, QA/testing requiring tooling outside the profile (e.g. Karate/Selenium with no evidence),
-   design/UX, ERP/functional (SAP, functional ERP) and PCD-exclusive jobs (candidate is not PCD).
+3. LEVEL AND AREA come from the active profile (bot/perfil.json), not from this text:
+   - Field/AREA: {{AREA}}. A job from another field → discard.
+   - ACCEPTED levels: {{NIVEIS}}.
+   - REFUSED levels: {{NIVEIS_RECUSADOS}}. No exception, even on a day with no job at an accepted level.
+   The OFFICIAL job title counts: a title with only refused levels → discard. A mixed title (e.g. "Junior/Mid",
+   "Senior/Specialist") where at least ONE level is accepted → evaluate normally.
+   SKIP TYPES (candidate preference — do NOT evaluate, do NOT open, do NOT log a block): {{PULAR_TIPOS}}.
    Also check aplicadas.json -> pular_tipos (editable list): discard anything matching, still in the listing.
 4. NEVER invent experience, language, skill or career length.
-   REAL STACK = dados_candidato.json -> experiencia.tecnologias (YOUR stack, which you
-   registered in examples/dados_candidato.example.json). SIMILAR-JR STACK =
-   experiencia.stacks_similares_jr (similar ones you accept working with at JR level, without claiming mastery).
-   EXAMPLE (adapt to YOUR stack — this is just a Java/Spring + Angular example):
-   REAL = Java/Spring Boot, Angular/TypeScript, Node/REST, Python FastAPI-JR,
-   Postgres/MySQL/Mongo, RPA (n8n/Make); SIMILAR-JR = basic React/Vue/Next,
-   NestJS/Express/Fastify, FastAPI/Flask-JR, basic Kotlin/Quarkus,
-   SQL Server/SQLite/Prisma, UiPath/PowerAutomate/Zapier/Camunda.
+   "STACK" = the skills of the field {{AREA}}: in tech, languages/frameworks; in other fields, tools,
+   systems, specialties and professional licenses (e.g. OAB, CRC, CRM, CREA, driver's license).
+   REAL STACK = dados_candidato.json -> experiencia.tecnologias (YOUR real skills).
+   SIMILAR STACK = experiencia.stacks_similares (or the legacy field experiencia.stacks_similares_jr):
+   close skills you accept using, without claiming mastery.
+   EXAMPLE (tech, Java/Spring + Angular): REAL = Java/Spring Boot, Angular/TypeScript, Postgres;
+   SIMILAR = React/Vue, NestJS/Express, Kotlin. EXAMPLE (legal): REAL = civil litigation, PJe, active OAB;
+   SIMILAR = labor advisory. Adapt to YOUR profile: your dados_candidato.json counts, not the example.
     MANDATORY vs NICE-TO-HAVE (golden rule): if the off-profile skill appears as
     "nice to have/preferred/familiarity/bonus" → APPLY (similar counts + frase_transferencia).
     If it appears as "mandatory/essential/prerequisite/proven solid" → DISCARD.
     In that case NEVER claim mastery: write in the CV/form only the real skill + the frase_transferencia
     from dados_candidato.json (e.g. "Angular + TypeScript, transferable to React — available to work").
-    FORBIDDEN to use similar for: solid/SR React or advanced Next (complex SSR), Karate/Selenium, ABAP, .NET/C#, Salesforce/Apex,
-     solid Django/Flutter/PHP-Laravel/Go, Databricks/Spark, or "solid/SR experience" / 4+ years requirements.
-    YEARS OF EXPERIENCE (up to 3 years allowed): if the job asks for AT MOST 3 years
-    (e.g. "1 year", "2 years", "1-2 years", "2-3 years", "up to 3 years", "3 years", "minimum 2 years",
-    "2+ years", "3+ years", "proven 2 years of experience") → APPLY, as long as the stack is within
-    REAL + SIMILAR-JR and level is JR/trainee (or mixed JR/mid). The years asked ALONE are never a
-    reason to discard if ≤3 years, even if the job marks it as mandatory/proven. If it asks 4+ years
-    ("4 years", "5 years", "extensive experience", "solid experience") → DISCARD.
+    FORBIDDEN to use similar when the job requires solid/proven mastery of exactly the skill you
+     only have as similar (e.g. tech: senior React with only Angular; legal: tax law with only civil).
+    YEARS OF EXPERIENCE (profile rule): {{REGRA_EXPERIENCIA}}. Valid as long as the stack is within
+    REAL + SIMILAR and the level is accepted (rule 3). The years asked ALONE are never a reason to
+    discard within this rule, even if the job marks it as mandatory/proven.
     EDUCATION: a job requiring a "completed degree" or "degree in IT" is NOT a discard — APPLY anyway,
     always stating the truth from dados_candidato.json -> formacao (and regra_formacao, if filled).
     NEVER mark it "completed"/"finished" nor invent a graduation date: if still in progress, say
     "in progress"; on a select with no such option, use "incomplete"/"in progress". Only discard for
-    education if the job requires a degree in ANOTHER field (e.g. Accounting, Engineering) or a
-    mandatory postgraduate degree. A pure OFFICIAL "Mid-level" title is still a DISCARD (rule 3); a
-    mixed "Junior/Mid-level" title follows this rule.
+    education if the job requires a degree in a field other than yours, a professional license you
+    don't hold (e.g. OAB, CRM, CRC) or a mandatory postgraduate degree missing from dados_candidato.json.
+    An OFFICIAL title with only refused levels is still a DISCARD (rule 3); a mixed title follows this rule.
     - REAL current role: YOUR_ROLE — YOUR_COMPANY, <period> (copy from dados_candidato.json -> experiencia).
-    - NEVER state "X years of experience": even for jobs asking up to 3 years, describe by role and period.
-      The experiencia.anos field is empty on purpose in dados_candidato.json; empty = forbidden to claim time.
+    - Only state "X years of experience" if dados_candidato.json -> experiencia.anos is FILLED
+      (use exactly that value). Empty = forbidden to claim time: describe by role and period.
    - Salary: follow the pretensao_regra from dados_candidato.json (base YOUR_BASE_VALUE; if the job lists a range, its midpoint).
      A mandatory numeric field never gets "To be agreed" — use the rule's number.
    - Address/ZIP/date of birth: use the ones from dados_candidato.json when asked.
@@ -92,12 +89,12 @@ a1) RECHECK (before looking for new jobs), in this order:
     2nd) BLOQUEADOS: walk the STATE SUMMARY -> bloqueados and check whether the cause still holds today.
     A block for missing data that ALREADY exists in dados_candidato.json is EXPIRED: resume the job,
     apply and log via add-aplicada (same effect). A still-valid block (job requires a CPF that
-    is still missing, incompatible stack, mid-level): leave as is and don't spend time on it.
+    is still missing, incompatible stack, refused level): leave as is and don't spend time on it.
     A job resumed from a block or from quase_la counts toward the rule-5 limit of 3 and has PRIORITY
     over new search.
     3rd) OUTDATED RULE: if the stored reason references a rule that has since CHANGED — "off the
     allowlist"/ERR_BLOCKED for a non-standard ATS (rule 7 now allows any ATS), a years-of-experience
-    requirement that would now be within the ≤3-year limit (rule 4), or "completed degree" (rule 4 now
+    requirement that would now be within the profile's experience rule (rule 4), or "completed degree" (rule 4 now
     allows it, stating the real education status) — RE-EVALUATE against the CURRENT rules in this
     prompt instead of blindly trusting the old reason text; if eligible now, resume and apply (same
     effect as add-aplicada); if the real cause still holds, rewrite the reason with the current cause.
@@ -120,47 +117,40 @@ b) SITE ROTATION: check rodizio.proximo in the STATE SUMMARY. Use EXACTLY 1 site
           -> remotar -> infojobs -> vagas -> (back to indeed)
    All Brazilian. Check $BOT_ROOT/config/sites_permitidos.json for the URLs and what each serves.
    2-LEVEL FRESHNESS (mandatory): 1st) sweep ONLY jobs ≤14 days old (sort=date / sortBy=DD),
-   newest first. 2nd) FALLBACK: only if zero new JR ≤14 days, do ONE
+   newest first. 2nd) FALLBACK: only if zero new job at an accepted level ≤14 days, do ONE
    15-21 day pass on the same site and stop (never >21 days). Remotar reposts old jobs — out of window, ignore even if compatible.
    LISTING PRE-FILTER (mandatory, BEFORE opening the job — saves model reads):
    judge by TITLE and card and do NOT open when:
-   - (level, rule 3) title carries mid/mid-level/senior/staff/lead/leader/PL/level II/III without jr/junior/trainee;
+   - (level, rule 3) title carries ONLY refused levels ({{NIVEIS_RECUSADOS}}), none of the accepted ones;
      if the card is AMBIGUOUS (no level), OPEN and check the official level inside — don't discard on suspicion;
    - (work model, rule 1) card shows on-site/hybrid; if the card does NOT state the model, OPEN and check inside;
-    - (off-profile stack) the card already shows a stack outside YOUR
-      dados_candidato.json REAL + SIMILAR-JR set. EXAMPLE (Java/Spring + Angular stack): in-profile =
-      Java/Spring (+basic Kotlin/Quarkus), Angular/TypeScript (+JR React/Vue, basic Next), Node
-      (+NestJS/Express/Fastify), Python FastAPI/Flask-JR, Postgres/MySQL/Mongo (+SQL Server/SQLite),
-      RPA (n8n/Make + UiPath/Power Automate/Zapier). Out of it: .NET/C#, Salesforce/Apex, ABAP,
-      PLC, Databricks/Spark, Zabbix, Karate/Selenium, solid Django/Flutter/PHP/Go, DS/BI/UX/ERP.
-      (Adapt the list to YOUR stack: what counts is your dados_candidato.json, not this example.)
+    - (off-profile field/stack) the card is from a field other than {{AREA}} or already lists as mandatory
+      a skill outside YOUR dados_candidato.json REAL + SIMILAR set.
    Listing discards do NOT become bloqueados entries (they're noise): instead, at the end of the round run
    ONCE `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE descartes LEVEL MODEL STACK`
    (how many you discarded in each) AND note up to 5 sample titles in the round log
    (e.g. "amostra_nivel: X, Y") to calibrate the filter. Only open jobs passing all three filters.
-   TERMS (EXAMPLE for Java/Spring stack — adapt to your stack; rotate per round, prioritize the real stack): "desenvolvedor java spring boot",
-   "desenvolvedor fullstack junior", "backend java junior", "backend junior remoto", "angular junior",
-   "typescript junior", "node junior", "desenvolvedor junior remoto", "trainee desenvolvedor remoto",
-   "RPA junior", "automacao junior", "integracoes junior", "sustentacao sistemas junior", "suporte tecnico junior remoto".
+   PROFILE TERMS (rotate per round, prioritize the first ones): {{TERMOS}}.
+   SITES OUTSIDE YOUR FIELD: {{SITES_PULAR}}. The loop already skips them; if you land on one, just advance rodizio.proximo.
    DRY SITE / PRIORITY: high return = gupy, linkedin, indeed, programathor, remotar. The loop
    (bot/rodizio-saude.py) pauses a site ON ITS OWN for 48h after 4 rounds in a row with zero new
    applications, and already updates rodizio.proximo before the next round starts. Do NOT switch
    sites yourself nor log a block for "dry site": run the site whose turn it is.
-   - indeed: https://br.indeed.com/jobs?q=...&l=Remoto&sort=date — terms: "desenvolvedor java spring boot",
-     "desenvolvedor fullstack junior", "RPA"
-   - linkedin: https://www.linkedin.com/jobs/search/?keywords=Java%20Spring%20Boot&location=Brasil&f_WT=2&sortBy=DD
-     (f_WT=2 = remote) and also "Desenvolvedor Full Stack Junior", "RPA"
-   - gupy: https://portal.gupy.io/job-search/term=java (filter remote; existing Google account)
-   - programathor: https://www.programathor.com.br/jobs (remote Java jobs)
+   In each URL below, TERM = one of the PROFILE TERMS (URL-encoded); start with "{{TERMO_PRINCIPAL}}".
+   - indeed: https://br.indeed.com/jobs?q=TERM&l=Remoto&sort=date
+   - linkedin: https://www.linkedin.com/jobs/search/?keywords=TERM&location=Brasil&f_WT=2&sortBy=DD
+     (f_WT=2 = remote)
+   - gupy: https://portal.gupy.io/job-search/term=TERM (filter remote; existing Google account)
+   - programathor: https://www.programathor.com.br/jobs (tech only; remote jobs)
    - trampardecasa: https://trampardecasa.com.br
-   - geekhunter: https://www.geekhunter.com.br (account already exists, see contas_criadas)
+   - geekhunter: https://www.geekhunter.com.br (tech only; account already exists, see contas_criadas)
    - remotar: https://remotar.com.br
-   - infojobs: https://www.infojobs.com.br/empregos.aspx?palabra=desenvolvedor+junior (filter remote)
-   - vagas: https://www.vagas.com.br/vagas-de-desenvolvedor-junior (filter home office)
+   - infojobs: https://www.infojobs.com.br/empregos.aspx?palabra=TERM (filter remote)
+   - vagas: https://www.vagas.com.br/vagas-de-TERM (term with hyphens; filter home office)
    A site requiring a new account with missing data, unsolvable captcha or long test: log in
    bloqueados as "bloqueado: reason", advance rotation and move on.
    ANTI-NOISE (mandatory): NEVER create bloqueados entries for "nothing new / no new /
-   no remote / list without JR". A round with no news only advances rodizio.proximo + ultima_rodada,
+   no remote / list without a job at the level". A round with no news only advances rodizio.proximo + ultima_rodada,
    without touching bloqueados. Bloqueados is only for real jobs/companies with a concrete reason
    (incompatible, missing datum, closed job). Re-finding the same list with no news
    does not create a new key with a suffix (_15b, _15d, _15e...).
@@ -177,7 +167,7 @@ c1) PER-JOB CV (effort rule): only generate the tailored PDF with reportlab (1 c
    $BOT_ROOT/bot/CV_YOUR_NAME_<Company>.pdf, WITHOUT "ATS" in the name) when the channel REALLY attaches
    a file of YOURs: e-mail (Gmail), LinkedIn upload, Indeed. On top of the CV use the frase_transferencia from
    dados_candidato.json + palavras_chave_ats in SUMMARY/SKILLS (all truthful, only reorder per job:
-   React job → push Angular/TS/RxJS up + transfer phrase; RPA job → push Make/n8n/REST/webhooks up).
+   e.g. React job → push Angular/TS up + transfer phrase; litigation job → push PJe/hearings up).
    ON GUPY DON'T GENERATE a per-job PDF — Gupy sends the PROFILE CV. On Gupy trust the profile CV; if it
    is bad/outdated, note it in manutencao_gupy for outside this round (checklist: summary with ATS,
    experiences with ago/2026-present period without claiming years, PT/B1/A2 languages without German, https links).
