@@ -16,13 +16,21 @@
 # Diferencas assumidas vs loop.sh (simplificacoes documentadas):
 # - Watchdog simplificado: Start-Job + Wait-Job com timeout por modelo
 #   (RUN_TIMEOUT). O .sh inspeciona o log interno do opencode para matar rodada
-#   travada em quota antes do timeout; aqui nao ha OC_LOG_DIR no Windows, entao
-#   rodada presa em retry silencioso morre no timeout cheio.
+#   travada em quota antes do timeout (early-abort) E tambem aborta se a saida
+#   ficar parada por WATCHDOG_STALL segundos no MEIO da rodada (quota que bate
+#   depois de ja ter comecado); aqui nao ha OC_LOG_DIR no Windows e o Start-Job
+#   atual so espera o job inteiro (sem poll incremental do log), entao rodada
+#   presa em retry silencioso morre no timeout cheio nos dois casos. GAP
+#   documentado (nao portado): watchdog de stall/early-abort mid-rodada.
 # - Lock via arquivo .lock com tentativa exclusiva ([IO.File]::Open,
 #   FileShare::None) em vez de flock(1). Segunda instancia sai calada (exit 0),
 #   como no .sh.
 # - Disputa pelo Chrome: espera exclusiva de ate 900s pelo lock do Chrome;
 #   timeout retorna o codigo 75 (mesmo do `flock -E 75` no .sh).
+# - Cooldown por modelo, deteccao de sessao improdutiva (modelo que encerra sem
+#   navegar) e arquivamento de logs de rodada (bot/arquivar-logs-rodada.py) SAO
+#   espelhados abaixo; o arquivamento so roda se houver python3/python/py no PATH
+#   (mesmo criterio de scripts/validate.ps1), senao e pulado silenciosamente.
 
 [CmdletBinding()]
 param()
@@ -94,6 +102,15 @@ $TEMP_DIR = $env:TEMP
 if ([string]::IsNullOrWhiteSpace($TEMP_DIR)) { $TEMP_DIR = [System.IO.Path]::GetTempPath() }
 $BROWSER_LOCK = Join-Path $TEMP_DIR 'agent-chrome-9222.lock'
 $LOOP_LOCK = Join-Path $TEMP_DIR 'oportunizavaga-loop.lock'
+
+# Localiza um python (qualquer um serve p/ estado.py / arquivar-logs-rodada.py).
+# Sem python instalado, RESUMO DO ESTADO e o arquivamento de logs sao pulados
+# silenciosamente (o resto do loop funciona igual).
+$Py = $null
+foreach ($c in @('python3', 'python', 'py')) {
+    $g = Get-Command $c -ErrorAction SilentlyContinue
+    if ($g) { $Py = $g.Source; break }
+}
 
 # Escada de modelos GRATUITOS, mesma ordem do loop.sh. Nao invente IDs: qualquer
 # modelo novo entra primeiro no loop.sh e depois e espelhado aqui.
@@ -182,6 +199,7 @@ if ($PerfilExplicito) {
     $StateDir = Join-Path $BOT_ROOT 'bot'
 }
 $AplicadasFile = Join-Path $StateDir 'aplicadas.json'
+$CooldownFile = Join-Path $StateDir 'model_cooldown'
 $DadosCandidatoFile = Join-Path $BOT_ROOT 'bot\dados_candidato.json'
 $RuntimePromptFile = Join-Path $StateDir 'prompt_loop.runtime.md'
 $ReconhecimentoFile = Join-Path $StateDir ("reconhecimento-{0}.json" -f (Get-Date).ToString('yyyyMMdd-HHmmss'))
@@ -314,6 +332,7 @@ function Render-Prompt {
     $text = Get-Content $source -Raw
     $text = $text.Replace('$APLICADAS_FILE', $AplicadasFile)
     $text = $text.Replace('$DADOS_CANDIDATO_FILE', $DadosCandidatoFile)
+    $text = $text.Replace('$BOT_ROOT', $BOT_ROOT)
     $text = $text.Replace('bot/perfil.json', $PerfilFile)
     $text = $text.Replace('SEU_NOME', $PerfilNome)
     $text = $text.Replace('YOUR_NAME', $PerfilNome)
@@ -322,6 +341,18 @@ function Render-Prompt {
         $text += "`n`nMODO RECONHECIMENTO (obrigatorio): NAO se candidate, NAO preencha formulario, NAO envie mensagem, NAO altere aplicadas.json. Avalie no maximo $env:OV_RECONHECIMENTO_LIMIT vagas recentes do site da rodada e grave somente $ReconhecimentoFile com schema compativel com config\reconhecimento.schema.json. Use chave estavel site+vaga, score 0-5, URL, empresa, vaga, remota, nivel, stack, motivos e observacoes; nunca inclua dados pessoais.`n"
     } else {
         $text += "`n`nPERFIL ATIVO: $PerfilNome. Use somente os termos, filtros e estado deste perfil. O limite desta rodada e $env:OV_MAX_CANDIDATURAS candidaturas novas.`n"
+    }
+    # RESUMO DO ESTADO: mesmo mecanismo do loop.sh (via estado.py), so roda se
+    # houver python no PATH. Sem python, a secao fica de fora (o agente ainda
+    # pode ler $APLICADAS_FILE direto, so perde a economia de tokens).
+    if ($Py) {
+        try {
+            $estadoScript = Join-Path $BOT_ROOT 'bot\estado.py'
+            $resumo = & $Py $estadoScript --file $AplicadasFile resumo 2>$null
+            if ($LASTEXITCODE -eq 0 -and $resumo) {
+                $text += "`n`nRESUMO DO ESTADO (gerado agora de $AplicadasFile; NAO leia o arquivo inteiro)`n" + ($resumo -join "`n")
+            }
+        } catch { }
     }
     Set-Content -Path $RuntimePromptFile -Value $text -Encoding UTF8
     return $text
@@ -391,14 +422,55 @@ while ($true) {
     $STATUS = 0
     $MODELO_OK = ''
     $TODOS_NO_LIMITE = $true
+    $IMPRODUTIVA = $false
 
-    foreach ($MODELO in $MODELOS) {
+    # Cooldown por modelo (espelho do loop.sh): pula modelo que bateu quota ha
+    # pouco em vez de recascatear por ele toda rodada.
+    $agoraS = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $cooldown = @{}
+    if (Test-Path $CooldownFile) {
+        foreach ($line in (Get-Content $CooldownFile -ErrorAction SilentlyContinue)) {
+            $parts = $line -split '\s+'
+            if ($parts.Count -ge 2) { $cooldown[$parts[0]] = [int64]$parts[1] }
+        }
+    }
+    $cascata = @($MODELOS | Where-Object { -not ($cooldown.ContainsKey($_) -and $cooldown[$_] -gt $agoraS) })
+    if ($cascata.Count -eq 0) { $cascata = $MODELOS }
+    if ($cascata.Count -lt $MODELOS.Count) {
+        Write-LoopLog ("cascata sem {0} modelo(s) em resfriamento" -f ($MODELOS.Count - $cascata.Count))
+    }
+
+    foreach ($MODELO in $cascata) {
         $res = Invoke-ModelRound $MODELO $prompt $ROUND_LOG
         $STATUS = $res.Status
         if (Test-IsQuota $ROUND_LOG) {
             Write-LoopLog ("modelo {0} no limite, cascateando para o proximo" -f $MODELO)
+            try {
+                New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
+                Add-Content -Path $CooldownFile -Value ("{0} {1}" -f $MODELO, ($agoraS + 5400))
+                $kept = Get-Content $CooldownFile -ErrorAction SilentlyContinue | Select-Object -Last 50
+                Set-Content -Path $CooldownFile -Value $kept
+            } catch { }
             continue
         }
+        # Sessao improdutiva = falha do modelo (encerrou sem navegar / quebrou o
+        # formato de tool-call), nao "rodada vazia": nao deve contar no backoff
+        # de vaga nova nem pausar site por falta de retorno.
+        $navegou = $false
+        if (Test-Path $ROUND_LOG) {
+            $navegou = ($null -ne (Select-String -Path $ROUND_LOG -Pattern 'browser_navigate' -ErrorAction SilentlyContinue))
+        }
+        if ($STATUS -ne 75 -and -not $navegou) {
+            $quebrouToolCall = ($null -ne (Select-String -Path $ROUND_LOG -Pattern '<tool_call>|<function=|<parameter=' -ErrorAction SilentlyContinue))
+            if ($quebrouToolCall) {
+                Write-LoopLog ("modelo {0} quebrou o formato de tool-call, cascateando para o proximo" -f $MODELO)
+            } else {
+                Write-LoopLog ("modelo {0} encerrou sem navegar (sessao improdutiva), cascateando para o proximo" -f $MODELO)
+            }
+            $IMPRODUTIVA = $true
+            continue
+        }
+        $IMPRODUTIVA = $false
         $MODELO_OK = $MODELO
         $TODOS_NO_LIMITE = $false
         break
@@ -412,6 +484,17 @@ while ($true) {
         $tail | Add-Content -Path 'loop.log'
     } catch { }
 
+    # O agente as vezes grava log_rodada_* em aplicadas.json; arquiva pra
+    # logs/rodadas.jsonl (so roda se houver python no PATH).
+    if ($Py) {
+        try {
+            $arquivarScript = Join-Path $BOT_ROOT 'bot\arquivar-logs-rodada.py'
+            $logsJsonl = Join-Path $BOT_ROOT 'bot\logs\rodadas.jsonl'
+            $out = & $Py $arquivarScript $AplicadasFile $logsJsonl 2>&1
+            if ($out) { Add-Content -Path 'loop.log' -Value $out }
+        } catch { }
+    }
+
     if (Test-BrokenSession $ROUND_LOG) {
         $FAILS++
         $W = Get-FailWait $FAILS
@@ -422,7 +505,11 @@ while ($true) {
         if ($IDX -ge $QUOTA_STEPS.Count) { $IDX = $QUOTA_STEPS.Count - 1 }
         $W = $QUOTA_STEPS[$IDX]
         $QUOTA_HITS++
-        Write-LoopLog ("quota/limite: TODOS os {0} modelos gratuitos no teto ({1}x seguidas), rechecando em {2}s" -f $MODELOS.Count, $QUOTA_HITS, $W)
+        if ($IMPRODUTIVA) {
+            Write-LoopLog ("nenhum modelo produtivo agora (quota ou sessao sem navegar em todos), rechecando em {0}s" -f $W)
+        } else {
+            Write-LoopLog ("quota/limite: TODOS os {0} modelos gratuitos no teto ({1}x seguidas), rechecando em {2}s" -f $MODELOS.Count, $QUOTA_HITS, $W)
+        }
         Start-Sleep -Seconds $W
     } elseif ($STATUS -eq 124 -or $STATUS -eq 137 -or $STATUS -eq 143) {
         $FAILS++

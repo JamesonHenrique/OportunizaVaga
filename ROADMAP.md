@@ -35,6 +35,9 @@ Discussions do repositório.
 - [ ] **Perfis prontos** por área (backend, frontend, dados, QA) em `config/perfis/`.
 - [ ] **Relatório de funil** exportável (aplicadas → convites → entrevistas).
 - [x] Cobertura de testes dos adaptadores (URL montada por `site_url_busca`).
+- [ ] **`bot/loop.ps1`**: portar o watchdog de stall/early-abort mid-rodada do
+      `loop.sh` (hoje o espelho Windows só aborta no timeout cheio — ver o
+      comentário de gaps no topo do arquivo).
 
 ## Depois / ideias
 
