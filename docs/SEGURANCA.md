@@ -36,8 +36,10 @@ ln -s ../../scripts/sanitize.sh .git/hooks/pre-commit
 
 - **Nunca inventa dados**: campo ausente em `dados_candidato.json` vira `bloqueado`
   com o motivo — nunca chute CPF, RG, tempo de experiência ou idioma.
-- **Allowlist de domínios**: o browser só acessa sites de vaga BR
-  (`config/sites_permitidos.json` + `--allowed-origins`); o resto nem é requisitado.
+- **Blocklist de domínios**: o browser bloqueia agregadores estrangeiros/spam sem
+  padrão de candidatura BR (`config/sites_permitidos.json` + `--blocked-origins`);
+  a candidatura pode seguir para qualquer ATS/site de carreira, desde que a vaga
+  seja BR/PT/remota (regra 7 do prompt).
 - **Monitor sem dado sensível**: o snapshot publica agregados por padrão (contadores,
   estados, perfis e totais); detalhes brutos só saem com `MONITOR_INCLUDE_DETAILS=1`.
   Nada de CPF, documentos, segredos, host/pid ou caminho local.

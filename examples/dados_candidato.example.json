@@ -9,7 +9,8 @@
   "facebook": "",
   "local": "SUA CIDADE/UF",
   "endereco": "SEU ENDEREÇO (só preenchido se você topar que o robô use em formulários)",
-  "formacao": "SEU CURSO - SUA FACULDADE (período)",
+  "formacao": "SEU CURSO - SUA FACULDADE (período) — descreva a situação REAL: cursando, completo, trancado...",
+  "regra_formacao": "Vaga que exige 'superior/graduação completa' NÃO é descarte automático: aplique informando a verdade deste campo 'formacao' (NUNCA marque 'concluído'/'completo' nem invente data de conclusão — se cursando, diga 'cursando'; em select sem essa opção, use 'incompleto'/'em andamento'). Só descarte por formação se a vaga exigir curso de OUTRA área ou pós-graduação obrigatória.",
   "idiomas": "Português nativo; Inglês INTERMEDIÁRIO (só declare o real)",
   "resumo": "SEU RESUMO PROFISSIONAL EM 3-4 LINHAS (verdadeiro)",
   "objetivo": "Ex.: Atuar como desenvolvedor júnior remoto",
@@ -37,7 +38,7 @@
     "portfolio": "",
     "inicio_cargo_atual": "2026-08",
     "anos": "",
-    "regra_tempo_experiencia": "VAZIO DE PROPÓSITO: vazio = proibido afirmar tempo de experiência"
+    "regra_tempo_experiencia": "VAZIO DE PROPÓSITO: vazio = proibido afirmar tempo de experiência total (descreva por cargo/período, nunca por número de anos). Regra do robô: vaga pedindo ATÉ 3 anos (ex.: 'mínimo 2 anos', '2 anos', '2-3 anos', '2+ anos', '3+ anos', 'experiência comprovada de 2 anos') NÃO é descarte — o tempo pedido sozinho nunca bloqueia se for ≤3 anos, mesmo marcado como obrigatório. Só descarte por tempo se pedir 4+ anos ('4 anos', '5 anos', 'ampla/sólida experiência')."
   },
   "documentos": {
     "cpf": "",

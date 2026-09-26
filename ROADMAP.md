@@ -7,7 +7,8 @@ Discussions do repositório.
 ## Princípios que não mudam
 
 - **R$ 0** para rodar (modelos free ou locais). Ver [`docs/CUSTO.md`](docs/CUSTO.md).
-- **Nunca inventar dado.** Campo vazio vira `bloqueado`, sempre.
+- **Nunca inventar dado.** Campo vazio vira `bloqueado` (ou `quase_la`, se for só UM dado faltando),
+  nunca um chute.
 - **Estado durável só em `aplicadas.json`** — nunca na sessão do modelo.
 - **Sem servidor**: seu PC + cron. Monitor é opcional e free-tier.
 
@@ -25,16 +26,28 @@ Discussions do repositório.
 - [x] Modo 100% local com Ollama ([`docs/MODELOS.md`](docs/MODELOS.md)).
 - [x] Wizard de setup (`scripts/setup-wizard.sh`).
 - [x] Pacing configurável + guia de uso ético ([`docs/USO-ETICO.md`](docs/USO-ETICO.md)).
+- [x] Blocklist de domínios no browser (`--blocked-origins`) em vez de allowlist fechada — candidatura
+      liberada para qualquer ATS/site de carreira BR.
+- [x] `bot/estado.py`: CLI atômica de leitura/escrita sobre `aplicadas.json` (economia de tokens).
+- [x] `bot/rodizio-saude.py`: pausa automática (48h) de site sem retorno após 4 rodadas vazias.
+- [x] Cooldown por modelo, sessão improdutiva e watchdog de stall no `loop.sh`; cascata de modelos e
+      retentativa semanal no `followup.sh`.
+- [x] `scripts/notificar.sh`, alertas de anomalia no `digest.sh` e `scripts/backup-jsons.sh`.
+- [x] Regras de elegibilidade generalizadas: tempo de experiência até 3 anos, regra de formação, fluxo
+      `c-Externo` para ATS sem padrão.
 
 ## Próximo
 
 - [ ] **Mais adaptadores de portal** (Catho, Trampos, Revelo, InfoJobs, Solides…) —
       `good first issue`, ver [`docs/ADAPTERS.md`](docs/ADAPTERS.md).
-- [ ] **Demo animada** no topo do README (GIF/asciinema de 1 rodada + monitor).
-- [ ] **Demo ao vivo** do monitor com dados fake, linkada no README.
+- [x] **Demo animada** no topo do README (GIF/asciinema de 1 rodada + monitor).
+- [x] **Demo ao vivo** do monitor com dados fake, linkada no README.
 - [ ] **Perfis prontos** por área (backend, frontend, dados, QA) em `config/perfis/`.
 - [ ] **Relatório de funil** exportável (aplicadas → convites → entrevistas).
 - [x] Cobertura de testes dos adaptadores (URL montada por `site_url_busca`).
+- [ ] **`bot/loop.ps1`**: portar o watchdog de stall/early-abort mid-rodada do
+      `loop.sh` (hoje o espelho Windows só aborta no timeout cheio — ver o
+      comentário de gaps no topo do arquivo).
 
 ## Depois / ideias
 

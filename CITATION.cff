@@ -13,8 +13,8 @@ keywords:
   - junior
   - remote
 authors:
-  - family-names: SEU_SOBRENOME
-    given-names: SEU_NOME
-    email: seu-email@example.com
-version: 0.1.0
-date-released: 2026-09-01
+  - family-names: Henrique
+    given-names: Jameson
+    email: jameson.henrique.dev@gmail.com
+version: 0.2.0
+date-released: 2026-09-26

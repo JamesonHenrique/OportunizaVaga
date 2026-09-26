@@ -1,6 +1,6 @@
 {
-  "_nota": "Allowlist de sites de vaga BR. Aplicada em DUAS camadas: (1) --allowed-origins no MCP playwright-chrome-real (bloqueio real: o browser nem faz a requisicao) e (2) regra 7 do prompt_loop.md. IMPORTANTE: cada dominio entra em DUAS formas, 'https://x.com' e 'https://*.x.com' — o wildcard sozinho NAO casa o dominio nu (coodesh.com foi bloqueado por esse motivo ate ser corrigido).",
-  "atualizado": "2026-09-14",
+  "_nota": "Sites de BUSCA do rodizio (onde o agente procura vaga) + blocklist do browser. NAO e mais allowlist: o MCP playwright-chrome-real usa --blocked-origins (lista em bloqueados_no_browser), entao a candidatura pode seguir para QUALQUER ATS/site de carreira (inhire.app, rippling, greenhouse, lever, factorialhr, recrutei, site proprio...) desde que a vaga seja no Brasil, em portugues, remota e com contratacao brasileira (regra 7 do prompt_loop.md). IMPORTANTE: cada dominio de bloqueados_no_browser entra em DUAS formas, 'https://x.com' e 'https://*.x.com' — o wildcard sozinho NAO casa o dominio nu.",
+  "atualizado": "2026-09-25 (allowlist do browser trocada por blocklist; apply liberado p/ qualquer ATS)",
   "generalistas_grandes": {
     "linkedin.com": "maior volume; Candidatura Simplificada e o caminho mais rapido",
     "br.indeed.com": "agregador; melhor filtro de remoto + sort=date",
@@ -38,7 +38,33 @@
     "indeedassets.com / indeedcdn.com": "assets do Indeed",
     "cloudfront.net / cloudflare.com / jsdelivr.net / recaptcha.net": "CDNs que esses sites usam"
   },
-  "bloqueado_por_padrao": "TUDO o mais, incluindo sites gringos (navapbc.com, ziprecruiter, wellfound, etc). O browser nem chega a fazer a requisicao.",
-  "verificado_em": "verifique cada site na sua máquina após configurar a allowlist",
+  "bloqueado_por_padrao": "So os sites de bloqueados_no_browser (agregadores gringos/spam, sem padrao de candidatura BR). O resto carrega; a regra 7 do prompt filtra vaga gringa pelo conteudo.",
+  "bloqueados_no_browser": [
+    "ziprecruiter.com",
+    "wellfound.com",
+    "angel.co",
+    "dice.com",
+    "weworkremotely.com",
+    "remoteok.com",
+    "remoteok.io",
+    "jobgether.com",
+    "turing.com",
+    "crossover.com",
+    "toptal.com",
+    "upwork.com",
+    "fiverr.com",
+    "monster.com",
+    "careerbuilder.com",
+    "simplyhired.com",
+    "talent.com",
+    "jobrapido.com",
+    "adzuna.com",
+    "remote.co",
+    "flexjobs.com",
+    "himalayas.app",
+    "workingnomads.com",
+    "otta.com"
+  ],
+  "verificado_em": "verifique cada site na sua máquina após configurar a blocklist",
   "como_reverter": "restaure o backup do seu opencode.jsonc (ex.: cp ~/.config/opencode/opencode.jsonc.bak ~/.config/opencode/opencode.jsonc)"
 }

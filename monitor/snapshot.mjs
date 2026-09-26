@@ -182,6 +182,12 @@ const applied = allAppliedRaw.map(a => {
 });
 const porFonte = {};
 for (const a of applied) porFonte[a.fonte] = (porFonte[a.fonte] || 0) + 1;
+// Per-day counts are aggregate (no company/job text): safe in both modes, feed the hero chart.
+const porDia = {};
+for (const a of applied) {
+  const k = a.data || (a.quando ? new Date(a.quando).toLocaleDateString('en-CA', { timeZone: TZ }) : null);
+  if (k) porDia[k] = (porDia[k] || 0) + 1;
+}
 const blocked = allBlockedRaw.map(item => {
   const o = typeof item.value === 'object' && item.value ? item.value : { motivo: String(item.value) };
   return { chave: item.chave, perfil: item.perfil, ...o, em: o.bloqueado_em || o.em || o.criadoEm || o.criado_em || o.at || null };
@@ -239,6 +245,7 @@ export function buildSnapshot() {
     loops: { candidaturas: { ...stateOf(candLast, 21), ultimoEvento: candLast?.at || null, rodadasHoje, duracao: duracoes(evCand) } },
     applied: INCLUDE_DETAILS ? applied : undefined,
     porFonte,
+    porDia,
     blocked: INCLUDE_DETAILS ? blocked : undefined,
     dadosFaltantes,
     descartes: INCLUDE_DETAILS ? Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.descartes_listagem || null])) : { total: descarteTotal },

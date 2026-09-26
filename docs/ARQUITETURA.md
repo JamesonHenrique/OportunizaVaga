@@ -46,14 +46,19 @@
 | `bot/guardiao.sh` | Supervisor via cron (sem systemd): loop + Chrome; limpa lock órfão |
 | `bot/followup.sh` | Rotina semanal (só leitura de status, nunca se candidata) |
 | `bot/prompt_*.md` | O "cérebro": regras, rodízio, pré-filtros, canais, formato de registro |
+| `bot/estado.py` | CLI compacta e atômica p/ ler/escrever `aplicadas.json` sem o agente ler o arquivo inteiro |
+| `bot/rodizio-saude.py` | Pausa (48h) site com 4 rodadas seguidas sem candidatura nova; hooks `pre`/`pos` no `loop.sh` |
 | `bot/sites/lib.sh` | Descoberta automática de adaptadores e contrato comum (`site_adapter_*`) |
 | `bot/sites/*.sh` | Adaptadores de portal: URL de busca, dica de remoto e termos por site |
 | `browser/chrome-real.sh` | Chrome persistente com CDP :9222 (login 1x vale p/ tudo) |
-| `config/sites_permitidos.json` | Allowlist BR em 2 camadas: `--allowed-origins` + regra 7 do prompt |
+| `config/sites_permitidos.json` | Blocklist de agregadores gringos/spam em 2 camadas: `--blocked-origins` + regra 7 do prompt |
 | `monitor/*.mjs` | `snapshot` (agregado + perfis) → `publish-status` / `publish-once` → Vercel |
 | `monitor/quota-daemon.mjs` | Mede cota diária OpenRouter `:free` (único provider com API de uso) |
 | `scripts/monitor-keepalive.sh` | Dono único do publisher (sobe se cair) |
 | `scripts/pull-monitor.sh` | Fast-forward do painel + restart do publisher se o código mudou |
+| `scripts/digest.sh` | Resumo diário (aplicadas/bloqueadas + alertas de anomalia no `loop.log`) |
+| `scripts/notificar.sh` | Push genérico ao Telegram (dedupe de 6h); usado por `digest`/`followup`/`rodizio-saude` |
+| `scripts/backup-jsons.sh` | Cópia rotativa (14x) de `aplicadas.json`/`dados_candidato.json`, raiz + cada perfil |
 
 ## Decisões-chave
 
