@@ -12,6 +12,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   gráfico de 14 dias, "Precisa de você", KPIs e abas (Candidaturas, Bloqueios, Robô). Antes a pasta
   só tinha os scripts de coleta e `npm run dev` abria um Next.js vazio.
 - `/api/status` com `MONITOR_SECRET` opcional, redação para GET sem segredo, `?ping=1` e limite de 1,5 MB.
+  O `?secret=` do navegador vira um cookie `httpOnly` (hash, nunca o secret) e sai da URL.
 - **Demo com dados fictícios** (`monitor/demo.mjs`, `MONITOR_DEMO=1`), usada na demo ao vivo
   (https://oportunizavaga-demo.vercel.app), no Docker e no GIF do README (`assets/demo.gif`).
 - Leitura local do disco quando nada foi publicado ainda (fora da Vercel), e `porDia` agregado no snapshot.

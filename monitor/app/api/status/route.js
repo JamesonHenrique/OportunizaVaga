@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { buildDemoSnapshot } from '../../../demo.mjs';
 
 // Guardado em memoria de proposito: a maquina local e a fonte de verdade e reenvia
@@ -80,13 +81,24 @@ function currentSnapshot() {
   return posted;
 }
 
+// Browser session: a valid ?secret= is exchanged for an httpOnly cookie holding a
+// hash of the secret (never the secret itself), so the page never stores it.
+const AUTH_COOKIE = 'monitor_auth';
+const digest = (v) => createHash('sha256').update(`monitor:${v}`).digest('hex');
+const sameText = (a, b) => {
+  const x = Buffer.from(String(a)), y = Buffer.from(String(b));
+  return x.length === y.length && timingSafeEqual(x, y);
+};
+
 function isAuthorized(request) {
   const secret = process.env.MONITOR_SECRET;
   if (!secret) return true;
   const hdr = request.headers.get('x-monitor-secret');
-  if (hdr && hdr === secret) return true;
+  if (hdr && sameText(hdr, secret)) return true;
   const qp = new URL(request.url).searchParams.get('secret');
-  if (qp && qp === secret) return true;
+  if (qp && sameText(qp, secret)) return true;
+  const ck = request.cookies?.get(AUTH_COOKIE)?.value;
+  if (ck && sameText(ck, digest(secret))) return true;
   return false;
 }
 
@@ -117,7 +129,14 @@ export async function GET(request) {
   const body = snap?._demo ? { ...snap, _meta: meta() }
     : isAuthorized(request) ? { ...snap, _meta: meta() }
     : { ...redactSnapshot(snap), _meta: meta(), _redacted: true };
-  return NextResponse.json(body, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+  const res = NextResponse.json(body, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+  const qp = searchParams.get('secret');
+  if (process.env.MONITOR_SECRET && qp && sameText(qp, process.env.MONITOR_SECRET)) {
+    res.cookies.set(AUTH_COOKIE, digest(process.env.MONITOR_SECRET), {
+      httpOnly: true, secure: true, sameSite: 'strict', path: '/', maxAge: 60 * 60 * 24 * 30
+    });
+  }
+  return res;
 }
 
 export async function POST(request) {
@@ -127,7 +146,7 @@ export async function POST(request) {
   const secret = process.env.MONITOR_SECRET;
   if (secret) {
     const got = request.headers.get('x-monitor-secret');
-    if (got !== secret) {
+    if (!got || !sameText(got, secret)) {
       globalThis.__monitorStats.lastError = 'POST negado: segredo invalido';
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
     }
