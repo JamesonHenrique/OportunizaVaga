@@ -25,15 +25,12 @@ rodando no seu próprio PC a **custo zero** (modelos de IA gratuitos + sites de 
 
 ## Demo
 
-<!-- TODO(demo): trocar pelo GIF real. Grave ≤30s (asciinema/GIF) de uma rodada +
-     o monitor ao vivo, salve em assets/demo.gif e troque o placeholder abaixo.
-     É a maior alavanca de alcance do projeto — ver ROADMAP.md. -->
 <p align="center">
-  <img src="assets/demo.gif" alt="OportunizaVaga em ação: uma rodada + o monitor ao vivo" width="820">
-  <br><em>▶️ Demo (GIF em breve). Por ora: <code>./bot/dry-run.sh</code> mostra uma rodada simulada sem aplicar em nada.</em>
+  <img src="assets/demo.gif" alt="Monitor do OportunizaVaga: faixa de status, candidaturas do dia, o que precisa de você e abas de detalhe" width="820">
+  <br><em>▶️ O monitor com <b>dados fictícios</b>. Quer uma rodada simulada sem se candidatar a nada? <code>./bot/dry-run.sh</code></em>
 </p>
 
-> 🔴 **Demo ao vivo** (monitor com dados fake): _em breve_ — ver [`monitor/README.md`](monitor/README.md).
+> 🔴 **Demo ao vivo** (dados fictícios, atualiza sozinha): **https://oportunizavaga-demo.vercel.app** — como hospedar o seu: [`monitor/README.md`](monitor/README.md).
 
 ## Como funciona
 

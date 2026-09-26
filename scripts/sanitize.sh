@@ -17,7 +17,7 @@ PATTERNS=(
   'R\$ ?[0-9]\.[0-9]{3}'
 )
 # Falsos positivos conhecidos (placeholders oficiais do projeto)
-ALLOW='seu-email@example\.com|jameson\.henrique\.dev@gmail\.com|SEU_|SUA_|SUA-EMPRESA|<sua-empresa>|sua-url\.vercel\.app|\$HOME|\${BOT_ROOT}|\$BOT_ROOT|\$HOME/opensource|00000-0000|\(00\)|OPENROUTER_API_KEY=\(\.\+\)'
+ALLOW='seu-email@example\.com|jameson\.henrique\.dev@gmail\.com|SEU_|SUA_|SUA-EMPRESA|<sua-empresa>|sua-url\.vercel\.app|oportunizavaga-demo\.vercel\.app|\$HOME|\${BOT_ROOT}|\$BOT_ROOT|\$HOME/opensource|00000-0000|\(00\)|OPENROUTER_API_KEY=\(\.\+\)'
 
 FAILS=0
 TARGETS=$(git ls-files 2>/dev/null | grep -v -E '^(scripts/sanitize\.sh|docs/SEGURANCA\.md)$' || true)

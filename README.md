@@ -23,18 +23,12 @@ running on your own PC at **zero cost** (free AI models + Brazilian job boards).
 
 ## Demo
 
-<!-- TODO(demo): replace with a real recording.
-     Record a ≤30s asciinema/GIF of one round + the live monitor, save it as
-     assets/demo.gif, and swap the placeholder below. This is the single biggest
-     lever for the project's reach — see ROADMAP.md. -->
 <p align="center">
-  <img src="assets/demo.gif" alt="OportunizaVaga em ação: uma rodada + o monitor ao vivo" width="820">
-  <br><em>▶️ Demo (GIF em breve). Enquanto isso: <code>./bot/dry-run.sh</code> mostra uma rodada simulada sem aplicar em nada.</em>
+  <img src="assets/demo.gif" alt="OportunizaVaga monitor: status strip, today's applications, what needs you, and detail tabs" width="820">
+  <br><em>▶️ The monitor with <b>fictional data</b>. Want a simulated round without applying anywhere? <code>./bot/dry-run.sh</code></em>
 </p>
 
-<!-- TODO(live-demo): host the monitor with FAKE data on Vercel free-tier and link it here.
-     Never point a public demo at real dados_candidato.json / aplicadas.json. -->
-> 🔴 **Live demo** (monitor with sample data): _coming soon_ — see [`monitor/README.md`](monitor/README.md).
+> 🔴 **Live demo** (fictional data, refreshes on its own): **https://oportunizavaga-demo.vercel.app** — how to host yours: [`monitor/README.md`](monitor/README.md).
 
 ## How it works
 
