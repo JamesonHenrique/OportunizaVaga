@@ -31,29 +31,42 @@ REGRAS FIXAS:
     Nesse caso NUNCA afirme domínio: escreva no CV/form apenas a skill real + frase_transferencia
     de dados_candidato.json (ex.: "Angular + TypeScript, transferível para React — disponível para atuar").
     PROIBIDO usar similar para: React sólido/SR ou Next avançado (SSR complexo), Karate/Selenium, ABAP, .NET/C#, Salesforce/Apex,
-     Django/Flutter/PHP-Laravel/Go sólidos, Databricks/Spark, ou exigência de "experiência sólida/SR" / 3+ anos.
-    TEMPO DE EXPERIÊNCIA (liberado até 2 anos): se a vaga pedir no MÁXIMO 2 anos
-    (ex.: "1 ano", "2 anos", "1-2 anos", "até 2 anos", "experiência de 2 anos") → APLIQUE,
-    desde que stack dentro de REAL + SIMILAR-JR e nível JR/trainee. Se pedir 3+ anos
-    ("3 anos", "5 anos", "ampla experiência", "sólida experiência") → DESCARTE.
+     Django/Flutter/PHP-Laravel/Go sólidos, Databricks/Spark, ou exigência de "experiência sólida/SR" / 4+ anos.
+    TEMPO DE EXPERIÊNCIA (liberado até 3 anos): se a vaga pedir no MÁXIMO 3 anos
+    (ex.: "1 ano", "2 anos", "1-2 anos", "2-3 anos", "até 3 anos", "3 anos", "mínimo 2 anos", "2+ anos",
+    "3+ anos", "experiência comprovada de 2 anos") → APLIQUE, desde que stack dentro de REAL + SIMILAR-JR
+    e nível JR/trainee (ou JR/Pleno misto). O tempo pedido sozinho NUNCA é motivo de descarte se for
+    ≤3 anos, mesmo que a vaga marque como obrigatório/comprovado. Se pedir 4+ anos
+    ("4 anos", "5 anos", "ampla experiência", "sólida experiência") → DESCARTE.
+    FORMAÇÃO: vaga que exige "superior/graduação completa" ou "formado em TI" NÃO é descarte — APLIQUE
+    igualmente, informando SEMPRE a verdade de dados_candidato.json -> formacao (e regra_formacao, se
+    preenchido). NUNCA marque "concluído"/"completo" nem invente data de conclusão: se está cursando,
+    diga "cursando"; em select sem essa opção, use "incompleto"/"em andamento". Só descarte por formação
+    se a vaga exigir curso de OUTRA área (ex.: Contabilidade, Engenharia) ou pós-graduação obrigatória.
+    Título OFICIAL "Pleno" puro continua DESCARTE (regra 3); título misto "Júnior/Pleno" segue esta regra.
     - Cargo atual REAL: SEU_CARGO — SUA_EMPRESA, <período> (copie de dados_candidato.json -> experiencia).
-    - NUNCA afirme "X anos de experiência": mesmo em vaga que pede até 2 anos, descreva por cargo e período.
+    - NUNCA afirme "X anos de experiência": mesmo em vaga que pede até 3 anos, descreva por cargo e período.
       O campo experiencia.anos está vazio de propósito em dados_candidato.json; vazio = proibido afirmar tempo.
    - Salário: siga pretensao_regra de dados_candidato.json (base SEU_VALOR_BASE; se a vaga informar faixa, o meio dela).
      Campo numérico obrigatório nunca recebe "A combinar" — use o número da regra.
    - Endereço/CEP/data de nascimento: use os de dados_candidato.json quando pedirem.
    - Se um formulário exigir dado que NÃO consta em dados_candidato.json (ex.: CPF, RG, PIS): não invente,
-     não chute. Registre em aplicadas.json -> bloqueados com o dado exato que faltou e siga para a próxima vaga.
+     não chute. Registre via `estado.py --file $APLICADAS_FILE set-quase-la CHAVE '<json>'` (NÃO em
+     bloqueados — campos chave, empresa, vaga, falta, bloqueado_em) e siga para a próxima vaga. Ver a1
+     para retomar quando o dado passar a existir.
    - Cadastros novos (GeekHunter, Remotar/Inhire, Talentbrand): crie com o e-mail do candidato + dados do CV;
      anote onde criou e quais dados em aplicadas.json (campo "contas_criadas").
 5. Máximo 3 candidaturas novas por rodada. Se não houver vaga nova compatível, encerre sem fazer nada.
 6. ECONOMIA DE RAM: no início liste as abas (agent-browser tabs) e FECHE todas desnecessárias, mantendo no
    máximo 1-2 abas. Ao final FECHE todas as abas de vagas/buscas, deixando só 1 aba about:blank.
-7. SOMENTE SITES BRASILEIROS DE VAGA. Nunca abra site gringo (navapbc.com, ziprecruiter,
-   wellfound, dice, etc). A lista permitida está em $BOT_ROOT/config/sites_permitidos.json e é
-   BLOQUEADA no browser: domínio fora dela nem carrega, não insista. Se um nome de empresa for
-   ambíguo (ex.: "Nava"), procure a vaga DENTRO dos sites permitidos — nunca no site próprio da
-   empresa. Vaga tem que ser no Brasil, em português, com contratação brasileira.
+7. BUSCA só nos sites BR do rodízio ($BOT_ROOT/config/sites_permitidos.json). CANDIDATURA pode seguir
+   para QUALQUER ATS ou site de carreira da empresa (inhire.app, rippling, greenhouse, lever, workable,
+   recrutei, factorialhr, pandape, teamtailor, bamboohr, Gupy de empresa, site próprio...) — NÃO há
+   allowlist no browser: só agregadores gringos/spam são bloqueados
+   ($BOT_ROOT/config/sites_permitidos.json -> bloqueados_no_browser). "Fora da allowlist" NÃO é motivo
+   de bloqueio. O que vale é o CONTEÚDO: vaga no Brasil, em português, remota, com contratação
+   brasileira. Um erro de carregamento de página (ex.: ERR_BLOCKED_BY_CLIENT) só significa agregador
+   gringo bloqueado ou adblock — tente recarregar 1x; se persistir, registre o domínio exato no motivo.
 8. FOCO: esta rodada é SÓ candidatura. Não faça manutenção de perfil, não explore site novo fora do rodízio,
    não tente resolver um formulário quebrado por mais de ~3 tentativas — registre em bloqueados e siga.
 
@@ -80,6 +93,12 @@ a1) RECHECAGEM (antes de buscar vaga nova), nesta ordem:
     aplique e grave via add-aplicada (mesmo efeito). Bloqueio ainda válido (vaga exige CPF que
     continua ausente, stack incompatível, nível pleno): deixe como está e não gaste tempo nele.
     Vaga com bloqueio ou quase_la retomado conta no limite de 3 da regra 5 e tem PRIORIDADE sobre busca nova.
+    3º) REGRA DESATUALIZADA: se o motivo gravado referenciar uma regra que MUDOU desde então — "fora da
+    allowlist"/ERR_BLOCKED por ATS sem padrão (regra 7 hoje libera qualquer ATS), exigência de tempo de
+    experiência que hoje estaria dentro do limite ≤3 anos (regra 4), ou "superior/graduação completa"
+    (regra 4 hoje libera, informando a formação real) — REAVALIE pelas regras ATUAIS deste prompt em vez
+    de confiar cegamente no texto antigo do motivo; se elegível agora, retome e aplique (mesmo efeito de
+    add-aplicada); se a causa real persistir, reescreva o motivo com a causa atual.
     BLOQUEIO ENCERRADO/404 já confirmado (página 404, vaga expirada, redireciona p/ home): arquive —
     estado.py não tem comando para isso; edite $APLICADAS_FILE só nesse caso raro, movendo a chave de
     "bloqueados" para "bloqueados_arquivados", e NÃO reavalie nem reabra em rodadas futuras.
@@ -162,10 +181,34 @@ c1) CV POR VAGA (regra de esforço): só gere o PDF ajustado com reportlab (1 co
 
 c-LinkedIn) LINKEDIN NO TODO (não só "Candidatura Simplificada"):
    - Candidatura Simplificada disponível: aplique direto (anexe o CV ajustado por vaga).
-   - Vaga que leva a site EXTERNO ("Candidatar-se no site da empresa"): siga SÓ se o destino for site
-     da allowlist BR (Gupy, Solides, Inhire/Remotar, Abler…) e complete lá. Se cair fora da allowlist,
-     o browser bloqueia — registre e siga, não insista.
+   - Vaga que leva a site EXTERNO ("Candidatar-se no site da empresa"): siga e complete lá (ver
+     c-Externo) — só é bloqueio se o domínio estiver na blocklist (agregador gringo/spam) ou a
+     página realmente travar; redirecionamento dentro do ATS é normal, não insista à toa.
    - Aplique as mesmas regras 1/3/4 e o PRÉ-FILTRO da listagem, igual aos outros sites.
+
+c-Externo) ATS / SITE SEM PADRÃO (rippling, greenhouse, lever, inhire.app, factorialhr, recrutei,
+   site próprio da empresa...):
+   1. Redirecionou para outra página/subdomínio dentro do ATS (ex.: empresa.inhire.app,
+      ats.rippling.com/...)? É NORMAL — continue o fluxo até o botão final de envio. Não registre
+      bloqueio por redirecionamento.
+   2. Ordem de preferência: formulário SEM conta (greenhouse/lever/rippling costumam ser) → "Continuar
+      com Google"/"Entrar com LinkedIn" (e-mail do candidato, já logado no Chrome) → cadastro com
+      e-mail+senha.
+   3. Cadastro com senha: gere uma senha forte NOVA por site
+      (python3 -c "import secrets;print(secrets.token_urlsafe(18))") e grave IMEDIATAMENTE, antes de
+      enviar o form, num arquivo FORA do repositório e do estado publicado (ex.:
+      ~/.config/oportunizavaga/credenciais.tsv, chmod 600):
+      printf '%s\t%s\t%s\n' "<dominio>" "<email>" "<senha>" >> ~/.config/oportunizavaga/credenciais.tsv
+      NUNCA escreva senha em aplicadas.json, log, resposta final ou CV — aplicadas.json pode ser
+      publicado no monitor. Em contas_criadas anote só site, e-mail, data e "senha em credenciais.tsv".
+      Confirmação por e-mail: abra o Gmail logado, clique no link de verificação e volte ao form.
+   4. Agregador sem link de candidatura (ex.: vaga só com texto, sem botão externo): procure a MESMA
+      vaga (empresa + título) no LinkedIn, Gupy, Inhire ou no site de carreiras da empresa
+      ("<empresa> carreiras" / "<empresa> trabalhe conosco") e aplique por lá. Só registre bloqueio se
+      não achar em nenhum canal.
+   5. Campos: use dados_candidato.json + respostas_padrao_gupy; upload de CV = gere o PDF por vaga
+      (regra c1). Dado ausente (CPF, RG...) → quase_la, como na regra 4. Captcha insolúvel/teste
+      longo → bloqueados.
 
 c2) TWO-TIER (opcional): para economizar quota do modelo forte, rode antes a
    triagem barata de bot/prompt_triage.md: cole a listagem (cards/HTML) no
