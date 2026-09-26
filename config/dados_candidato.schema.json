@@ -17,6 +17,7 @@
     "local": { "type": "string", "minLength": 1 },
     "endereco": { "type": "string" },
     "formacao": { "type": "string" },
+    "regra_formacao": { "type": "string" },
     "idiomas": { "type": "string" },
     "resumo": { "type": "string" },
     "objetivo": { "type": "string" },
