@@ -122,8 +122,10 @@ b) SITE ROTATION: check rodizio.proximo in the STATE SUMMARY. Use EXACTLY 1 site
    "desenvolvedor fullstack junior", "backend java junior", "backend junior remoto", "angular junior",
    "typescript junior", "node junior", "desenvolvedor junior remoto", "trainee desenvolvedor remoto",
    "RPA junior", "automacao junior", "integracoes junior", "sustentacao sistemas junior", "suporte tecnico junior remoto".
-   DRY SITE / PRIORITY: high return = gupy, linkedin, indeed, programathor, remotar. If a site gave
-   zero new jobs 2 rounds in a row (e.g. Trampardecasa with spam, GeekHunter with broken apply, Vagas zero RPA), skip it for 24h and advance rotation without logging a block.
+   DRY SITE / PRIORITY: high return = gupy, linkedin, indeed, programathor, remotar. The loop
+   (bot/rodizio-saude.py) pauses a site ON ITS OWN for 48h after 4 rounds in a row with zero new
+   applications, and already updates rodizio.proximo before the next round starts. Do NOT switch
+   sites yourself nor log a block for "dry site": run the site whose turn it is.
    - indeed: https://br.indeed.com/jobs?q=...&l=Remoto&sort=date — terms: "desenvolvedor java spring boot",
      "desenvolvedor fullstack junior", "RPA"
    - linkedin: https://www.linkedin.com/jobs/search/?keywords=Java%20Spring%20Boot&location=Brasil&f_WT=2&sortBy=DD
