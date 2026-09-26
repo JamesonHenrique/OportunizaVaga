@@ -46,6 +46,7 @@
 | `bot/guardiao.sh` | Supervisor via cron (sem systemd): loop + Chrome; limpa lock órfão |
 | `bot/followup.sh` | Rotina semanal (só leitura de status, nunca se candidata) |
 | `bot/prompt_*.md` | O "cérebro": regras, rodízio, pré-filtros, canais, formato de registro |
+| `bot/estado.py` | CLI compacta e atômica p/ ler/escrever `aplicadas.json` sem o agente ler o arquivo inteiro |
 | `bot/sites/lib.sh` | Descoberta automática de adaptadores e contrato comum (`site_adapter_*`) |
 | `bot/sites/*.sh` | Adaptadores de portal: URL de busca, dica de remoto e termos por site |
 | `browser/chrome-real.sh` | Chrome persistente com CDP :9222 (login 1x vale p/ tudo) |

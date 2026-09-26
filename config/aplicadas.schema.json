@@ -27,6 +27,7 @@
     },
     "bloqueados": { "type": "object" },
     "bloqueados_arquivados": { "type": "object" },
+    "quase_la": { "type": "object", "description": "Vaga que so nao foi enviada por falta de UM dado (ex.: campo ausente em dados_candidato.json); retomada por estado.py assim que o dado existir." },
     "contas_criadas": { "type": "object" },
     "descartes_listagem": {
       "type": "object",
