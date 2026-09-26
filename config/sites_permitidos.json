@@ -6,6 +6,11 @@
     "programathor": "tech",
     "geekhunter": "tech"
   },
+  "restrito_a_modelo": {
+    "_nota": "id do rodizio -> modelo exigido. Perfil que nao aceita esse modelo pula o site (bot/perfil_render.py).",
+    "trampardecasa": "remoto",
+    "remotar": "remoto"
+  },
   "generalistas_grandes": {
     "linkedin.com": "maior volume; Candidatura Simplificada e o caminho mais rapido",
     "br.indeed.com": "agregador; melhor filtro de remoto + sort=date",

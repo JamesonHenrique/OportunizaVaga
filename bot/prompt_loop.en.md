@@ -6,7 +6,7 @@ acting and write (same) before exiting.
 $DADOS_CANDIDATO_FILE for the active profile before the round starts.)
 
 FIXED RULES:
-1. REMOTE (home office) jobs ONLY. Never on-site/hybrid.
+1. WORK MODEL (from the active profile): {{REGRA_MODELO}}
 2. NEVER companies from $APLICADAS_FILE (pular_empresas field) nor jobs already in aplicadas.json.
 3. LEVEL AND AREA come from the active profile (bot/perfil.json), not from this text:
    - Field/AREA: {{AREA}}. A job from another field → discard.
@@ -62,7 +62,7 @@ FIXED RULES:
    factorialhr, pandape, teamtailor, bamboohr, company Gupy, own site...) — there is no browser
    allowlist: only foreign/spam aggregators are blocked
    ($BOT_ROOT/config/sites_permitidos.json -> bloqueados_no_browser). "Off the allowlist" is NOT a
-   reason to block anymore. What matters is the CONTENT: job in Brazil, in Portuguese, remote, with
+   reason to block anymore. What matters is the CONTENT: job in Brazil, in Portuguese, within rule 1 (work model), with
    Brazilian hiring. A page load error (e.g. ERR_BLOCKED_BY_CLIENT) just means a blocked foreign
    aggregator or an adblocker — try reloading once; if it persists, log the exact domain in the reason.
 8. FOCUS: this round is applications ONLY. No profile maintenance, no exploring new sites off-rotation,
@@ -123,7 +123,7 @@ b) SITE ROTATION: check rodizio.proximo in the STATE SUMMARY. Use EXACTLY 1 site
    judge by TITLE and card and do NOT open when:
    - (level, rule 3) title carries ONLY refused levels ({{NIVEIS_RECUSADOS}}), none of the accepted ones;
      if the card is AMBIGUOUS (no level), OPEN and check the official level inside — don't discard on suspicion;
-   - (work model, rule 1) card shows on-site/hybrid; if the card does NOT state the model, OPEN and check inside;
+   - (work model, rule 1) card shows a refused model or a city outside rule 1; if the card does NOT state the model, OPEN and check inside;
     - (off-profile field/stack) the card is from a field other than {{AREA}} or already lists as mandatory
       a skill outside YOUR dados_candidato.json REAL + SIMILAR set.
    Listing discards do NOT become bloqueados entries (they're noise): instead, at the end of the round run
@@ -137,16 +137,17 @@ b) SITE ROTATION: check rodizio.proximo in the STATE SUMMARY. Use EXACTLY 1 site
    applications, and already updates rodizio.proximo before the next round starts. Do NOT switch
    sites yourself nor log a block for "dry site": run the site whose turn it is.
    In each URL below, TERM = one of the PROFILE TERMS (URL-encoded); start with "{{TERMO_PRINCIPAL}}".
-   - indeed: https://br.indeed.com/jobs?q=TERM&l=Remoto&sort=date
-   - linkedin: https://www.linkedin.com/jobs/search/?keywords=TERM&location=Brasil&f_WT=2&sortBy=DD
-     (f_WT=2 = remote)
-   - gupy: https://portal.gupy.io/job-search/term=TERM (filter remote; existing Google account)
-   - programathor: https://www.programathor.com.br/jobs (tech only; remote jobs)
+   WORK MODEL FILTER on each site: {{FILTRO_MODELO}}.
+   - indeed: https://br.indeed.com/jobs?q=TERM&l={{LOCAL_BUSCA}}&sort=date
+   - linkedin: https://www.linkedin.com/jobs/search/?keywords=TERM&location=Brasil&f_WT={{LINKEDIN_WT}}&sortBy=DD
+     (f_WT: 1 = on-site, 2 = remote, 3 = hybrid)
+   - gupy: https://portal.gupy.io/job-search/term=TERM (apply the WORK MODEL FILTER; existing Google account)
+   - programathor: https://www.programathor.com.br/jobs (tech only)
    - trampardecasa: https://trampardecasa.com.br
    - geekhunter: https://www.geekhunter.com.br (tech only; account already exists, see contas_criadas)
    - remotar: https://remotar.com.br
-   - infojobs: https://www.infojobs.com.br/empregos.aspx?palabra=TERM (filter remote)
-   - vagas: https://www.vagas.com.br/vagas-de-TERM (term with hyphens; filter home office)
+   - infojobs: https://www.infojobs.com.br/empregos.aspx?palabra=TERM (apply the WORK MODEL FILTER)
+   - vagas: https://www.vagas.com.br/vagas-de-TERM (term with hyphens; apply the WORK MODEL FILTER)
    A site requiring a new account with missing data, unsolvable captcha or long test: log in
    bloqueados as "bloqueado: reason", advance rotation and move on.
    ANTI-NOISE (mandatory): NEVER create bloqueados entries for "nothing new / no new /
@@ -214,7 +215,7 @@ d) Attach with the hidden file input via CDP when needed (input[name=Filedata] i
 
 e) Log EACH sent application via
    `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE add-aplicada '<json>'` with these fields:
-   chave, empresa, vaga, remota:true, como, cv,
+   chave, empresa, vaga, remota (true if remote, false if hybrid/on-site), como, cv,
    data  = LOCAL date in YYYY-MM-DD format,
    enviada_em = LOCAL timestamp WITH TIMEZONE, e.g. 2026-09-14T21:46:03-03:00.
    Get both by running `date '+%Y-%m-%d'` and `date '+%FT%T%:z'` in the shell — NEVER use UTC dates

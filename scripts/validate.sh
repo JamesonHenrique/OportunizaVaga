@@ -15,6 +15,7 @@ PARES=(
   "examples/aplicadas.example.json|config/aplicadas.schema.json|1"
   "bot/dados_candidato.json|config/dados_candidato.schema.json|0"
   "bot/aplicadas.json|config/aplicadas.schema.json|0"
+  "bot/perfil.json|config/perfil.schema.json|0"
 )
 for perfil in config/perfis/*.example.json; do
   [ -f "$perfil" ] || continue

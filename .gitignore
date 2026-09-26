@@ -1,6 +1,7 @@
 # Dados pessoais — NUNCA commitar (vale em qualquer subdir)
 **/dados_candidato.json
 **/aplicadas.json
+bot/perfil.json
 **/quota-cache.json
 **/state/*/
 **/backups/

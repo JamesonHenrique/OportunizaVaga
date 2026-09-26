@@ -5,6 +5,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Modelo de trabalho configurável**: `modelos` (`remoto`, `hibrido`, `presencial`) e `cidades` no perfil.
+  Placeholders `{{REGRA_MODELO}}`, `{{FILTRO_MODELO}}`, `{{LOCAL_BUSCA}}` e `{{LINKEDIN_WT}}` na regra 1 e nas
+  URLs de busca. Padrão continua só remoto. Sites só-remoto (`restrito_a_modelo`) saem do rodízio de quem não aceita remoto.
+- Wizard (`setup-wizard.sh`/`.ps1`) gera também o `bot/perfil.json`; `validate` passa a checar esse arquivo.
+
+### Changed
+- `bot/perfil.json` entra no `.gitignore` (é a preferência pessoal de cada usuário).
+- ROADMAP atualizado (nível/área/modelo feitos; modo triagem = reconhecimento).
+
 ### Changed
 - README principal agora é em português (`README.md`); inglês foi para `README.en.md`.
 

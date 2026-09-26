@@ -6,7 +6,7 @@ de agir e escreva (idem) antes de sair.
 e $DADOS_CANDIDATO_FILE para o perfil ativo antes de iniciar a rodada.)
 
 REGRAS FIXAS:
-1. SOMENTE vagas REMOTAS (home office). Nunca presencial/híbrida.
+1. MODELO DE TRABALHO (do perfil ativo): {{REGRA_MODELO}}
 2. NUNCA empresas de $APLICADAS_FILE (campo pular_empresas) nem vagas já em aplicadas.json.
 3. NÍVEL E ÁREA vêm do perfil ativo (bot/perfil.json), não deste texto:
    - ÁREA de atuação: {{AREA}}. Vaga de outra área → descarte.
@@ -62,7 +62,7 @@ REGRAS FIXAS:
    recrutei, factorialhr, pandape, teamtailor, bamboohr, Gupy de empresa, site próprio...) — NÃO há
    allowlist no browser: só agregadores gringos/spam são bloqueados
    ($BOT_ROOT/config/sites_permitidos.json -> bloqueados_no_browser). "Fora da allowlist" NÃO é motivo
-   de bloqueio. O que vale é o CONTEÚDO: vaga no Brasil, em português, remota, com contratação
+   de bloqueio. O que vale é o CONTEÚDO: vaga no Brasil, em português, dentro da regra 1 (modelo), com contratação
    brasileira. Um erro de carregamento de página (ex.: ERR_BLOCKED_BY_CLIENT) só significa agregador
    gringo bloqueado ou adblock — tente recarregar 1x; se persistir, registre o domínio exato no motivo.
 8. FOCO: esta rodada é SÓ candidatura. Não faça manutenção de perfil, não explore site novo fora do rodízio,
@@ -121,7 +121,7 @@ b) RODÍZIO DE SITES: veja rodizio.proximo no RESUMO DO ESTADO. Use EXATAMENTE 1
    avalie pelo TÍTULO e pelo card e NÃO abra quando:
    - (nível, regra 3) título traz SÓ nível recusado ({{NIVEIS_RECUSADOS}}), sem nenhum dos aceitos;
      se o card for AMBÍGUO (sem nível), ABRA e confira o nível oficial dentro — não descarte por suspeita;
-   - (modelo, regra 1) card marca presencial/híbrido; se o card NÃO informa modelo, ABRA e confira dentro;
+   - (modelo, regra 1) card marca modelo recusado ou cidade fora da regra 1; se o card NÃO informa modelo, ABRA e confira dentro;
     - (área/stack fora do perfil) o card é de outra área que não {{AREA}} ou já exibe como obrigatória
       competência fora de REAL + SIMILAR do SEU dados_candidato.json.
    Descarte de listagem NÃO vira entrada em bloqueados (é ruído): em vez disso, ao fim da rodada rode
@@ -135,16 +135,17 @@ b) RODÍZIO DE SITES: veja rodizio.proximo no RESUMO DO ESTADO. Use EXATAMENTE 1
    nova e já ajusta rodizio.proximo antes da próxima rodada começar. NÃO troque de site por conta
    própria nem registre bloqueado por "site esgotado": faça o site da vez.
    Em cada URL abaixo, TERMO = um dos TERMOS DO PERFIL (URL-encoded); comece por "{{TERMO_PRINCIPAL}}".
-   - indeed: https://br.indeed.com/jobs?q=TERMO&l=Remoto&sort=date
-   - linkedin: https://www.linkedin.com/jobs/search/?keywords=TERMO&location=Brasil&f_WT=2&sortBy=DD
-     (f_WT=2 = remoto)
-   - gupy: https://portal.gupy.io/job-search/term=TERMO (filtre remoto; conta Google existente)
-   - programathor: https://www.programathor.com.br/jobs (só tech; remotas)
+   FILTRO DE MODELO em cada site: {{FILTRO_MODELO}}.
+   - indeed: https://br.indeed.com/jobs?q=TERMO&l={{LOCAL_BUSCA}}&sort=date
+   - linkedin: https://www.linkedin.com/jobs/search/?keywords=TERMO&location=Brasil&f_WT={{LINKEDIN_WT}}&sortBy=DD
+     (f_WT: 1 = presencial, 2 = remoto, 3 = híbrido)
+   - gupy: https://portal.gupy.io/job-search/term=TERMO (aplique o FILTRO DE MODELO; conta Google existente)
+   - programathor: https://www.programathor.com.br/jobs (só tech)
    - trampardecasa: https://trampardecasa.com.br
    - geekhunter: https://www.geekhunter.com.br (só tech; conta já existe, ver contas_criadas)
    - remotar: https://remotar.com.br
-   - infojobs: https://www.infojobs.com.br/empregos.aspx?palabra=TERMO (filtre remoto)
-   - vagas: https://www.vagas.com.br/vagas-de-TERMO (termo com hífens; filtre home office)
+   - infojobs: https://www.infojobs.com.br/empregos.aspx?palabra=TERMO (aplique o FILTRO DE MODELO)
+   - vagas: https://www.vagas.com.br/vagas-de-TERMO (termo com hífens; aplique o FILTRO DE MODELO)
    Site que exigir conta nova com dado ausente, captcha insolúvel ou teste longo: registre em
    bloqueados como "bloqueado: motivo", avance o rodízio e siga.
    ANTI-RUÍDO (obrigatório): NUNCA crie entrada em bloqueados para "nada novo / sem novo /
@@ -211,7 +212,7 @@ d) Anexe com o input file oculto via CDP quando necessário (input[name=Filedata
 
 e) Registre CADA candidatura enviada via
    `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE add-aplicada '<json>'` com estes campos:
-   chave, empresa, vaga, remota:true, como, cv,
+   chave, empresa, vaga, remota (true se remota, false se híbrida/presencial), como, cv,
    data  = data LOCAL no formato YYYY-MM-DD,
    enviada_em = carimbo LOCAL COM FUSO, ex.: 2026-09-14T21:46:03-03:00.
    Pegue os dois rodando `date '+%Y-%m-%d'` e `date '+%FT%T%:z'` no shell — NUNCA use data em UTC

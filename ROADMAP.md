@@ -35,16 +35,22 @@ Discussions do repositório.
 - [x] `scripts/notificar.sh`, alertas de anomalia no `digest.sh` e `scripts/backup-jsons.sh`.
 - [x] Regras de elegibilidade generalizadas: tempo de experiência até 3 anos, regra de formação, fluxo
       `c-Externo` para ATS sem padrão.
+- [x] **Qualquer nível e área**: `niveis`, `area`, `experiencia_max_anos` e `sites_pular` no perfil,
+      injetados nos prompts por [`bot/perfil_render.py`](bot/perfil_render.py).
+- [x] **Modelo de trabalho configurável**: `modelos` (remoto/híbrido/presencial) e `cidades` no perfil.
+- [x] Wizard gera também o `bot/perfil.json` (nível, área, modelo, termos).
 
 ## Próximo
 
-- [ ] **Mais adaptadores de portal** (Catho, Trampos, Revelo, InfoJobs, Solides…) —
-      `good first issue`, ver [`docs/ADAPTERS.md`](docs/ADAPTERS.md).
+- [ ] **Mais adaptadores de portal**, com prioridade para os generalistas (Catho, InfoJobs, Solides,
+      Trampos) que atendem perfis fora de tech — `good first issue`, ver [`docs/ADAPTERS.md`](docs/ADAPTERS.md).
 - [x] **Demo animada** no topo do README (GIF/asciinema de 1 rodada + monitor).
 - [x] **Demo ao vivo** do monitor com dados fake, linkada no README.
-- [ ] **Perfis prontos** por área (backend, frontend, dados, QA) em `config/perfis/`.
+- [ ] **Mais perfis prontos** em `config/perfis/` (já há backend, QA, tech lead, marketing e direito;
+      faltam frontend, dados, saúde, administrativo, vendas…).
 - [ ] **Relatório de funil** exportável (aplicadas → convites → entrevistas).
 - [x] Cobertura de testes dos adaptadores (URL montada por `site_url_busca`).
+- [ ] Testes Pester para `Expand-PerfilPlaceholders` (`loop.ps1`) e o filtro de sites do `dry-run.ps1`.
 - [ ] **`bot/loop.ps1`**: portar o watchdog de stall/early-abort mid-rodada do
       `loop.sh` (hoje o espelho Windows só aborta no timeout cheio — ver o
       comentário de gaps no topo do arquivo).
@@ -54,7 +60,7 @@ Discussions do repositório.
 - [ ] Suporte a espanhol (LatAm) no prompt e nos filtros.
 - [ ] Painel de métricas históricas (opt-in, ainda sem banco).
 - [ ] Detecção de vaga duplicada entre portais.
-- [ ] Modo "somente triagem" (lista e pontua, não aplica).
+- [x] Modo "somente triagem" (lista e pontua, não aplica) — é o modo reconhecimento (`OV_RECONHECIMENTO=1`).
 
 ## Como ajudar
 

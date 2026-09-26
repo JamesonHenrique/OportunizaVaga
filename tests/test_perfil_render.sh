@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 RENDER="bot/perfil_render.py"
 
-TOTAL=6
+TOTAL=8
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -102,5 +102,30 @@ python3 bot/rodizio-saude.py pre "$TMPD/aplicadas2.json" >/dev/null 2>&1
 PROX2="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['rodizio']['proximo'])" "$TMPD/aplicadas2.json")"
 [ "$PROX2" = "programathor" ]
 relata $? "rodizio pre sem --perfil nao muda o site (foi: $PROX2)"
+
+# 7 — modelo: padrao so remoto; hibrido com cidade vira regra + filtros de busca.
+python3 - <<'PYEOF'
+import sys
+sys.path.insert(0, "bot")
+import perfil_render as r
+padrao = r.placeholders(r.resolver({"termos": ["x"]}))
+assert padrao["{{REGRA_MODELO}}"].startswith("SOMENTE vagas REMOTAS"), padrao["{{REGRA_MODELO}}"]
+assert padrao["{{LOCAL_BUSCA}}"] == "Remoto" and padrao["{{LINKEDIN_WT}}"] == "2"
+hib = r.placeholders(r.resolver({"termos": ["x"], "modelos": ["remoto", "híbrido"], "cidades": ["Natal/RN"]}))
+assert "Natal/RN" in hib["{{REGRA_MODELO}}"] and "presencial" in hib["{{REGRA_MODELO}}"], hib["{{REGRA_MODELO}}"]
+assert hib["{{LOCAL_BUSCA}}"] == "Natal/RN" and hib["{{LINKEDIN_WT}}"] == "2%2C3", hib
+PYEOF
+relata $? "modelos: padrao so remoto; remoto+hibrido em Natal/RN gera regra e filtros"
+
+# 8 — perfil so presencial pula sites so-remoto (restrito_a_modelo).
+python3 - <<'PYEOF'
+import sys
+sys.path.insert(0, "bot")
+import perfil_render as r
+pular = r.resolver({"termos": ["x"], "modelos": ["presencial"]})["sites_pular"]
+assert "remotar" in pular and "trampardecasa" in pular, pular
+assert r.resolver({"termos": ["x"]})["sites_pular"] == [], "padrao nao pode pular nada"
+PYEOF
+relata $? "perfil so presencial pula remotar/trampardecasa"
 
 [ "$FAIL" -eq 0 ]

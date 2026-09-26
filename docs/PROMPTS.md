@@ -29,8 +29,9 @@ Troque o bloco `EXEMPLO` pelo seu stack real:
   `especialista`, `lider`, `gestor`, `diretor`), `area` (texto livre: "jurídico", "marketing"...)
   e, se quiser, `experiencia_max_anos` (`null` = sem teto). Fora de tech, sites só-tech
   (GeekHunter, Programathor) saem do rodízio sozinhos; `sites_pular` sobrepõe isso.
-- Regra 1 (remoto): ajuste no prompt se seu alvo for outro (ex.: híbrido na sua cidade) —
-  mas seja explícito, o robô segue ao pé da letra.
+- Regra 1 (modelo de trabalho) também vem do perfil: `modelos` (`remoto`, `hibrido`, `presencial`)
+  e `cidades` (ex.: `["Natal/RN"]`). Padrão: só remoto. Os filtros de busca (Indeed `l=`, LinkedIn
+  `f_WT=`) seguem o perfil.
 - `pretensao_regra`: base `SEU_VALOR_BASE`; campo numérico **nunca** recebe "A combinar".
 
 ## 4. `bot/prompt_followup.md` e `bot/prompt_perfil_gupy.md`

@@ -164,7 +164,7 @@ termo = json.load(open(termo_path, encoding='utf-8'))
 sys.path.insert(0, os.environ['OV_BOT_DIR'])
 import perfil_render
 _r = perfil_render.resolver(termo['perfil'])
-perfil_resolvido = {k: _r[k] for k in ('niveis', 'niveis_recusados', 'area', 'experiencia_max_anos', 'sites_pular')}
+perfil_resolvido = {k: _r[k] for k in ('niveis', 'niveis_recusados', 'area', 'modelos', 'cidades', 'experiencia_max_anos', 'sites_pular')}
 sites = []
 with open(site_path, encoding='utf-8') as fh:
     for line in fh:

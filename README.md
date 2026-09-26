@@ -51,7 +51,7 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
 - **Estado isolado por perfil:** o perfil ativo guarda o próprio histórico em `bot/state/<perfil>/`.
 - **Modo reconhecimento:** `OV_RECONHECIMENTO=1` pontua vagas sem se candidatar.
 - **Qualquer nível e área:** níveis aceitos (`niveis`), área (`area`), termos de busca e teto de
-  experiência vêm do seu perfil (`bot/perfil.json`); remoto + ≤14 dias por padrão.
+  experiência vêm do seu perfil (`bot/perfil.json`); modelo de trabalho (remoto, híbrido ou presencial na sua cidade) também; ≤14 dias por padrão.
 - **Nunca inventa dados:** tudo vem de `bot/dados_candidato.json`; o que falta vira
   `bloqueado` com o motivo exato.
 - **Anti-ruído:** descarte de listagem vira contador, não polui bloqueios.

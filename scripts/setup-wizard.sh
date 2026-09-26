@@ -1,7 +1,7 @@
 #!/bin/bash
-# setup-wizard.sh — cria bot/dados_candidato.json por perguntas, sem editar JSON
-# na mão. Parte do exemplo oficial (estrutura completa) e só sobrescreve o que
-# você responder. O arquivo gerado é gitignored e NUNCA vai ao repo.
+# setup-wizard.sh — cria bot/dados_candidato.json e bot/perfil.json por perguntas,
+# sem editar JSON na mão. Parte do exemplo oficial (estrutura completa) e só sobrescreve o que
+# você responder. Os arquivos gerados são gitignored e NUNCA vão ao repo.
 #
 # Uso: ./scripts/setup-wizard.sh
 set -euo pipefail
@@ -41,7 +41,7 @@ ask idiomas     "Idiomas (só o real, ex.: Português nativo; Inglês intermedi�
 ask objetivo    "Objetivo (ex.: tech lead remoto, advogado pleno remoto)"
 ask resumo      "Resumo profissional (3-4 linhas verdadeiras)"
 ask techs       "Tecnologias que você domina (separadas por vírgula)"
-ask nivel       "Nível (estágio, trainee, júnior, pleno, sênior, especialista, líder, gestor, diretor)"
+ask nivel       "Níveis aceitos, separados por vírgula (estágio, trainee, júnior, pleno, sênior, especialista, líder, gestor, diretor)"
 
 # Converte lista separada por vírgula em array JSON (trim de espaços).
 techs_json="$(printf '%s' "${techs:-}" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$";"")) | map(select(length>0))')"
@@ -63,12 +63,52 @@ jq \
   | .objetivo = ($objetivo // .objetivo)
   | .resumo = ($resumo // .resumo)
   | (if ($techs | length) > 0 then .experiencia.tecnologias = $techs | .palavras_chave_ats = $techs else . end)
-  | (if ($nivel|length) > 0 then .situacao_profissional.nivel = $nivel else . end)
+  | (if ($nivel|length) > 0 then .situacao_profissional.nivel = ($nivel | split(",") | map(gsub("^\\s+|\\s+$";"")) | join("|")) else . end)
   ' "$EXEMPLO" > "$tmp"
 
 mv "$tmp" "$DESTINO"
 echo
 echo "Gerado: $DESTINO (gitignored — não commite)."
+
+# ---- Perfil de busca (bot/perfil.json): nível, área, modelo e termos ----
+PERFIL="bot/perfil.json"
+gera_perfil=1
+if [ -f "$PERFIL" ]; then
+  read -r -p "$PERFIL já existe. Sobrescrever? [s/N] " ok
+  case "$ok" in s|S|sim|Sim) : ;; *) gera_perfil=0 ;; esac
+fi
+if [ "$gera_perfil" -eq 1 ]; then
+  echo
+  echo "Perfil de busca (o que o robô aceita/recusa):"
+  ask area       "Área de atuação (ex.: tecnologia, jurídico, marketing, saúde)"
+  ask modelos    "Modelos aceitos, separados por vírgula (remoto, híbrido, presencial) [remoto]"
+  ask cidades    "Cidades p/ híbrido/presencial, separadas por vírgula (Enter = ${local:-sua cidade})"
+  ask termos     "Termos de busca, separados por vírgula (ex.: tech lead remoto, advogado pleno)"
+  ask pular      "Tipos de vaga a pular, separados por vírgula (opcional)"
+  python3 - "$PERFIL" "${nivel:-}" "${area:-}" "${modelos:-}" "${cidades:-}" "${termos:-}" "${pular:-}" "${objetivo:-}" <<'PY'
+import json, sys
+sys.path.insert(0, "bot")
+import perfil_render as r
+destino, nivel, area, modelos, cidades, termos, pular, objetivo = sys.argv[1:]
+lista = lambda s: [x.strip() for x in s.split(",") if x.strip()]
+niveis = [n for n in (r.nivel_canonico(x) for x in lista(nivel)) if n] or ["junior", "trainee"]
+termos_l = lista(termos) or ([objetivo] if objetivo.strip() else [])
+if not termos_l:
+    sys.exit("perfil: informe ao menos um termo de busca (ou o objetivo) e rode de novo.")
+perfil = {
+    "nome_perfil": "-".join([niveis[-1], (area or "tecnologia").split()[0].lower()]),
+    "niveis": niveis,
+    "area": area.strip() or "tecnologia",
+    "modelos": r.modelos_do_perfil({"modelos": lista(modelos)}),
+    "termos": termos_l,
+    "pular_tipos": lista(pular),
+}
+if lista(cidades):
+    perfil["cidades"] = lista(cidades)
+open(destino, "w", encoding="utf-8").write(json.dumps(perfil, ensure_ascii=False, indent=2) + "\n")
+print("Gerado: %s (gitignored). Confira: python3 bot/perfil_render.py info %s" % (destino, destino))
+PY
+fi
 
 # Valida contra o schema, se o validador existir.
 if [ -x scripts/validate.sh ]; then
