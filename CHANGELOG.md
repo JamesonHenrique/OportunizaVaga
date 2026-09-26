@@ -5,6 +5,29 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- README principal agora é em português (`README.md`); inglês foi para `README.en.md`.
+
+### Added
+- **Qualquer nível e qualquer área.** O perfil (`bot/perfil.json`) ganha `niveis` (estágio → diretor,
+  em qualquer combinação), `area` (texto livre), `experiencia_max_anos` e `sites_pular`.
+  `bot/perfil_render.py` preenche os placeholders `{{NIVEIS}}`, `{{NIVEIS_RECUSADOS}}`, `{{AREA}}`,
+  `{{TERMOS}}`, `{{PULAR_TIPOS}}`, `{{REGRA_EXPERIENCIA}}` e `{{SITES_PULAR}}` dos prompts
+  (`loop.sh`, `loop.ps1`, triagem).
+- Perfis de exemplo `senior-techlead`, `pleno-marketing` e `estagio-direito`.
+- `config/sites_permitidos.json` -> `restrito_a_area`: perfis fora de tech pulam GeekHunter/Programathor
+  no rodízio (`rodizio-saude.py pre --perfil`); o dry-run marca esses sites como pulados.
+- `dados_candidato`: `experiencia.stacks_similares`, `aceita_senior`, `aceita_lideranca`.
+
+### Changed
+- Regra 3 dos prompts (PT/EN) e da triagem deixa de fixar "só JR/trainee" e a stack Java/Angular:
+  nível, área, termos e teto de experiência vêm do perfil ativo. URLs de busca usam os termos do perfil.
+- "X anos de experiência" só pode ser afirmado se `experiencia.anos` estiver preenchido.
+
+### Deprecated
+- `nivel` (string) no perfil — use `niveis`. `experiencia.stacks_similares_jr` — use `stacks_similares`.
+  Os dois seguem funcionando; perfil só com `nivel: "junior"` aceita também trainee, como antes.
+
 ## [0.2.0] - 2026-09-26
 
 ### Added

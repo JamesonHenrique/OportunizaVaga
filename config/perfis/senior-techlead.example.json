@@ -1,0 +1,23 @@
+{
+  "_COMO_USAR": "Exemplo de perfil. Copie para bot/perfil.json e ajuste niveis/area/termos/pular_tipos ao SEU caso. Este arquivo de exemplo NUNCA vai ao git com dados reais.",
+  "nome_perfil": "senior-techlead-exemplo",
+  "niveis": [
+    "senior",
+    "especialista",
+    "lider"
+  ],
+  "area": "tecnologia (engenharia de software / liderança técnica)",
+  "termos": [
+    "tech lead remoto",
+    "engenheiro de software senior",
+    "desenvolvedor backend senior",
+    "staff engineer",
+    "lider tecnico desenvolvimento"
+  ],
+  "pular_tipos": [
+    "ciência de dados",
+    "design/UX",
+    "ERP/funcional"
+  ],
+  "experiencia_max_anos": null
+}

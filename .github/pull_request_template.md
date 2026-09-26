@@ -13,7 +13,7 @@
       `https://sua-url.vercel.app`)
 - [ ] Tests / CI: `bash -n` clean, `node --check` clean (if `monitor/` touched),
       JSON valid, CI green (Linux + Windows jobs)
-- [ ] Docs updated (`docs/` or `README.md` if behavior changed)
+- [ ] Docs updated (`docs/` or `README.md` / `README.en.md` / `README.es.md` if behavior changed)
 - [ ] If the bot was touched (`bot/`, `browser/`, `config/`, `scripts/`):
       dry-run tested with 1 manual round (`./bot/loop.sh` or `bot\loop.ps1`)
       and result noted below

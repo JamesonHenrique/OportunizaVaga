@@ -62,8 +62,27 @@ $PerfilDoc = $null
 try { $PerfilDoc = Get-Content $ProfileFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
 catch { throw "perfil: JSON invalido ou ilegivel ($($_.Exception.Message))" }
 
-foreach ($key in @('nome_perfil', 'nivel', 'termos', 'pular_tipos')) {
+foreach ($key in @('nome_perfil', 'termos', 'pular_tipos')) {
     if ($null -eq $PerfilDoc.PSObject.Properties[$key]) { throw "perfil: chave obrigatoria ausente: '$key'" }
+}
+if ($null -eq $PerfilDoc.PSObject.Properties['niveis'] -and $null -eq $PerfilDoc.PSObject.Properties['nivel']) {
+    throw "perfil: chave obrigatoria ausente: 'niveis' (ou o legado 'nivel')"
+}
+# Sites fora da area do perfil (espelho de bot/perfil_render.py: sites_pular explicito ou area nao-tech).
+$SitesPular = @()
+if ($null -ne $PerfilDoc.PSObject.Properties['sites_pular']) {
+    $SitesPular = @($PerfilDoc.sites_pular)
+} else {
+    $areaPerfil = if ($PerfilDoc.area) { [string]$PerfilDoc.area } else { 'tecnologia' }
+    $ehTech = $areaPerfil -match '(?i)\b(tech|ti|it|dev|qa|rpa)\b|tecnolog|software|desenvolv|programa|dados|data|infra|devops'
+    if (-not $ehTech) {
+        try {
+            $catalogo = Get-Content (Join-Path $BOT_ROOT 'config\sites_permitidos.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+            foreach ($prop in $catalogo.restrito_a_area.PSObject.Properties) {
+                if ($prop.Name -notlike '_*' -and $prop.Value -eq 'tech') { $SitesPular += $prop.Name }
+            }
+        } catch { }
+    }
 }
 if (-not $PerfilDoc.termos -or @($PerfilDoc.termos).Count -eq 0) { throw 'perfil: termos precisa ser uma lista nao vazia' }
 
@@ -107,6 +126,7 @@ foreach ($file in (Get-ChildItem $adapterDir -Filter '*.sh' | Sort-Object Name))
     $encoded = if ($template -like '*vagas-de-*') { $term.Replace(' ', '-') } else { $term.Replace(' ', '%20') }
     $url = $template.Replace('SEU_TERMO', $encoded)
     [void]$Sites.Add([ordered]@{
+        pulado_pelo_perfil = ($SitesPular -contains $siteId)
         site_id = $siteId
         label = $label
         home = $siteHome
@@ -129,6 +149,9 @@ $Result = [ordered]@{
         slug = $PerfilSlug
         arquivo = $ProfileFile
         nivel = [string]$PerfilDoc.nivel
+        niveis = @($PerfilDoc.niveis | Where-Object { $_ })
+        area = $(if ($PerfilDoc.area) { [string]$PerfilDoc.area } else { 'tecnologia' })
+        sites_pular = @($SitesPular)
         termos = @($PerfilDoc.termos)
         pular_tipos = @($PerfilDoc.pular_tipos)
     }
@@ -160,7 +183,8 @@ if ($json) {
     Write-Host ("  perfil: {0} | estado isolado: {1}" -f $PerfilNome, $Result.estado.isolado)
     Write-Host ("  sites: {0} | proximo do rodizio: {1}" -f $Sites.Count, $ProximoSite)
     foreach ($site in $Sites) {
-        Write-Host ("  - {0}: {1}" -f $site.site_id, $site.url_busca)
+        $nota = if ($site.pulado_pelo_perfil) { ' (pulado: fora da area do perfil)' } else { '' }
+        Write-Host ("  - {0}: {1}{2}" -f $site.site_id, $site.url_busca, $nota)
     }
 }
 exit 0

@@ -38,10 +38,10 @@ ask github      "URL do GitHub"
 ask local       "Cidade/UF"
 ask formacao    "Formação (curso - instituição - período)"
 ask idiomas     "Idiomas (só o real, ex.: Português nativo; Inglês intermediário)"
-ask objetivo    "Objetivo (ex.: desenvolvedor júnior remoto)"
+ask objetivo    "Objetivo (ex.: tech lead remoto, advogado pleno remoto)"
 ask resumo      "Resumo profissional (3-4 linhas verdadeiras)"
 ask techs       "Tecnologias que você domina (separadas por vírgula)"
-ask nivel       "Nível (ex.: júnior)"
+ask nivel       "Nível (estágio, trainee, júnior, pleno, sênior, especialista, líder, gestor, diretor)"
 
 # Converte lista separada por vírgula em array JSON (trim de espaços).
 techs_json="$(printf '%s' "${techs:-}" | jq -R 'split(",") | map(gsub("^\\s+|\\s+$";"")) | map(select(length>0))')"

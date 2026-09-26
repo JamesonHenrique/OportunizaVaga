@@ -3,14 +3,111 @@
   "$id": "https://example.com/oportunizavaga/perfil.schema.json",
   "title": "Perfil de busca",
   "type": "object",
-  "required": ["nome_perfil", "nivel", "termos", "pular_tipos"],
+  "required": [
+    "nome_perfil",
+    "termos",
+    "pular_tipos"
+  ],
   "properties": {
-    "_COMO_USAR": { "type": "string" },
-    "nome_perfil": { "type": "string", "minLength": 1 },
-    "nivel": { "type": "string", "enum": ["estagio", "trainee", "junior", "júnior", "pleno", "senior", "sênior"] },
-    "termos": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
-    "pular_tipos": { "type": "array", "items": { "type": "string" } },
-    "estado_isolado": { "type": "boolean", "default": true }
+    "_COMO_USAR": {
+      "type": "string"
+    },
+    "nome_perfil": {
+      "type": "string",
+      "minLength": 1
+    },
+    "niveis": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "estagio",
+          "trainee",
+          "junior",
+          "pleno",
+          "senior",
+          "especialista",
+          "lider",
+          "gestor",
+          "diretor",
+          "júnior",
+          "sênior",
+          "estágio"
+        ]
+      },
+      "description": "Níveis aceitos (qualquer combinação). Os demais são recusados. Ex.: [\"senior\",\"especialista\",\"lider\"]."
+    },
+    "nivel": {
+      "type": "string",
+      "enum": [
+        "estagio",
+        "trainee",
+        "junior",
+        "pleno",
+        "senior",
+        "especialista",
+        "lider",
+        "gestor",
+        "diretor",
+        "júnior",
+        "sênior",
+        "estágio"
+      ],
+      "description": "LEGADO: um único nível. Prefira 'niveis'. 'junior' sozinho aceita também trainee."
+    },
+    "area": {
+      "type": "string",
+      "minLength": 1,
+      "default": "tecnologia",
+      "description": "Área de atuação em texto livre (tecnologia, jurídico, marketing, saúde, administrativo...). Fora de tech, sites só-tech saem do rodízio."
+    },
+    "experiencia_max_anos": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Máximo de anos que a vaga pode pedir. null = sem teto. Omitido = padrão pelo maior nível (estágio/trainee 1, júnior 3, pleno 6, acima sem teto)."
+    },
+    "sites_pular": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Ids do rodízio a pular (sobrepõe o filtro automático por área)."
+    },
+    "termos": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "pular_tipos": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "estado_isolado": {
+      "type": "boolean",
+      "default": true
+    }
   },
-  "additionalProperties": true
+  "additionalProperties": true,
+  "anyOf": [
+    {
+      "required": [
+        "niveis"
+      ]
+    },
+    {
+      "required": [
+        "nivel"
+      ]
+    }
+  ]
 }

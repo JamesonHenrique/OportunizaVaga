@@ -92,7 +92,7 @@ export const ROTULO = {
 export function causaRaiz(b) {
   const t = `${b.chave || ''} ${(b.motivo || b.detalhe || '')}`.toLowerCase();
   if (/presencial|h[ií]brido|somente remoto|regra 1/.test(t)) return 'regra 1 · não-remoto';
-  if (/pleno|senior|s[eê]nior|nível|nivel|regra 3|somente jr/.test(t)) return 'regra 3 · nível';
+  if (/pleno|senior|s[eê]nior|j[uú]nior|est[aá]gi|trainee|n[ií]vel|regra 3|somente jr|recusad/.test(t)) return 'regra 3 · nível';
   if (/evid[eê]ncia|inventar|regra 4|sem evidencia|experi[eê]ncia/.test(t)) return 'regra 4 · skill sem evidência';
   if (/cpf|rg|facebook|instagram|estado civil|nome.*m[aã]e|coeficiente|cr\b|grade hor[aá]ria|obrigat[oó]rio|n[aã]o consta/.test(t)) return 'dado ausente (não inventar)';
   if (/404|encerrad|expirad|p[aá]gina.*home|zero resultados/.test(t)) return 'vaga encerrada';

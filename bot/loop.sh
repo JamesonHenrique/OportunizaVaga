@@ -262,6 +262,10 @@ text = text.replace('$BOT_ROOT', bot_root)
 text = text.replace('bot/perfil.json', perfil)
 text = text.replace('SEU_NOME', perfil_nome)
 text = text.replace('YOUR_NAME', perfil_nome)
+# Nivel/area/termos do perfil ativo -> placeholders {{...}} (bot/perfil_render.py).
+sys.path.insert(0, str(Path(bot_root) / 'bot'))
+import perfil_render
+text = perfil_render.render(text, perfil_render.carregar(perfil))
 if modo in {'1', 'true', 'True', 'sim', 'Sim'}:
     text += '''\n\nMODO RECONHECIMENTO (obrigatorio): NAO se candidate, NAO preencha formulario, NAO envie mensagem, NAO altere aplicadas.json. Avalie no maximo %s vagas recentes do site da rodada e grave somente %s com schema compativel com config/reconhecimento.schema.json. Use chave estavel site+vaga, score 0-5, URL, empresa, vaga, remota, nivel, stack, motivos e observacoes; nunca inclua dados pessoais.\n''' % (limite_reconhecimento, reconhecimento)
 else:
@@ -318,7 +322,7 @@ while true; do
   ensure_monitor
 
   ROUND_LOG="logs/rodada-$(date '+%Y%m%d-%H%M%S').log"
-  python3 "$BOT_ROOT/bot/rodizio-saude.py" pre "$APLICADAS_FILE" >> loop.log 2>&1 || true
+  python3 "$BOT_ROOT/bot/rodizio-saude.py" pre "$APLICADAS_FILE" --perfil "$PERFIL_FILE" >> loop.log 2>&1 || true
   render_prompt
   FP_ANTES=$(fingerprint "$APLICADAS_FILE")
   log "rodada iniciada (perfil ${PERFIL_NOME}, rodadas vazias seguidas: ${VAZIAS})"

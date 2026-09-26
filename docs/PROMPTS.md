@@ -9,7 +9,7 @@ o resto (rodízio, anti-ruído, canais, registro) funciona como está.
 Troque o bloco `EXEMPLO` pelo seu stack real:
 
 - `STACK REAL` → `experiencia.tecnologias` no seu `dados_candidato.json`.
-- `STACK SIMILAR-JR` → similares que você topa atuar **sem afirmar domínio**
+- `STACK SIMILAR` (`experiencia.stacks_similares`) → similares que você topa usar **sem afirmar domínio**
   (sempre com `frase_transferencia` no CV/form).
 - `PROIBIDO usar similar para` → liste o que, no seu perfil, nunca pode ser
   "transferido" (ex.: alemão que você não fala, ferramenta que você nunca abriu).
@@ -17,15 +17,20 @@ Troque o bloco `EXEMPLO` pelo seu stack real:
 ## 2. `bot/prompt_loop.md` — PRÉ-FILTRO + TERMOS
 
 - O pré-filtro de listagem (nível/modelo/stack) deve espelhar o **seu** conjunto
-  REAL + SIMILAR-JR — é ele que economiza leitura de modelo (e quota).
-- `TERMOS`: priorize o seu stack real; alterne por rodada, nunca repita sempre o mesmo.
+  REAL + SIMILAR — é ele que economiza leitura de modelo (e quota).
+- `TERMOS`: vêm de `termos[]` do perfil (placeholder `{{TERMOS}}`); priorize o que você faz de verdade.
 - `pular_tipos` (em `aplicadas.json`): áreas que você nunca quer (ex.: DS/BI, UX, ERP)
   — o robô descarta ainda na listagem, sem abrir nem registrar bloqueio.
 
 ## 3. Nível, modelo e salário
 
-- Regra 1 (remoto) e regra 3 (JR/trainee): ajuste se seu alvo for outro
-  (ex.: aceitar híbrido na sua cidade) — mas seja explícito, o robô segue ao pé da letra.
+- Regra 3 (nível e área) **não se edita no prompt**: vem do perfil. Em `bot/perfil.json` use
+  `niveis` (qualquer combinação de `estagio`, `trainee`, `junior`, `pleno`, `senior`,
+  `especialista`, `lider`, `gestor`, `diretor`), `area` (texto livre: "jurídico", "marketing"...)
+  e, se quiser, `experiencia_max_anos` (`null` = sem teto). Fora de tech, sites só-tech
+  (GeekHunter, Programathor) saem do rodízio sozinhos; `sites_pular` sobrepõe isso.
+- Regra 1 (remoto): ajuste no prompt se seu alvo for outro (ex.: híbrido na sua cidade) —
+  mas seja explícito, o robô segue ao pé da letra.
 - `pretensao_regra`: base `SEU_VALOR_BASE`; campo numérico **nunca** recebe "A combinar".
 
 ## 4. `bot/prompt_followup.md` e `bot/prompt_perfil_gupy.md`

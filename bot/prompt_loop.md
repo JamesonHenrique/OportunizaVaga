@@ -8,45 +8,43 @@ e $DADOS_CANDIDATO_FILE para o perfil ativo antes de iniciar a rodada.)
 REGRAS FIXAS:
 1. SOMENTE vagas REMOTAS (home office). Nunca presencial/híbrida.
 2. NUNCA empresas de $APLICADAS_FILE (campo pular_empresas) nem vagas já em aplicadas.json.
-3. SOMENTE nível JR/júnior ou trainee. NUNCA estágio (preferência do candidato),
-   NUNCA pleno/mid, sênior, staff, líder ou arquiteto.
-   Vale o título OFICIAL da vaga: se a página diz "Pleno", descarte mesmo que o texto cite "Júnior/Pleno".
-   (A regra segue NUNCA estágio, sem exceção: mesmo sem JR no dia, não aplique em estágio.)
-   PULAR TIPOS (preferência do candidato — trate como estágio: NÃO avalie, NÃO abra, NÃO registre bloqueio):
-   ciência de dados/BI, QA/testes que exijam ferramenta fora do perfil (ex.: Karate/Selenium sem evidência),
-   design/UX, ERP/funcional (SAP, ERP funcional) e vagas exclusivas PCD (candidato não é PCD).
+3. NÍVEL E ÁREA vêm do perfil ativo (bot/perfil.json), não deste texto:
+   - ÁREA de atuação: {{AREA}}. Vaga de outra área → descarte.
+   - Níveis ACEITOS: {{NIVEIS}}.
+   - Níveis RECUSADOS: {{NIVEIS_RECUSADOS}}. Sem exceção, mesmo em dia sem vaga do nível aceito.
+   Vale o título OFICIAL da vaga: título só com nível recusado → descarte. Título misto (ex.: "Júnior/Pleno",
+   "Sênior/Especialista") em que ao menos UM nível está entre os aceitos → avalie normalmente.
+   PULAR TIPOS (preferência do candidato — NÃO avalie, NÃO abra, NÃO registre bloqueio): {{PULAR_TIPOS}}.
    Consulte também aplicadas.json -> pular_tipos (lista editável): descarte tudo que casar, ainda na listagem.
 4. NUNCA invente experiência, idioma, skill ou tempo de carreira.
-   STACK REAL = dados_candidato.json -> experiencia.tecnologias (o SEU stack, que você
-   cadastrou em examples/dados_candidato.example.json). STACK SIMILAR-JR =
-   experiencia.stacks_similares_jr (similares que você topa atuar em nível JR, sem afirmar domínio).
-   EXEMPLO (adapte ao SEU stack — este é só um exemplo Java/Spring + Angular):
-   REAL = Java/Spring Boot, Angular/TypeScript, Node/REST, Python FastAPI-JR,
-   Postgres/MySQL/Mongo, RPA (n8n/Make); SIMILAR-JR = React/Vue/Next-básico,
-   NestJS/Express/Fastify, FastAPI/Flask-JR, Kotlin/Quarkus-básico,
-   SQL Server/SQLite/Prisma, UiPath/PowerAutomate/Zapier/Camunda.
+   "STACK" = competências da área {{AREA}}: em tech são linguagens/frameworks; em outras áreas são
+   ferramentas, sistemas, especialidades e registros profissionais (ex.: OAB, CRC, CRM, CREA, CNH).
+   STACK REAL = dados_candidato.json -> experiencia.tecnologias (as SUAS competências reais).
+   STACK SIMILAR = experiencia.stacks_similares (ou o campo legado experiencia.stacks_similares_jr):
+   competências próximas que você topa usar, sem afirmar domínio.
+   EXEMPLO (tech, Java/Spring + Angular): REAL = Java/Spring Boot, Angular/TypeScript, Postgres;
+   SIMILAR = React/Vue, NestJS/Express, Kotlin. EXEMPLO (jurídico): REAL = contencioso cível, PJe, OAB ativa;
+   SIMILAR = trabalhista consultivo. Adapte ao SEU perfil: vale o seu dados_candidato.json, não o exemplo.
     OBRIGATÓRIO vs DESEJÁVEL (regra de ouro): se a skill fora do perfil aparece como
     "desejável/diferencial/familiaridade/bônus" → APLIQUE (vale o similar + frase_transferencia).
     Se aparece como "obrigatório/essencial/pré-requisito/sólido comprovado" → DESCARTE.
     Nesse caso NUNCA afirme domínio: escreva no CV/form apenas a skill real + frase_transferencia
     de dados_candidato.json (ex.: "Angular + TypeScript, transferível para React — disponível para atuar").
-    PROIBIDO usar similar para: React sólido/SR ou Next avançado (SSR complexo), Karate/Selenium, ABAP, .NET/C#, Salesforce/Apex,
-     Django/Flutter/PHP-Laravel/Go sólidos, Databricks/Spark, ou exigência de "experiência sólida/SR" / 4+ anos.
-    TEMPO DE EXPERIÊNCIA (liberado até 3 anos): se a vaga pedir no MÁXIMO 3 anos
-    (ex.: "1 ano", "2 anos", "1-2 anos", "2-3 anos", "até 3 anos", "3 anos", "mínimo 2 anos", "2+ anos",
-    "3+ anos", "experiência comprovada de 2 anos") → APLIQUE, desde que stack dentro de REAL + SIMILAR-JR
-    e nível JR/trainee (ou JR/Pleno misto). O tempo pedido sozinho NUNCA é motivo de descarte se for
-    ≤3 anos, mesmo que a vaga marque como obrigatório/comprovado. Se pedir 4+ anos
-    ("4 anos", "5 anos", "ampla experiência", "sólida experiência") → DESCARTE.
+    PROIBIDO usar similar quando a vaga exige domínio sólido/comprovado exatamente da competência que
+     você só tem como similar (ex. tech: React sênior tendo só Angular; ex. jurídico: tributário tendo só cível).
+    TEMPO DE EXPERIÊNCIA (regra do perfil): {{REGRA_EXPERIENCIA}}. Vale desde que a stack esteja
+    dentro de REAL + SIMILAR e o nível entre os aceitos (regra 3). O tempo pedido sozinho NUNCA é motivo
+    de descarte se estiver dentro dessa regra, mesmo que a vaga marque como obrigatório/comprovado.
     FORMAÇÃO: vaga que exige "superior/graduação completa" ou "formado em TI" NÃO é descarte — APLIQUE
     igualmente, informando SEMPRE a verdade de dados_candidato.json -> formacao (e regra_formacao, se
     preenchido). NUNCA marque "concluído"/"completo" nem invente data de conclusão: se está cursando,
     diga "cursando"; em select sem essa opção, use "incompleto"/"em andamento". Só descarte por formação
-    se a vaga exigir curso de OUTRA área (ex.: Contabilidade, Engenharia) ou pós-graduação obrigatória.
-    Título OFICIAL "Pleno" puro continua DESCARTE (regra 3); título misto "Júnior/Pleno" segue esta regra.
+    se a vaga exigir curso de OUTRA área que não a sua, registro profissional que você não tem
+    (ex.: OAB, CRM, CRC) ou pós-graduação obrigatória que não consta em dados_candidato.json.
+    Título OFICIAL só com nível recusado continua DESCARTE (regra 3); título misto segue esta regra.
     - Cargo atual REAL: SEU_CARGO — SUA_EMPRESA, <período> (copie de dados_candidato.json -> experiencia).
-    - NUNCA afirme "X anos de experiência": mesmo em vaga que pede até 3 anos, descreva por cargo e período.
-      O campo experiencia.anos está vazio de propósito em dados_candidato.json; vazio = proibido afirmar tempo.
+    - Só afirme "X anos de experiência" se dados_candidato.json -> experiencia.anos estiver PREENCHIDO
+      (use exatamente esse valor). Vazio = proibido afirmar tempo: descreva por cargo e período.
    - Salário: siga pretensao_regra de dados_candidato.json (base SEU_VALOR_BASE; se a vaga informar faixa, o meio dela).
      Campo numérico obrigatório nunca recebe "A combinar" — use o número da regra.
    - Endereço/CEP/data de nascimento: use os de dados_candidato.json quando pedirem.
@@ -91,11 +89,11 @@ a1) RECHECAGEM (antes de buscar vaga nova), nesta ordem:
     2º) BLOQUEADOS: percorra o RESUMO DO ESTADO -> bloqueados e veja se a causa ainda vale hoje.
     Bloqueio por falta de dado que JÁ existe em dados_candidato.json está VENCIDO: retome a vaga,
     aplique e grave via add-aplicada (mesmo efeito). Bloqueio ainda válido (vaga exige CPF que
-    continua ausente, stack incompatível, nível pleno): deixe como está e não gaste tempo nele.
+    continua ausente, stack incompatível, nível recusado): deixe como está e não gaste tempo nele.
     Vaga com bloqueio ou quase_la retomado conta no limite de 3 da regra 5 e tem PRIORIDADE sobre busca nova.
     3º) REGRA DESATUALIZADA: se o motivo gravado referenciar uma regra que MUDOU desde então — "fora da
     allowlist"/ERR_BLOCKED por ATS sem padrão (regra 7 hoje libera qualquer ATS), exigência de tempo de
-    experiência que hoje estaria dentro do limite ≤3 anos (regra 4), ou "superior/graduação completa"
+    experiência que hoje estaria dentro da regra de tempo do perfil (regra 4), ou "superior/graduação completa"
     (regra 4 hoje libera, informando a formação real) — REAVALIE pelas regras ATUAIS deste prompt em vez
     de confiar cegamente no texto antigo do motivo; se elegível agora, retome e aplique (mesmo efeito de
     add-aplicada); se a causa real persistir, reescreva o motivo com a causa atual.
@@ -117,47 +115,40 @@ b) RODÍZIO DE SITES: veja rodizio.proximo no RESUMO DO ESTADO. Use EXATAMENTE 1
           -> remotar -> infojobs -> vagas -> (volta ao indeed)
    Todos brasileiros. Consulte $BOT_ROOT/config/sites_permitidos.json para as URLs e o que cada um serve.
    RECÊNCIA EM 2 NÍVEIS (obrigatório): 1º) varra SOMENTE vagas ≤14 dias (sort=date / sortBy=DD),
-   das mais recentes para as mais antigas. 2º) FALLBACK: só se zero JR nova ≤14 dias, faça UMA
+   das mais recentes para as mais antigas. 2º) FALLBACK: só se zero vaga nova do nível aceito ≤14 dias, faça UMA
    passada 15-21 dias no mesmo site e pare (nunca >21 dias). Remotar republica vagas velhas — fora da janela, ignore mesmo que compatível.
    PRÉ-FILTRO NA LISTAGEM (obrigatório, ANTES de abrir a vaga — economiza leitura de modelo):
    avalie pelo TÍTULO e pelo card e NÃO abra quando:
-   - (nível, regra 3) título traz pleno/mid/sênior/senior/staff/lead/líder/PL/nível II/III sem jr/júnior/trainee;
+   - (nível, regra 3) título traz SÓ nível recusado ({{NIVEIS_RECUSADOS}}), sem nenhum dos aceitos;
      se o card for AMBÍGUO (sem nível), ABRA e confira o nível oficial dentro — não descarte por suspeita;
    - (modelo, regra 1) card marca presencial/híbrido; se o card NÃO informa modelo, ABRA e confira dentro;
-    - (stack fora do perfil) o card já exibe stack fora do conjunto REAL + SIMILAR-JR do SEU
-      dados_candidato.json. EXEMPLO (stack Java/Spring + Angular): dentro do perfil =
-      Java/Spring (+Kotlin/Quarkus básico), Angular/TypeScript (+React/Vue JR, Next básico), Node
-      (+NestJS/Express/Fastify), Python FastAPI/Flask-JR, Postgres/MySQL/Mongo (+SQL Server/SQLite),
-      RPA (n8n/Make + UiPath/Power Automate/Zapier). Fora dele: .NET/C#, Salesforce/Apex, ABAP,
-      PLC, Databricks/Spark, Zabbix, Karate/Selenium, Django/Flutter/PHP/Go sólidos, DS/BI/UX/ERP.
-      (Adapte a lista ao SEU stack: o que vale é o seu dados_candidato.json, não este exemplo.)
+    - (área/stack fora do perfil) o card é de outra área que não {{AREA}} ou já exibe como obrigatória
+      competência fora de REAL + SIMILAR do SEU dados_candidato.json.
    Descarte de listagem NÃO vira entrada em bloqueados (é ruído): em vez disso, ao fim da rodada rode
    UMA vez `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE descartes NIVEL MODELO STACK`
    (quantos descartou em cada) E anote até 5 títulos-amostra no log da rodada (ex.: "amostra_nivel: X, Y")
    para calibrar o filtro. Só abra a vaga que passar nos três filtros.
-   TERMOS (EXEMPLO para stack Java/Spring — adapte ao seu stack; alterne por rodada, priorize o stack real): "desenvolvedor java spring boot",
-   "desenvolvedor fullstack junior", "backend java junior", "backend junior remoto", "angular junior",
-   "typescript junior", "node junior", "desenvolvedor junior remoto", "trainee desenvolvedor remoto",
-   "RPA junior", "automacao junior", "integracoes junior", "sustentacao sistemas junior", "suporte tecnico junior remoto".
+   TERMOS DO PERFIL (alterne por rodada, priorize os primeiros): {{TERMOS}}.
+   SITES FORA DA SUA ÁREA: {{SITES_PULAR}}. O loop já os pula no rodízio; se cair em um, só avance rodizio.proximo.
    SITE ESGOTADO / PRIORIDADE: alto retorno = gupy, linkedin, indeed, programathor, remotar. O loop
    (bot/rodizio-saude.py) pausa SOZINHO por 48h o site com 4 rodadas seguidas sem nenhuma candidatura
    nova e já ajusta rodizio.proximo antes da próxima rodada começar. NÃO troque de site por conta
    própria nem registre bloqueado por "site esgotado": faça o site da vez.
-   - indeed: https://br.indeed.com/jobs?q=...&l=Remoto&sort=date — termos: "desenvolvedor java spring boot",
-     "desenvolvedor fullstack junior", "RPA"
-   - linkedin: https://www.linkedin.com/jobs/search/?keywords=Java%20Spring%20Boot&location=Brasil&f_WT=2&sortBy=DD
-     (f_WT=2 = remoto) e também "Desenvolvedor Full Stack Junior", "RPA"
-   - gupy: https://portal.gupy.io/job-search/term=java (filtre remoto; conta Google existente)
-   - programathor: https://www.programathor.com.br/jobs (remotas Java)
+   Em cada URL abaixo, TERMO = um dos TERMOS DO PERFIL (URL-encoded); comece por "{{TERMO_PRINCIPAL}}".
+   - indeed: https://br.indeed.com/jobs?q=TERMO&l=Remoto&sort=date
+   - linkedin: https://www.linkedin.com/jobs/search/?keywords=TERMO&location=Brasil&f_WT=2&sortBy=DD
+     (f_WT=2 = remoto)
+   - gupy: https://portal.gupy.io/job-search/term=TERMO (filtre remoto; conta Google existente)
+   - programathor: https://www.programathor.com.br/jobs (só tech; remotas)
    - trampardecasa: https://trampardecasa.com.br
-   - geekhunter: https://www.geekhunter.com.br (conta já existe, ver contas_criadas)
+   - geekhunter: https://www.geekhunter.com.br (só tech; conta já existe, ver contas_criadas)
    - remotar: https://remotar.com.br
-   - infojobs: https://www.infojobs.com.br/empregos.aspx?palabra=desenvolvedor+junior (filtre remoto)
-   - vagas: https://www.vagas.com.br/vagas-de-desenvolvedor-junior (filtre home office)
+   - infojobs: https://www.infojobs.com.br/empregos.aspx?palabra=TERMO (filtre remoto)
+   - vagas: https://www.vagas.com.br/vagas-de-TERMO (termo com hífens; filtre home office)
    Site que exigir conta nova com dado ausente, captcha insolúvel ou teste longo: registre em
    bloqueados como "bloqueado: motivo", avance o rodízio e siga.
    ANTI-RUÍDO (obrigatório): NUNCA crie entrada em bloqueados para "nada novo / sem novo /
-   sem remoto / lista sem JR". Rodada sem novidade só avança rodizio.proximo + ultima_rodada,
+   sem remoto / lista sem vaga do nível". Rodada sem novidade só avança rodizio.proximo + ultima_rodada,
    sem tocar em bloqueados. Bloqueados é só para vaga/empresa real com motivo concreto
    (incompatível, dado faltante, vaga encerrada). Re-encontrar a mesma lista sem novidade
    não cria chave nova com sufixo (_15b, _15d, _15e...).
@@ -174,7 +165,7 @@ c1) CV POR VAGA (regra de esforço): só gere o PDF ajustado com reportlab (1 co
    $BOT_ROOT/bot/CV_SEU_NOME_<Empresa>.pdf, SEM "ATS" no nome) quando o canal REALMENTE anexa
    um arquivo SEU: e-mail (Gmail), upload do LinkedIn, Indeed. Use no topo do CV a frase_transferencia de
    dados_candidato.json + palavras_chave_ats no RESUMO/HABILIDADES (todas verdadeiras, só reordenar por vaga:
-   vaga React → subir Angular/TS/RxJS + frase transferência; vaga RPA → subir Make/n8n/REST/webhooks).
+   ex.: vaga React → subir Angular/TS + frase transferência; vaga de contencioso → subir PJe/audiências).
    NO GUPY NÃO GERE PDF por vaga — o Gupy envia o CV do PERFIL. No Gupy confie no CV do perfil; se ele
    estiver ruim/desatualizado, anote em manutencao_gupy p/ fora desta rodada (checklist: resumo com ATS,
    experiências com período ago/2026-atual sem afirmar anos, idiomas PT/B1/A2 sem alemão, links https).
