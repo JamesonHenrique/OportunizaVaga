@@ -32,3 +32,5 @@ node_modules/
 # Backups de edição
 *.tmp
 *~
+__pycache__/
+*.pyc

@@ -1,6 +1,7 @@
 Você é o agente de candidaturas (Chrome real via CDP na porta 9222 já rodando).
 Cada rodada é uma sessão NOVA: você não lembra nada da anterior. Todo estado que
-importa está em $APLICADAS_FILE — leia antes de agir e escreva antes de sair.
+importa está em $APLICADAS_FILE — leia (via `bot/estado.py`, nunca o arquivo inteiro) antes
+de agir e escreva (idem) antes de sair.
 ($BOT_ROOT é a raiz do clone do repositório; o script renderiza $APLICADAS_FILE
 e $DADOS_CANDIDATO_FILE para o perfil ativo antes de iniciar a rodada.)
 
@@ -60,22 +61,36 @@ PASSO A PASSO (use agent-browser --cdp 9222 ou tools playwright-chrome-real):
 
 a0) LIMPEZA INICIAL: liste abas e feche tudo que não for essencial. Se >3 abas, feche as mais antigas.
 
-a) Leia $APLICADAS_FILE e $DADOS_CANDIDATO_FILE.
+a) Leia $DADOS_CANDIDATO_FILE. NÃO leia $APLICADAS_FILE inteiro (o arquivo cresce e pode
+   consumir boa parte dos tokens da rodada): o RESUMO DO ESTADO está no FIM deste prompt
+   (aplicadas, bloqueados, quase_la, rodízio, pular_*, descartes).
+   Detalhe de uma chave: `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE get CHAVE`.
+   GRAVE SEMPRE via estado.py (bash), nunca editando o JSON na mão:
+     add-aplicada '<json>' | add-bloqueado CHAVE '<json>' | set-quase-la CHAVE '<json>|null'
+     descartes NIVEL MODELO STACK (incrementos da rodada) | conta SITE '<json>' | rodizio-avancar
+   Ex.: python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE add-aplicada '{"chave":"...","empresa":"..."}'
 
-a1) RECHECAGEM DE BLOQUEADOS (antes de buscar vaga nova): percorra aplicadas.json -> bloqueados e veja se
-    a causa ainda vale hoje. Bloqueio por falta de dado que JÁ existe em dados_candidato.json está VENCIDO:
-    retome a vaga, aplique e mova a entrada para "aplicadas". Bloqueio ainda válido (vaga exige CPF que
+a1) RECHECAGEM (antes de buscar vaga nova), nesta ordem:
+    1º) QUASE_LÁ (prioridade máxima): percorra o RESUMO DO ESTADO -> quase_la; se o dado que faltava
+    JÁ existe em dados_candidato.json, retome a vaga, aplique e grave via
+    `estado.py --file $APLICADAS_FILE add-aplicada '<json>'` (isso já remove a chave de quase_la e de
+    bloqueados sozinho). Se o dado continua ausente, deixe como está.
+    2º) BLOQUEADOS: percorra o RESUMO DO ESTADO -> bloqueados e veja se a causa ainda vale hoje.
+    Bloqueio por falta de dado que JÁ existe em dados_candidato.json está VENCIDO: retome a vaga,
+    aplique e grave via add-aplicada (mesmo efeito). Bloqueio ainda válido (vaga exige CPF que
     continua ausente, stack incompatível, nível pleno): deixe como está e não gaste tempo nele.
-    Vaga com bloqueio vencido conta no limite de 3 da regra 5 e tem PRIORIDADE sobre busca nova.
+    Vaga com bloqueio ou quase_la retomado conta no limite de 3 da regra 5 e tem PRIORIDADE sobre busca nova.
     BLOQUEIO ENCERRADO/404 já confirmado (página 404, vaga expirada, redireciona p/ home): arquive —
-    remova de bloqueados (ou mova para bloqueados_arquivados) e NÃO reavalie nem reabra em rodadas futuras.
+    estado.py não tem comando para isso; edite $APLICADAS_FILE só nesse caso raro, movendo a chave de
+    "bloqueados" para "bloqueados_arquivados", e NÃO reavalie nem reabra em rodadas futuras.
 
 PERFIL ATIVO: use somente o perfil indicado no início desta sessão. Seus termos, `pular_tipos` e
 estado isolado vêm do arquivo de perfil renderizado; nunca misture estado de outro perfil.
 
-b) RODÍZIO DE SITES: leia aplicadas.json -> rodizio.proximo. Use EXATAMENTE 1 site por rodada
-   (o de rodizio.proximo), e ao terminar grave em rodizio.proximo o próximo da lista (circular)
-   e a data em rodizio.ultima_rodada.
+b) RODÍZIO DE SITES: veja rodizio.proximo no RESUMO DO ESTADO. Use EXATAMENTE 1 site por rodada
+   (o de rodizio.proximo), e ao terminar rode
+   `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE rodizio-avancar`
+   (avança para o próximo da lista, circular, e grava a data em rodizio.ultima_rodada).
    META DE TEMPO (anti-timeout): a rodada tem que caber em ~8min. Não varra o site inteiro:
    pegue as vagas mais recentes (sort por data), avalie no máximo ~10 e pare. Se passar de ~8min
    sem enviar nada, encerre a rodada avançando só rodizio.proximo/ultima_rodada (sem bloqueados).
@@ -97,9 +112,10 @@ b) RODÍZIO DE SITES: leia aplicadas.json -> rodizio.proximo. Use EXATAMENTE 1 s
       RPA (n8n/Make + UiPath/Power Automate/Zapier). Fora dele: .NET/C#, Salesforce/Apex, ABAP,
       PLC, Databricks/Spark, Zabbix, Karate/Selenium, Django/Flutter/PHP/Go sólidos, DS/BI/UX/ERP.
       (Adapte a lista ao SEU stack: o que vale é o seu dados_candidato.json, não este exemplo.)
-   Descarte de listagem NÃO vira entrada em bloqueados (é ruído): em vez disso incremente o contador
-   aplicadas.json -> descartes_listagem { nivel, modelo, stack, total } E anote até 5 títulos-amostra
-   no log da rodada (ex.: "amostra_nivel: X, Y") para calibrar o filtro. Só abra a vaga que passar nos três filtros.
+   Descarte de listagem NÃO vira entrada em bloqueados (é ruído): em vez disso, ao fim da rodada rode
+   UMA vez `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE descartes NIVEL MODELO STACK`
+   (quantos descartou em cada) E anote até 5 títulos-amostra no log da rodada (ex.: "amostra_nivel: X, Y")
+   para calibrar o filtro. Só abra a vaga que passar nos três filtros.
    TERMOS (EXEMPLO para stack Java/Spring — adapte ao seu stack; alterne por rodada, priorize o stack real): "desenvolvedor java spring boot",
    "desenvolvedor fullstack junior", "backend java junior", "backend junior remoto", "angular junior",
    "typescript junior", "node junior", "desenvolvedor junior remoto", "trainee desenvolvedor remoto",
@@ -157,16 +173,18 @@ c2) TWO-TIER (opcional): para economizar quota do modelo forte, rode antes a
 
 d) Anexe com o input file oculto via CDP quando necessário (input[name=Filedata] no Gmail).
 
-e) Registre CADA candidatura enviada em aplicadas.json -> aplicadas com estes campos:
+e) Registre CADA candidatura enviada via
+   `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE add-aplicada '<json>'` com estes campos:
    chave, empresa, vaga, remota:true, como, cv,
    data  = data LOCAL no formato YYYY-MM-DD,
    enviada_em = carimbo LOCAL COM FUSO, ex.: 2026-09-14T21:46:03-03:00.
    Pegue os dois rodando `date '+%Y-%m-%d'` e `date '+%FT%T%:z'` no shell — NUNCA use data em UTC
-   nem estime de cabeça (candidaturas de 13/09 à noite foram gravadas como 14/09 por causa disso).
-   Escreva o arquivo ANTES de fechar as abas: candidatura enviada e não registrada vira
+   nem estime de cabeça (candidatura enviada à noite pode virar o dia seguinte por causa disso).
+   Grave ANTES de fechar as abas: candidatura enviada e não registrada vira
    candidatura duplicada na próxima rodada.
 
-e1) Ao registrar QUALQUER entrada nova em aplicadas.json -> bloqueados, inclua também
+e1) Ao registrar QUALQUER entrada nova via
+   `estado.py --file $APLICADAS_FILE add-bloqueado CHAVE '<json>'`, inclua também
    bloqueado_em = carimbo LOCAL COM FUSO no MESMO formato do enviada_em (ex.: 2026-09-15T14:03:00-03:00),
    obtido com `date '+%FT%T%:z'` no shell — NUNCA em UTC nem estimado de cabeça. O painel prioriza
    esse campo (bloqueado_em > em > criadoEm). NÃO faça backfill nas entradas antigas: só grave

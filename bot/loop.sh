@@ -249,14 +249,15 @@ PY
 }
 
 render_prompt() {
-  python3 - "$BOT_ROOT/bot/prompt_loop.md" "$RUNTIME_PROMPT" "$APLICADAS_FILE" "$DADOS_CANDIDATO_FILE" "$PERFIL_FILE" "$PERFIL_NOME" "$RECONHECIMENTO_FILE" "$OV_RECONHECIMENTO" "$OV_MAX_CANDIDATURAS" "$OV_RECONHECIMENTO_LIMIT" <<'PY'
+  python3 - "$BOT_ROOT/bot/prompt_loop.md" "$RUNTIME_PROMPT" "$APLICADAS_FILE" "$DADOS_CANDIDATO_FILE" "$PERFIL_FILE" "$PERFIL_NOME" "$RECONHECIMENTO_FILE" "$OV_RECONHECIMENTO" "$OV_MAX_CANDIDATURAS" "$OV_RECONHECIMENTO_LIMIT" "$BOT_ROOT" <<'PY'
 from pathlib import Path
 import sys
 
-source, target, aplicadas, dados, perfil, perfil_nome, reconhecimento, modo, limite, limite_reconhecimento = sys.argv[1:]
+source, target, aplicadas, dados, perfil, perfil_nome, reconhecimento, modo, limite, limite_reconhecimento, bot_root = sys.argv[1:]
 text = Path(source).read_text(encoding='utf-8')
 text = text.replace('$APLICADAS_FILE', aplicadas)
 text = text.replace('$DADOS_CANDIDATO_FILE', dados)
+text = text.replace('$BOT_ROOT', bot_root)
 text = text.replace('bot/perfil.json', perfil)
 text = text.replace('SEU_NOME', perfil_nome)
 text = text.replace('YOUR_NAME', perfil_nome)
@@ -264,6 +265,16 @@ if modo in {'1', 'true', 'True', 'sim', 'Sim'}:
     text += '''\n\nMODO RECONHECIMENTO (obrigatorio): NAO se candidate, NAO preencha formulario, NAO envie mensagem, NAO altere aplicadas.json. Avalie no maximo %s vagas recentes do site da rodada e grave somente %s com schema compativel com config/reconhecimento.schema.json. Use chave estavel site+vaga, score 0-5, URL, empresa, vaga, remota, nivel, stack, motivos e observacoes; nunca inclua dados pessoais.\n''' % (limite_reconhecimento, reconhecimento)
 else:
     text += '''\n\nPERFIL ATIVO: %s. Use somente os termos, filtros e estado deste perfil. O limite desta rodada e %s candidaturas novas.\n''' % (perfil_nome, limite)
+# RESUMO DO ESTADO: gerado agora via estado.py (compacto) em vez do agente ler
+# o aplicadas.json inteiro (arquivo de estado pode dominar os tokens de uma rodada).
+try:
+    import subprocess
+    res = subprocess.run([sys.executable, str(Path(bot_root) / 'bot' / 'estado.py'), '--file', aplicadas, 'resumo'],
+                         capture_output=True, text=True, timeout=30)
+    if res.returncode == 0 and res.stdout.strip():
+        text += '\n\nRESUMO DO ESTADO (gerado agora de ' + aplicadas + '; NAO leia o arquivo inteiro)\n' + res.stdout
+except Exception:
+    pass
 Path(target).write_text(text, encoding='utf-8')
 PY
 }
