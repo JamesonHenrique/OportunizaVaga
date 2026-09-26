@@ -37,9 +37,12 @@ O guardião checa o **processo**, não só o lock, e limpa órfãos (`bot/guardi
 Se persistir: `fuser -k /tmp/oportunizavaga-loop.lock` e deixe o cron subir de novo.
 
 **Como adiciono um site novo?**
-1. Adicione em `config/sites_permitidos.json` (nas **duas** formas: `https://x` e `https://*.x`).
-2. Adicione as origens no `--allowed-origins` do seu `opencode.jsonc`.
-3. Inclua no rodízio (`rodizio.ordem` em `aplicadas.json`) e no prompt (URLs + termos).
+1. Inclua no rodízio (`rodizio.ordem` em `aplicadas.json`) e no prompt (URLs + termos).
+2. Só bloqueie se for um agregador estrangeiro/spam: adicione em
+   `config/sites_permitidos.json` (`bloqueados_no_browser`, nas **duas** formas:
+   `https://x` e `https://*.x`) e no `--blocked-origins` do seu `opencode.jsonc`.
+   Sites de vaga BR não precisam de allowlist — o `--blocked-origins` já deixa
+   passar por padrão; a regra 7 do prompt filtra vaga gringa pelo conteúdo.
 
 **Funciona no Windows/macOS?**
 Os scripts são bash (Linux testado). No macOS, adapte `stat -c %s`, `fuser` e o

@@ -84,7 +84,7 @@ oportunizavaga/
 │   ├── chrome-real.ps1          # espelho Windows (perfil em %LOCALAPPDATA%)
 │   └── README.md
 ├── config/
-│   ├── sites_permitidos.json    # allowlist de domínios BR (espelha o bloqueio do browser)
+│   ├── sites_permitidos.json    # blocklist de agregadores gringos/spam (espelha o bloqueio do browser)
 │   ├── opencode.jsonc.example   # modelo do config do opencode (com a cascata de modelos)
 │   ├── crontab.example          # cron sugerido (guardiao, keepalive, follow-up)
 │   └── TaskScheduler.md         # equivalente Windows (schtasks prontos)
@@ -98,7 +98,10 @@ oportunizavaga/
 │   ├── setup.sh / setup.ps1    # instalador interativo (Linux / Windows)
 │   ├── sanitize.sh              # varredura pré-commit de segredos/dados pessoais
 │   ├── monitor-keepalive.sh / .ps1  # mantém o publisher do painel no ar
-│   └── pull-monitor.sh / .ps1       # atualiza o painel via git pull
+│   ├── pull-monitor.sh / .ps1       # atualiza o painel via git pull
+│   ├── digest.sh / .ps1             # resumo diário + alertas de anomalia no loop.log
+│   ├── notificar.sh / .ps1          # push genérico ao Telegram (dedupe 6h)
+│   └── backup-jsons.sh / .ps1       # cópia rotativa (14x) dos JSONs de estado
 ├── examples/
 │   ├── dados_candidato.example.json  # COPIE p/ bot/dados_candidato.json e preencha
 │   └── aplicadas.example.json        # COPIE p/ bot/aplicadas.json (estado inicial)

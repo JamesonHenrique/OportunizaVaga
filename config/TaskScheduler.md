@@ -50,16 +50,46 @@ schtasks /Create /TN 'OportunizaVaga\PullMonitor' `
 
 Equivale a `*/10 * * * * $BOT_DIR/scripts/pull-monitor.sh`.
 
-## 5. Follow-up semanal (segundas 09:00)
+## 5. Follow-up semanal (roda todo dia, so executa de fato 1x/semana)
+
+`followup.ps1` tem retentativa interna (`state/followup.ok`): pula sozinho se o
+último sucesso tiver menos de 6 dias, então a tarefa pode rodar todo dia sem
+duplicar o follow-up — uma falha não trava a semana inteira sem tentar de novo.
 
 ```powershell
 $BOT_DIR = 'C:\Users\VOCE\opensource\oportunizavaga'
 schtasks /Create /TN 'OportunizaVaga\Followup' `
   /TR "powershell -ExecutionPolicy Bypass -File `"$BOT_DIR\bot\followup.ps1`"" `
-  /SC WEEKLY /D MON /ST 09:00 /F
+  /SC DAILY /ST 09:00 /F
 ```
 
-Equivale a `0 9 * * 1 $BOT_DIR/bot/followup.sh`.
+Equivale a `0 9 * * * $BOT_DIR/bot/followup.sh`.
+
+## 6. Backup rotativo dos JSONs de estado (2x/dia)
+
+```powershell
+$BOT_DIR = 'C:\Users\VOCE\opensource\oportunizavaga'
+schtasks /Create /TN 'OportunizaVaga\BackupJsons' `
+  /TR "powershell -ExecutionPolicy Bypass -File `"$BOT_DIR\scripts\backup-jsons.ps1`"" `
+  /SC DAILY /ST 08:00 /RI 240 /DU 0008:00 /F
+```
+
+Equivale a `0 8,12 * * * $BOT_DIR/scripts/backup-jsons.sh` (duas execuções, 8h e 12h).
+
+## 7. Resumo diário com alertas (21h)
+
+`digest.ps1 -Send` exige `$env:TELEGRAM_BOT_TOKEN` e `$env:TELEGRAM_CHAT_ID` no
+ambiente da tarefa (ex.: via `cron.env` carregado pelo próprio script, se você
+adaptar; nunca hardcode no Task Scheduler).
+
+```powershell
+$BOT_DIR = 'C:\Users\VOCE\opensource\oportunizavaga'
+schtasks /Create /TN 'OportunizaVaga\Digest' `
+  /TR "powershell -ExecutionPolicy Bypass -File `"$BOT_DIR\scripts\digest.ps1`" -Send" `
+  /SC DAILY /ST 21:05 /F
+```
+
+Equivale a `5 21 * * * $BOT_DIR/scripts/digest.sh --send`.
 
 ## Conferir / remover
 

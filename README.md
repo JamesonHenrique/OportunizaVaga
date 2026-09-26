@@ -94,7 +94,8 @@ Adapt filters to your stack: [`docs/PROMPTS.md`](docs/PROMPTS.md).
 ./browser/chrome-real.sh &  # CDP on :9222; one login covers every site
 ```
 
-Details: [`browser/README.md`](browser/README.md). Domain allowlist:
+Details: [`browser/README.md`](browser/README.md). Domain blocklist (foreign/spam
+aggregators only — the bot can apply on any ATS/career site):
 [`config/sites_permitidos.json`](config/sites_permitidos.json).
 
 ### 4. Safe test first, then one real round
