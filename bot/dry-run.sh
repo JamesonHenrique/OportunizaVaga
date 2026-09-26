@@ -76,9 +76,11 @@ except Exception as exc:
     perfil, perfil = {}, None
     erros.append('perfil: JSON invalido ou ilegivel (%s)' % exc)
 if perfil is not None:
-    for key in ('nome_perfil', 'nivel', 'termos', 'pular_tipos'):
+    for key in ('nome_perfil', 'termos', 'pular_tipos'):
         if key not in perfil:
             erros.append('perfil: chave obrigatoria ausente: %s' % key)
+    if 'niveis' not in perfil and 'nivel' not in perfil:
+        erros.append('perfil: chave obrigatoria ausente: niveis (ou o legado nivel)')
     if not isinstance(perfil.get('termos'), list) or not perfil.get('termos'):
         erros.append('perfil: termos precisa ser uma lista nao vazia')
     if not isinstance(perfil.get('pular_tipos'), list):
@@ -154,11 +156,15 @@ PY
   } >> "$SITE_FILE"
 done
 
-python3 - "$TERMO_FILE" "$SITE_FILE" "$PROFILE_FILE" "$DADOS_FILE" "$APLICADAS_FILE" "$PERFIL_NOME" "$PERFIL_SLUG" "$STATE_DIR" "$JSON_OUT" "$RECONHECIMENTO" "$SITE_FILTER" <<'PY'
+OV_BOT_DIR="$BOT_ROOT/bot" python3 - "$TERMO_FILE" "$SITE_FILE" "$PROFILE_FILE" "$DADOS_FILE" "$APLICADAS_FILE" "$PERFIL_NOME" "$PERFIL_SLUG" "$STATE_DIR" "$JSON_OUT" "$RECONHECIMENTO" "$SITE_FILTER" <<'PY'
 import json, os, sys
 
 termo_path, site_path, perfil_path, dados_path, aplic_path, perfil_nome, perfil_slug, state_dir, json_out, reconhecimento, site_filter = sys.argv[1:]
 termo = json.load(open(termo_path, encoding='utf-8'))
+sys.path.insert(0, os.environ['OV_BOT_DIR'])
+import perfil_render
+_r = perfil_render.resolver(termo['perfil'])
+perfil_resolvido = {k: _r[k] for k in ('niveis', 'niveis_recusados', 'area', 'experiencia_max_anos', 'sites_pular')}
 sites = []
 with open(site_path, encoding='utf-8') as fh:
     for line in fh:
@@ -172,6 +178,7 @@ with open(site_path, encoding='utf-8') as fh:
             'home': home,
             'termos': terms,
             'url_busca': url,
+            'pulado_pelo_perfil': site_id in perfil_resolvido['sites_pular'],
         })
 aplic = termo['aplic'] or {}
 rodizio = aplic.get('rodizio', {}) if isinstance(aplic, dict) else {}
@@ -185,6 +192,7 @@ resultado = {
         'slug': perfil_slug,
         'arquivo': perfil_path,
         'nivel': termo['perfil'].get('nivel'),
+        **perfil_resolvido,
         'termos': termo['perfil'].get('termos', []),
         'pular_tipos': termo['perfil'].get('pular_tipos', []),
     },
@@ -214,5 +222,5 @@ else:
     print('  perfil: %s | estado isolado: %s' % (perfil_nome, resultado['estado']['isolado']))
     print('  sites: %d | proximo do rodizio: %s' % (len(sites), resultado['estado']['proximo_site'] or 'nao definido'))
     for site in sites:
-        print('  - %s: %s' % (site['site_id'], site['url_busca']))
+        print('  - %s: %s%s' % (site['site_id'], site['url_busca'], ' (pulado: fora da area do perfil)' if site['pulado_pelo_perfil'] else ''))
 PY

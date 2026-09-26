@@ -5,12 +5,12 @@ type: software
 license: MIT
 repository-code: "https://github.com/JamesonHenrique/OportunizaVaga"
 url: "https://github.com/JamesonHenrique/OportunizaVaga"
-abstract: "Open-source bot for automatic applications to junior/trainee remote jobs in Brazil, running on your own PC at zero cost."
+abstract: "Open-source bot for automatic applications to remote jobs in Brazil, for any seniority level and any field, running on your own PC at zero cost."
 keywords:
   - jobs
   - automation
   - brazil
-  - junior
+  - careers
   - remote
 authors:
   - family-names: Henrique
