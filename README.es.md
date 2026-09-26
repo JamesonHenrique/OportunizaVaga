@@ -9,7 +9,7 @@
 [![Platform](https://img.shields.io/badge/platform-Linux%7CWindows%7CWSL2-blue.svg)](docs/QUICKSTART.md)
 [![Release](https://img.shields.io/github/v/release/JamesonHenrique/OportunizaVaga?label=release)](https://github.com/JamesonHenrique/OportunizaVaga/releases)
 
-> 🌐 Traducciones / Translations: 🇬🇧 [English](README.md) · 🇧🇷 [Português](README.pt-BR.md) · 🇪🇸 Español
+> 🌐 Traducciones / Translations: 🇧🇷 [Português](README.md) · 🇬🇧 [English](README.en.md) · 🇪🇸 Español
 
 Bot de código abierto que **aplica automáticamente a empleos remotos en Brasil, de cualquier nivel y área**
 (de pasantía a dirección; tecnología, jurídico, marketing, salud...),
