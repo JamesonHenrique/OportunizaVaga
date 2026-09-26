@@ -48,7 +48,7 @@ Sem `MONITOR_URL`, o bot funciona normalmente — só não publica nada.
 | Variável | Onde | Para quê |
 | --- | --- | --- |
 | `MONITOR_URL` | PC | URL do painel que recebe o heartbeat |
-| `MONITOR_SECRET` | PC + Vercel | exige `x-monitor-secret` no POST; no GET, sem ele o painel mostra a visão redigida (terminal oculto). Abra `?secret=...` uma vez para salvar no navegador |
+| `MONITOR_SECRET` | PC + Vercel | exige `x-monitor-secret` no POST; no GET, sem ele o painel mostra a visão redigida (terminal oculto). Abra `?secret=...` uma vez: a API troca por um cookie `httpOnly` (hash do secret, 30 dias) e o secret some da URL, sem ficar salvo no navegador |
 | `MONITOR_INCLUDE_DETAILS=1` | PC | publica listas brutas (candidaturas, bloqueios, eventos, terminal). Padrão: só agregados |
 | `MONITOR_DEMO=1` | Vercel/local | serve a demo fictícia e recusa POST (demo pública segura) |
 | `MONITOR_LOCAL=0` | local | desliga a leitura direta do disco |

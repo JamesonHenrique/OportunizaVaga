@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [deltaLog, setDeltaLog] = useState(null);
   const ultimoBom = useRef(null);
   const prevSnap = useRef(null);
+  const secretUmaVez = useRef(null);
   const [aba, setAba] = useState('candidaturas');
   const abrirAba = (id) => {
     setAba(id);
@@ -53,11 +54,18 @@ export default function Dashboard() {
     if (cached) { ultimoBom.current = cached; setDados(cached); setUsandoCache(true); }
     try { setVistos(JSON.parse(localStorage.getItem(FIRST_SEEN_KEY) || '{}')); } catch {}
     try { const a = localStorage.getItem(ABA_KEY); if (a) setAba(a); } catch {}
-    // Terminal ao vivo exige secret: ?secret=XXX na URL persiste no navegador.
+    // Terminal ao vivo exige secret: ?secret=XXX é enviado UMA vez e a API devolve
+    // um cookie httpOnly. O secret nunca fica salvo no navegador e sai da URL.
     // Sem isso a API devolve visão pública redigida (logTail vazio de propósito).
     try {
-      const qs = new URLSearchParams(window.location.search).get('secret');
-      if (qs) localStorage.setItem('monitor:secret:v1', qs);
+      localStorage.removeItem('monitor:secret:v1'); // legacy: versões antigas guardavam aqui
+      const url = new URL(window.location.href);
+      const qs = url.searchParams.get('secret');
+      if (qs) {
+        secretUmaVez.current = qs;
+        url.searchParams.delete('secret');
+        window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+      }
     } catch {}
   }, []);
 
@@ -67,12 +75,12 @@ export default function Dashboard() {
       try {
         const ctrl = new AbortController();
         const timeout = setTimeout(() => ctrl.abort(), 15000);
-        let secret = null;
-        try { secret = localStorage.getItem('monitor:secret:v1'); } catch {}
+        const secret = secretUmaVez.current;
         const url = secret ? `/api/status?secret=${encodeURIComponent(secret)}` : '/api/status';
-        const r = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+        const r = await fetch(url, { cache: 'no-store', signal: ctrl.signal, credentials: 'same-origin' });
         clearTimeout(timeout);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        secretUmaVez.current = null; // the auth cookie now carries the session
         const j = await r.json();
         if (!ativo) return;
         if (j && j.updatedAt) {
