@@ -8,7 +8,7 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: bash -n (scripts intocados + espelhos não quebram nada)
         run: |
           bash -n bot/loop.sh
@@ -27,7 +27,7 @@ jobs:
         with:
           scandir: .
           severity: error
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - name: node --check (monitor/*.mjs)
@@ -58,7 +58,7 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: PSScriptAnalyzer (só erros)
         shell: pwsh
         run: |
@@ -67,7 +67,7 @@ jobs:
           $issues = Invoke-ScriptAnalyzer -Path . -Recurse -IncludeRule 'PS*' -Severity Error
           if ($issues) { $issues | Format-Table -AutoSize; exit 1 }
           Write-Host 'PSScriptAnalyzer: nenhum erro.'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - name: node --check (monitor/*.mjs)
@@ -99,8 +99,8 @@ jobs:
       run:
         working-directory: monitor
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - name: npm ci
