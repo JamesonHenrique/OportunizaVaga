@@ -5,6 +5,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- README principal agora é em português (`README.md`); inglês foi para `README.en.md`.
+
 ### Added
 - **Qualquer nível e qualquer área.** O perfil (`bot/perfil.json`) ganha `niveis` (estágio → diretor,
   em qualquer combinação), `area` (texto livre), `experiencia_max_anos` e `sites_pular`.
