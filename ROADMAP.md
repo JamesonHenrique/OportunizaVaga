@@ -7,7 +7,8 @@ Discussions do repositório.
 ## Princípios que não mudam
 
 - **R$ 0** para rodar (modelos free ou locais). Ver [`docs/CUSTO.md`](docs/CUSTO.md).
-- **Nunca inventar dado.** Campo vazio vira `bloqueado`, sempre.
+- **Nunca inventar dado.** Campo vazio vira `bloqueado` (ou `quase_la`, se for só UM dado faltando),
+  nunca um chute.
 - **Estado durável só em `aplicadas.json`** — nunca na sessão do modelo.
 - **Sem servidor**: seu PC + cron. Monitor é opcional e free-tier.
 
@@ -25,6 +26,15 @@ Discussions do repositório.
 - [x] Modo 100% local com Ollama ([`docs/MODELOS.md`](docs/MODELOS.md)).
 - [x] Wizard de setup (`scripts/setup-wizard.sh`).
 - [x] Pacing configurável + guia de uso ético ([`docs/USO-ETICO.md`](docs/USO-ETICO.md)).
+- [x] Blocklist de domínios no browser (`--blocked-origins`) em vez de allowlist fechada — candidatura
+      liberada para qualquer ATS/site de carreira BR.
+- [x] `bot/estado.py`: CLI atômica de leitura/escrita sobre `aplicadas.json` (economia de tokens).
+- [x] `bot/rodizio-saude.py`: pausa automática (48h) de site sem retorno após 4 rodadas vazias.
+- [x] Cooldown por modelo, sessão improdutiva e watchdog de stall no `loop.sh`; cascata de modelos e
+      retentativa semanal no `followup.sh`.
+- [x] `scripts/notificar.sh`, alertas de anomalia no `digest.sh` e `scripts/backup-jsons.sh`.
+- [x] Regras de elegibilidade generalizadas: tempo de experiência até 3 anos, regra de formação, fluxo
+      `c-Externo` para ATS sem padrão.
 
 ## Próximo
 
