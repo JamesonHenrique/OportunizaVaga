@@ -49,7 +49,7 @@ cron (*/5) ──▶ bot/guardiao.sh ──┬──▶ bot/loop.sh ──▶ op
 - **Profile isolation:** active profile keeps its own state in `bot/state/<perfil>/`.
 - **Recognition mode:** `OV_RECONHECIMENTO=1` scores jobs without applying.
 - **Any level, any field:** accepted levels (`niveis`), field (`area`), search terms and
-  experience ceiling come from your profile (`bot/perfil.json`); remote + ≤14 days by default.
+  experience ceiling come from your profile (`bot/perfil.json`); work model (remote, hybrid or on-site in your city) too; ≤14 days by default.
 - **Never hallucinates data:** everything comes from `bot/dados_candidato.json`;
   gaps become `bloqueado` entries with the exact reason.
 - **Noise-free:** listing discards become counters, never block entries.

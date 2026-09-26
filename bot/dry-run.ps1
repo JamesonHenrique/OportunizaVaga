@@ -83,6 +83,14 @@ if ($null -ne $PerfilDoc.PSObject.Properties['sites_pular']) {
             }
         } catch { }
     }
+    # Sites so-remoto saem do rodizio de quem nao aceita remoto (espelho de restrito_a_modelo).
+    $modelosPerfil = if ($PerfilDoc.modelos) { @($PerfilDoc.modelos) } else { @('remoto') }
+    try {
+        $catalogo = Get-Content (Join-Path $BOT_ROOT 'config\sites_permitidos.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+        foreach ($prop in $catalogo.restrito_a_modelo.PSObject.Properties) {
+            if ($prop.Name -notlike '_*' -and ($modelosPerfil -notcontains $prop.Value) -and ($SitesPular -notcontains $prop.Name)) { $SitesPular += $prop.Name }
+        }
+    } catch { }
 }
 if (-not $PerfilDoc.termos -or @($PerfilDoc.termos).Count -eq 0) { throw 'perfil: termos precisa ser uma lista nao vazia' }
 
@@ -151,6 +159,8 @@ $Result = [ordered]@{
         nivel = [string]$PerfilDoc.nivel
         niveis = @($PerfilDoc.niveis | Where-Object { $_ })
         area = $(if ($PerfilDoc.area) { [string]$PerfilDoc.area } else { 'tecnologia' })
+        modelos = $(if ($PerfilDoc.modelos) { @($PerfilDoc.modelos) } else { @('remoto') })
+        cidades = @($PerfilDoc.cidades | Where-Object { $_ })
         sites_pular = @($SitesPular)
         termos = @($PerfilDoc.termos)
         pular_tipos = @($PerfilDoc.pular_tipos)
