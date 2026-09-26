@@ -13,5 +13,13 @@ BOT_DIR=$HOME/opensource/oportunizavaga
 # "Correio" do monitor (opcional): atualiza o codigo do painel via git pull
 */10 * * * *                  $BOT_DIR/scripts/pull-monitor.sh
 
-# Follow-up semanal das candidaturas (segundas 09:00)
-0 9 * * 1                     $BOT_DIR/bot/followup.sh >> $BOT_DIR/bot/followup.log 2>&1
+# Follow-up semanal das candidaturas (segundas 09:00; roda todo dia, mas so
+# executa de fato se o ultimo sucesso tiver 6+ dias — ver bot/followup.sh)
+0 9 * * *                     $BOT_DIR/bot/followup.sh >> $BOT_DIR/bot/followup.log 2>&1
+
+# Backup rotativo dos JSONs de estado (2x/dia; guarda as ultimas 14 copias)
+0 8,12 * * *                  $BOT_DIR/scripts/backup-jsons.sh >> $BOT_DIR/bot/backups/backup.log 2>&1
+
+# Resumo diario com alertas de anomalia (21h; --send exige TELEGRAM_BOT_TOKEN
+# e TELEGRAM_CHAT_ID no ambiente do cron, ex.: via cron.env)
+5 21 * * *                    $BOT_DIR/scripts/digest.sh --send >> $BOT_DIR/bot/digest.log 2>&1

@@ -3,6 +3,7 @@
 **/aplicadas.json
 **/quota-cache.json
 **/state/*/
+**/backups/
 **/prompt_loop.runtime.md
 **/reconhecimento-*.json
 **/cron.env
@@ -35,3 +36,5 @@ node_modules/
 
 # Local agent worktrees
 .claude/worktrees/
+__pycache__/
+*.pyc
