@@ -40,8 +40,8 @@ Discussions do repositório.
 
 - [ ] **Mais adaptadores de portal** (Catho, Trampos, Revelo, InfoJobs, Solides…) —
       `good first issue`, ver [`docs/ADAPTERS.md`](docs/ADAPTERS.md).
-- [ ] **Demo animada** no topo do README (GIF/asciinema de 1 rodada + monitor).
-- [ ] **Demo ao vivo** do monitor com dados fake, linkada no README.
+- [x] **Demo animada** no topo do README (GIF/asciinema de 1 rodada + monitor).
+- [x] **Demo ao vivo** do monitor com dados fake, linkada no README.
 - [ ] **Perfis prontos** por área (backend, frontend, dados, QA) em `config/perfis/`.
 - [ ] **Relatório de funil** exportável (aplicadas → convites → entrevistas).
 - [x] Cobertura de testes dos adaptadores (URL montada por `site_url_busca`).

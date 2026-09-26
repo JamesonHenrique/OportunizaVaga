@@ -5,7 +5,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-26
+
 ### Added
+- **Painel do monitor** (`monitor/app`, `monitor/components`): faixa de status, destaque do dia com
+  gráfico de 14 dias, "Precisa de você", KPIs e abas (Candidaturas, Bloqueios, Robô). Antes a pasta
+  só tinha os scripts de coleta e `npm run dev` abria um Next.js vazio.
+- `/api/status` com `MONITOR_SECRET` opcional, redação para GET sem segredo, `?ping=1` e limite de 1,5 MB.
+- **Demo com dados fictícios** (`monitor/demo.mjs`, `MONITOR_DEMO=1`), usada na demo ao vivo
+  (https://oportunizavaga-demo.vercel.app), no Docker e no GIF do README (`assets/demo.gif`).
+- Leitura local do disco quando nada foi publicado ainda (fora da Vercel), e `porDia` agregado no snapshot.
+- CI: job `monitor` com `next build` e checagem da demo.
 - Contrato comum de adaptadores (`bot/sites/lib.sh`) com descoberta automática de portais.
 - Dry-run global por perfil (`--json`, `--site`, `--profile`, `--reconhecimento`).
 - Estado isolado por perfil em `bot/state/<perfil>/aplicadas.json`.
@@ -41,6 +51,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 - Testes: `tests/test_estado.sh`, `tests/test_rodizio_saude.sh`.
 
 ### Changed
+- Monitor em Next 16 / React 19; GitHub Actions `checkout`/`setup-node` v7.
 - Modelo preferido da cascata movido para `openrouter/nex-agi/nex-n2.5-pro:free`
   enquanto `muse-spark-1.3` estiver no limite.
 - Browser: `--allowed-origins` (allowlist fechada de sites de vaga) trocado por `--blocked-origins`
