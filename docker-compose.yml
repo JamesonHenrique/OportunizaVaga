@@ -1,6 +1,6 @@
-# Demo with sample data — never mounts your real bot/ directory.
-# The container copies examples/aplicadas.example.json to the expected
-# aplicadas.json name inside an ephemeral dir and serves the dashboard.
+# Demo with FICTIONAL data — never mounts your real bot/ directory.
+# MONITOR_DEMO=1 makes /api/status serve monitor/demo.mjs (invented companies,
+# dates relative to now). examples/ is still copied so snapshot.mjs has a root.
 services:
   monitor:
     build:
@@ -13,6 +13,7 @@ services:
       - ./examples:/demo:ro
     environment:
       CANDIDATURAS_ROOT: /tmp/demo
+      MONITOR_DEMO: "1"
     command: >
       sh -c "mkdir -p /tmp/demo
       && cp /demo/aplicadas.example.json /tmp/demo/aplicadas.json

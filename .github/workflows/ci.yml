@@ -8,7 +8,7 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: bash -n (scripts intocados + espelhos não quebram nada)
         run: |
           bash -n bot/loop.sh
@@ -21,13 +21,16 @@ jobs:
           bash -n scripts/pull-monitor.sh
           bash -n scripts/setup.sh
           bash -n scripts/sanitize.sh
+          bash -n scripts/digest.sh
+          bash -n scripts/notificar.sh
+          bash -n scripts/backup-jsons.sh
           bash -n browser/chrome-real.sh
       - name: shellcheck
         uses: ludeeus/action-shellcheck@2.0.0
         with:
           scandir: .
           severity: error
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - name: node --check (monitor/*.mjs)
@@ -40,6 +43,12 @@ jobs:
           python3 -m json.tool monitor/vercel.json > /dev/null
           python3 -m json.tool examples/dados_candidato.example.json > /dev/null
           python3 -m json.tool examples/aplicadas.example.json > /dev/null
+          python3 -m json.tool config/aplicadas.schema.json > /dev/null
+      - name: python compile (bot/*.py)
+        run: |
+          python3 -m py_compile bot/estado.py
+          python3 -m py_compile bot/arquivar-logs-rodada.py
+          python3 -m py_compile bot/rodizio-saude.py
       - name: validate (schemas + novos .sh)
         run: |
           bash -n bot/dry-run.sh
@@ -50,6 +59,8 @@ jobs:
         run: |
           bash tests/test_validate.sh
           bash tests/test_dry_run.sh
+          bash tests/test_estado.sh
+          bash tests/test_rodizio_saude.sh
       - name: node --test monitor/
         run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)
@@ -58,7 +69,7 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: PSScriptAnalyzer (só erros)
         shell: pwsh
         run: |
@@ -67,7 +78,7 @@ jobs:
           $issues = Invoke-ScriptAnalyzer -Path . -Recurse -IncludeRule 'PS*' -Severity Error
           if ($issues) { $issues | Format-Table -AutoSize; exit 1 }
           Write-Host 'PSScriptAnalyzer: nenhum erro.'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - name: node --check (monitor/*.mjs)
@@ -92,3 +103,23 @@ jobs:
       - name: sanitize via git-bash
         shell: bash
         run: ./scripts/sanitize.sh
+
+  monitor:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monitor
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+      - name: next build (painel + /api/status)
+        run: npx next build
+      - name: demo responde com dados fictícios
+        run: |
+          MONITOR_DEMO=1 npx next start -p 3100 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3100/api/status -o /tmp/s.json && break; sleep 1; done
+          node -e "const s=require('/tmp/s.json'); if(!s._demo||!s.applied.length) process.exit(1); console.log('demo ok:', s.applied.length, 'candidaturas')"

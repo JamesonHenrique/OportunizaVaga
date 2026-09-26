@@ -25,15 +25,12 @@ rodando no seu próprio PC a **custo zero** (modelos de IA gratuitos + sites de 
 
 ## Demo
 
-<!-- TODO(demo): trocar pelo GIF real. Grave ≤30s (asciinema/GIF) de uma rodada +
-     o monitor ao vivo, salve em assets/demo.gif e troque o placeholder abaixo.
-     É a maior alavanca de alcance do projeto — ver ROADMAP.md. -->
 <p align="center">
-  <img src="assets/demo.gif" alt="OportunizaVaga em ação: uma rodada + o monitor ao vivo" width="820">
-  <br><em>▶️ Demo (GIF em breve). Por ora: <code>./bot/dry-run.sh</code> mostra uma rodada simulada sem aplicar em nada.</em>
+  <img src="assets/demo.gif" alt="Monitor do OportunizaVaga: faixa de status, candidaturas do dia, o que precisa de você e abas de detalhe" width="820">
+  <br><em>▶️ O monitor com <b>dados fictícios</b>. Quer uma rodada simulada sem se candidatar a nada? <code>./bot/dry-run.sh</code></em>
 </p>
 
-> 🔴 **Demo ao vivo** (monitor com dados fake): _em breve_ — ver [`monitor/README.md`](monitor/README.md).
+> 🔴 **Demo ao vivo** (dados fictícios, atualiza sozinha): **https://oportunizavaga-demo.vercel.app** — como hospedar o seu: [`monitor/README.md`](monitor/README.md).
 
 ## Como funciona
 
@@ -87,7 +84,7 @@ oportunizavaga/
 │   ├── chrome-real.ps1          # espelho Windows (perfil em %LOCALAPPDATA%)
 │   └── README.md
 ├── config/
-│   ├── sites_permitidos.json    # allowlist de domínios BR (espelha o bloqueio do browser)
+│   ├── sites_permitidos.json    # blocklist de agregadores gringos/spam (espelha o bloqueio do browser)
 │   ├── opencode.jsonc.example   # modelo do config do opencode (com a cascata de modelos)
 │   ├── crontab.example          # cron sugerido (guardiao, keepalive, follow-up)
 │   └── TaskScheduler.md         # equivalente Windows (schtasks prontos)
@@ -101,7 +98,10 @@ oportunizavaga/
 │   ├── setup.sh / setup.ps1    # instalador interativo (Linux / Windows)
 │   ├── sanitize.sh              # varredura pré-commit de segredos/dados pessoais
 │   ├── monitor-keepalive.sh / .ps1  # mantém o publisher do painel no ar
-│   └── pull-monitor.sh / .ps1       # atualiza o painel via git pull
+│   ├── pull-monitor.sh / .ps1       # atualiza o painel via git pull
+│   ├── digest.sh / .ps1             # resumo diário + alertas de anomalia no loop.log
+│   ├── notificar.sh / .ps1          # push genérico ao Telegram (dedupe 6h)
+│   └── backup-jsons.sh / .ps1       # cópia rotativa (14x) dos JSONs de estado
 ├── examples/
 │   ├── dados_candidato.example.json  # COPIE p/ bot/dados_candidato.json e preencha
 │   └── aplicadas.example.json        # COPIE p/ bot/aplicadas.json (estado inicial)

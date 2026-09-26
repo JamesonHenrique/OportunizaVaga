@@ -23,18 +23,12 @@ ejecutándose en tu propia PC a **costo cero** (modelos de IA gratuitos + portal
 
 ## Demo
 
-<!-- TODO(demo): replace with a real recording.
-     Record a ≤30s asciinema/GIF of one round + the live monitor, save it as
-     assets/demo.gif, and swap the placeholder below. This is the single biggest
-     lever for the project's reach — see ROADMAP.md. -->
 <p align="center">
-  <img src="assets/demo.gif" alt="OportunizaVaga em ação: uma rodada + o monitor ao vivo" width="820">
-  <br><em>▶️ Demo (GIF próximamente). Mientras tanto: <code>./bot/dry-run.sh</code> muestra una ronda simulada sin aplicar a nada.</em>
+  <img src="assets/demo.gif" alt="Monitor de OportunizaVaga: barra de estado, postulaciones del día, lo que necesita de ti y pestañas de detalle" width="820">
+  <br><em>▶️ El monitor con <b>datos ficticios</b>. ¿Una ronda simulada sin postular a nada? <code>./bot/dry-run.sh</code></em>
 </p>
 
-<!-- TODO(live-demo): host the monitor with FAKE data on Vercel free-tier and link it here.
-     Never point a public demo at real dados_candidato.json / aplicadas.json. -->
-> 🔴 **Demo en vivo** (monitor con datos de ejemplo): _próximamente_ — ver [`monitor/README.md`](monitor/README.md).
+> 🔴 **Demo en vivo** (datos ficticios, se actualiza sola): **https://oportunizavaga-demo.vercel.app** — cómo alojar el tuyo: [`monitor/README.md`](monitor/README.md).
 
 ## Cómo funciona
 
@@ -100,8 +94,9 @@ Adapta los filtros a tu stack: [`docs/PROMPTS.md`](docs/PROMPTS.md).
 ./browser/chrome-real.sh &  # CDP on :9222; one login covers every site
 ```
 
-Detalles: [`browser/README.md`](browser/README.md). Lista de dominios permitidos:
-[`config/sites_permitidos.json`](config/sites_permitidos.json).
+Detalles: [`browser/README.md`](browser/README.md). Lista de dominios bloqueados
+(solo agregadores extranjeros/spam — el bot puede aplicar en cualquier ATS/sitio
+de carrera): [`config/sites_permitidos.json`](config/sites_permitidos.json).
 
 ### 4. Prueba segura primero, luego una ronda real
 

@@ -103,9 +103,10 @@ powershell -ExecutionPolicy Bypass -File browser\chrome-real.ps1
 # CDP em :9222; faça login 1x nos sites (vale p/ tudo). Perfil em %LOCALAPPDATA%\oportunizavaga-chrome-real
 ```
 
-Detalhes em `browser/README.md`. A allowlist de domínios está em
-`config/sites_permitidos.json` e deve espelhar o `--allowed-origins` do seu
-`~/.config/opencode/opencode.jsonc` (modelo em `config/opencode.jsonc.example`).
+Detalhes em `browser/README.md`. A blocklist de domínios está em
+`config/sites_permitidos.json` (`bloqueados_no_browser`) e deve espelhar o
+`--blocked-origins` do seu `~/.config/opencode/opencode.jsonc` (modelo em
+`config/opencode.jsonc.example`).
 
 ## 5. Teste manual (1 rodada)
 

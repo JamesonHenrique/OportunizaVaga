@@ -48,6 +48,45 @@ print(json.dumps({
 }))
 ")
 export DIGEST_JSON="$RESUMO"
+# Alertas de anomalia: regras simples sobre as linhas de HOJE do loop.log
+# (nenhuma rodada ok, sequencia longa de rodadas vazias, muitos timeouts/quota).
+export DIGEST_ALERTAS=$(python3 -c "
+import os, re
+from datetime import date
+hoje = date.today().isoformat()
+linhas = []
+try:
+    linhas = open(os.environ['DIGEST_LOG'], encoding='utf-8', errors='replace').readlines()
+except OSError:
+    pass
+hoje_l = [l for l in linhas if l.startswith('[' + hoje)]
+oks = [l for l in hoje_l if 'rodada ok' in l]
+vazias = [l for l in hoje_l if 'NENHUMA vaga nova' in l]
+estouros = [l for l in hoje_l if 'estourou' in l]
+quotas = [l for l in hoje_l if 'quota/limite' in l or 'no limite' in l]
+erros = [l for l in hoje_l if 'terminou com erro' in l or 'sessao opencode invalida' in l]
+streak = 0
+for l in reversed(oks + vazias):
+    m = re.search(r'\((\d+)x seguidas\)', l)
+    if 'NENHUMA vaga nova' in l and m:
+        streak = int(m.group(1)); break
+    elif 'NENHUMA vaga nova' in l:
+        streak += 1
+    else:
+        break
+a = []
+if hoje_l and not oks:
+    a.append('ALERTA: nenhuma rodada ok hoje — loop pode estar preso em erro/quota.')
+if streak >= 3:
+    a.append('ALERTA: %dx rodadas vazias seguidas — considerar pular o site atual por 24h.' % streak)
+if len(estouros) >= 2:
+    a.append('ALERTA: %d timeouts hoje — rodadas estourando o limite, rever META de tempo.' % len(estouros))
+if len(quotas) >= 3:
+    a.append('INFO: %d sinais de quota hoje — avaliar reordenar a cascata de modelos.' % len(quotas))
+if erros:
+    a.append('INFO: %d erro(s) de sessao/modelo hoje (ver loop.log).' % len(erros))
+print('\n'.join(a))
+")
 python3 -c "
 import json, os
 d = json.loads(os.environ['DIGEST_JSON'])
@@ -70,6 +109,11 @@ else:
     print('Rodízio atual: próximo %s (última rodada: %s)' % (d['proximo'], d['ultima_rodada'] or '—'))
     print('Próximo passo: rodar o site %s (ver rodizio.proximo em aplicadas.json)' % d['proximo'])
 "
+# Alertas de anomalia (vazio se nenhuma regra disparou).
+if [ -n "$DIGEST_ALERTAS" ]; then
+  if [ "$MARKDOWN" -eq 1 ]; then echo -e "\n## Alertas"; else echo "--- alertas ---"; fi
+  echo "$DIGEST_ALERTAS"
+fi
 # Trecho recente do loop.log (contexto, sem segredos: só últimas linhas de status).
 if [ -f "$LOOPLOG" ]; then
   if [ "$MARKDOWN" -eq 1 ]; then echo -e "\n## Últimas linhas do loop.log"; else echo "--- últimas linhas do loop.log ---"; fi
