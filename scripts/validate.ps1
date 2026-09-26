@@ -15,7 +15,8 @@ $pairs = @(
     @('examples\dados_candidato.example.json', 'config\dados_candidato.schema.json', $true),
     @('examples\aplicadas.example.json', 'config\aplicadas.schema.json', $true),
     @('bot\dados_candidato.json', 'config\dados_candidato.schema.json', $false),
-    @('bot\aplicadas.json', 'config\aplicadas.schema.json', $false)
+    @('bot\aplicadas.json', 'config\aplicadas.schema.json', $false),
+    @('bot\perfil.json', 'config\perfil.schema.json', $false)
 )
 
 foreach ($perfil in (Get-ChildItem (Join-Path $BOT_ROOT 'config\perfis') -Filter '*.example.json' -ErrorAction SilentlyContinue)) {

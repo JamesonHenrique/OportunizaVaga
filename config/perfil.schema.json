@@ -63,6 +63,32 @@
       "default": "tecnologia",
       "description": "Área de atuação em texto livre (tecnologia, jurídico, marketing, saúde, administrativo...). Fora de tech, sites só-tech saem do rodízio."
     },
+    "modelos": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "remoto",
+          "hibrido",
+          "híbrido",
+          "presencial"
+        ]
+      },
+      "default": [
+        "remoto"
+      ],
+      "description": "Modelos de trabalho aceitos. Padrão: só remoto."
+    },
+    "cidades": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Cidades onde híbrido/presencial vale (ex.: [\"Natal/RN\"]). Vazio = dados_candidato.json -> local."
+    },
     "experiencia_max_anos": {
       "type": [
         "integer",

@@ -61,7 +61,9 @@ Exemplos em `config/perfis/` para níveis e áreas diferentes:
 | `estagio-direito.example.json` | estágio | jurídico |
 
 Estrutura: `nome_perfil`, `niveis[]`, `area`, `termos[]`, `pular_tipos[]` e, opcionais,
-`experiencia_max_anos` e `sites_pular` (schema em `config/perfil.schema.json`).
+`modelos[]` (`remoto`, `hibrido`, `presencial`; padrão só remoto), `cidades[]` (onde híbrido/presencial
+vale), `experiencia_max_anos` e `sites_pular` (schema em `config/perfil.schema.json`).
+O `./scripts/setup-wizard.sh` já gera esse arquivo por perguntas.
 
 ```bash
 cp config/perfis/senior-techlead.example.json bot/perfil.json  # ou qualquer outro

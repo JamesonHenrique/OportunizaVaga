@@ -345,6 +345,11 @@ function Expand-PerfilPlaceholders([string]$text) {
     $termos = @(); if ($perfil -and $perfil.termos) { $termos = @($perfil.termos) }
     $pular = @(); if ($perfil -and $perfil.pular_tipos) { $pular = @($perfil.pular_tipos) }
     $area = if ($perfil -and $perfil.area) { [string]$perfil.area } else { 'tecnologia' }
+    $modelos = @('remoto'); if ($perfil -and $perfil.modelos) { $modelos = @($perfil.modelos) }
+    $cidades = @(); if ($perfil -and $perfil.cidades) { $cidades = @($perfil.cidades) }
+    $cidadeTxt = if ($cidades.Count) { $cidades -join ', ' } else { 'a cidade de dados_candidato.json -> local' }
+    $soRemoto = ($modelos.Count -eq 1 -and $modelos[0] -eq 'remoto')
+    $wt = @{ 'presencial' = '1'; 'remoto' = '2'; 'hibrido' = '3' }
     $map = [ordered]@{
         '{{NIVEIS}}' = ($niveis -join ' | ')
         '{{NIVEIS_RECUSADOS}}' = '(todos os que nao estao entre os aceitos)'
@@ -354,6 +359,10 @@ function Expand-PerfilPlaceholders([string]$text) {
         '{{PULAR_TIPOS}}' = ($pular -join ', ')
         '{{REGRA_EXPERIENCIA}}' = 'compare o tempo pedido com dados_candidato.json; nunca afirme tempo que nao tem'
         '{{SITES_PULAR}}' = '(nenhum)'
+        '{{REGRA_MODELO}}' = $(if ($soRemoto) { 'SOMENTE vagas REMOTAS (home office). Nunca presencial/hibrida.' } else { "Modelos aceitos: $($modelos -join ' | '). Hibrido/presencial SOMENTE em: $cidadeTxt (outra cidade -> descarte)." })
+        '{{FILTRO_MODELO}}' = $(if ($soRemoto) { 'remoto' } else { "$($modelos -join ' + ') em $cidadeTxt" })
+        '{{LOCAL_BUSCA}}' = $(if ($soRemoto) { 'Remoto' } elseif ($cidades.Count) { [string]$cidades[0] } else { 'sua cidade' })
+        '{{LINKEDIN_WT}}' = (($modelos | Where-Object { $wt.ContainsKey($_) } | ForEach-Object { $wt[$_] }) -join '%2C')
     }
     foreach ($k in $map.Keys) { $text = $text.Replace($k, [string]$map[$k]) }
     return $text

@@ -15,7 +15,9 @@ Profile fields (see config/perfil.schema.json):
   termos               search terms
   pular_tipos          job types to skip on the listing
   experiencia_max_anos max years a posting may require (null = no ceiling); default by level
-  sites_pular          rotation site ids to skip (overrides the automatic area filter)
+  modelos              accepted work models: remoto, hibrido, presencial; default ["remoto"]
+  cidades              cities where hybrid/on-site is accepted (empty = dados_candidato.json -> local)
+  sites_pular          rotation site ids to skip (overrides the automatic area/model filters)
 """
 import json
 import sys
@@ -48,6 +50,14 @@ ALIASES = {
     "gerente": "gestor", "manager": "gestor", "head": "gestor",
     "vp": "diretor", "c-level": "diretor",
 }
+MODELOS = {
+    "remoto": {"pt": "remoto/home office", "en": "remote/home office"},
+    "hibrido": {"pt": "híbrido", "en": "hybrid"},
+    "presencial": {"pt": "presencial", "en": "on-site"},
+}
+MODELO_ALIASES = {"remote": "remoto", "home office": "remoto", "home-office": "remoto", "híbrido": "hibrido",
+                  "hybrid": "hibrido", "on-site": "presencial", "onsite": "presencial"}
+LINKEDIN_WT = {"presencial": "1", "remoto": "2", "hibrido": "3"}
 # Default ceiling of required experience, by the HIGHEST accepted level (None = no ceiling).
 EXPERIENCIA_PADRAO = {"estagio": 1, "trainee": 1, "junior": 3, "pleno": 6}
 TECH_HINTS = ("tech", "tecnolog", "ti", "t.i", "it", "software", "desenvolv", "dev", "programa",
@@ -102,11 +112,31 @@ def experiencia_max(perfil, niveis):
     return EXPERIENCIA_PADRAO.get(niveis[-1])
 
 
-def sites_restritos():
-    """Rotation site id -> required area, from config/sites_permitidos.json (key "restrito_a_area")."""
+def modelos_do_perfil(perfil):
+    brutos = perfil.get("modelos") or ["remoto"]
+    if isinstance(brutos, str):
+        brutos = [brutos]
+    vistos = set()
+    for b in brutos:
+        v = str(b).strip().lower()
+        v = v if v in MODELOS else MODELO_ALIASES.get(v, MODELO_ALIASES.get(_norm(v), _norm(v)))
+        if v in MODELOS:
+            vistos.add(v)
+    return [m for m in MODELOS if m in vistos] or ["remoto"]
+
+
+def cidades_do_perfil(perfil):
+    c = perfil.get("cidades") or []
+    if isinstance(c, str):
+        c = [c]
+    return [str(x).strip() for x in c if str(x).strip()]
+
+
+def sites_restritos(chave="restrito_a_area"):
+    """Rotation site id -> required area/model, from config/sites_permitidos.json."""
     try:
         doc = json.loads(SITES_FILE.read_text(encoding="utf-8"))
-        return {k: v for k, v in doc.get("restrito_a_area", {}).items() if not k.startswith("_")}
+        return {k: v for k, v in doc.get(chave, {}).items() if not k.startswith("_")}
     except Exception:
         return {}
 
@@ -115,7 +145,11 @@ def pular_sites(perfil):
     if isinstance(perfil.get("sites_pular"), list):
         return [str(s) for s in perfil["sites_pular"]]
     tech = area_eh_tech(area_do_perfil(perfil))
-    return [site for site, area in sites_restritos().items() if area == "tech" and not tech]
+    modelos = modelos_do_perfil(perfil)
+    pular = [site for site, area in sites_restritos().items() if area == "tech" and not tech]
+    pular += [site for site, modelo in sites_restritos("restrito_a_modelo").items()
+              if modelo not in modelos and site not in pular]
+    return pular
 
 
 def resolver(perfil):
@@ -129,6 +163,8 @@ def resolver(perfil):
         "termos": [t for t in perfil.get("termos", []) if isinstance(t, str) and t.strip()],
         "pular_tipos": [t for t in perfil.get("pular_tipos", []) if isinstance(t, str) and t.strip()],
         "experiencia_max_anos": experiencia_max(perfil, niveis),
+        "modelos": modelos_do_perfil(perfil),
+        "cidades": cidades_do_perfil(perfil),
         "sites_pular": pular_sites(perfil),
     }
 
@@ -148,7 +184,33 @@ def placeholders(info, lang="pt"):
         regra_exp = (f"up to {exp} year(s) required → APPLY; {exp + 1}+ years → DISCARD"
                      if en else f"vaga que pede no MÁXIMO {exp} ano(s) → APLIQUE; {exp + 1}+ anos → DESCARTE")
     nenhum = "(none)" if en else "(nenhum)"
+    modelos = info["modelos"]
+    cidades = ", ".join(info["cidades"]) or (
+        "the city in dados_candidato.json -> local" if en else "a cidade de dados_candidato.json -> local")
+    rotulos = " | ".join(MODELOS[m]["en" if en else "pt"] for m in modelos)
+    recusados = [MODELOS[m]["en" if en else "pt"] for m in MODELOS if m not in modelos]
+    if modelos == ["remoto"]:
+        regra_modelo = ("REMOTE (home office) jobs ONLY. Never on-site/hybrid." if en
+                        else "SOMENTE vagas REMOTAS (home office). Nunca presencial/híbrida.")
+        filtro = "remote" if en else "remoto"
+        local = "Remoto"
+    else:
+        fora = [m for m in modelos if m != "remoto"]
+        rot_fora = "/".join(MODELOS[m]["en" if en else "pt"] for m in fora)
+        if en:
+            regra_modelo = (f"Accepted work models: {rotulos}. {rot_fora.capitalize()} ONLY in: {cidades}"
+                            f" (another city → discard). Refused: {_lista(recusados, nenhum)}.")
+            filtro = f"{'remote + ' if 'remoto' in modelos else ''}{rot_fora} in {cidades}"
+        else:
+            regra_modelo = (f"Modelos aceitos: {rotulos}. {rot_fora.capitalize()} SOMENTE em: {cidades}"
+                            f" (outra cidade → descarte). Recusados: {_lista(recusados, nenhum)}.")
+            filtro = f"{'remoto + ' if 'remoto' in modelos else ''}{rot_fora} em {cidades}"
+        local = info["cidades"][0] if info["cidades"] else ("your city" if en else "sua cidade")
     return {
+        "{{REGRA_MODELO}}": regra_modelo,
+        "{{FILTRO_MODELO}}": filtro,
+        "{{LOCAL_BUSCA}}": local,
+        "{{LINKEDIN_WT}}": "%2C".join(LINKEDIN_WT[m] for m in modelos),
         "{{NIVEIS}}": " | ".join(rotulo(n) for n in info["niveis"]),
         "{{NIVEIS_RECUSADOS}}": _lista([rotulo(n) for n in info["niveis_recusados"]], nenhum),
         "{{AREA}}": info["area"],
