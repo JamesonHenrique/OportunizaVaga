@@ -415,6 +415,13 @@ while ($true) {
     Ensure-Monitor
 
     $ROUND_LOG = 'logs/rodada-{0}.log' -f (Get-Date).ToString('yyyyMMdd-HHmmss')
+    if ($Py) {
+        try {
+            $rodizioScript = Join-Path $BOT_ROOT 'bot\rodizio-saude.py'
+            $out = & $Py $rodizioScript pre $AplicadasFile 2>&1
+            if ($out) { Add-Content -Path 'loop.log' -Value $out }
+        } catch { }
+    }
     $FP_ANTES = Get-Fingerprint
     Write-LoopLog ("rodada iniciada (perfil {0}, rodadas vazias seguidas: {1})" -f $PerfilNome, $VAZIAS)
     $prompt = Render-Prompt
@@ -527,6 +534,13 @@ while ($true) {
     } else {
         $FAILS = 0
         $QUOTA_HITS = 0
+        if ($Py) {
+            try {
+                $rodizioScript = Join-Path $BOT_ROOT 'bot\rodizio-saude.py'
+                $out = & $Py $rodizioScript pos $AplicadasFile 2>&1
+                if ($out) { Add-Content -Path 'loop.log' -Value $out }
+            } catch { }
+        }
         $FP_DEPOIS = Get-Fingerprint
         if (($FP_ANTES -ne -1) -and ($FP_DEPOIS -ne -1) -and ($FP_ANTES -eq $FP_DEPOIS)) {
             $VAZIAS++

@@ -318,6 +318,7 @@ while true; do
   ensure_monitor
 
   ROUND_LOG="logs/rodada-$(date '+%Y%m%d-%H%M%S').log"
+  python3 "$BOT_ROOT/bot/rodizio-saude.py" pre "$APLICADAS_FILE" >> loop.log 2>&1 || true
   render_prompt
   FP_ANTES=$(fingerprint "$APLICADAS_FILE")
   log "rodada iniciada (perfil ${PERFIL_NOME}, rodadas vazias seguidas: ${VAZIAS})"
@@ -447,6 +448,7 @@ while true; do
   else
     FAILS=0
     QUOTA_HITS=0
+    python3 "$BOT_ROOT/bot/rodizio-saude.py" pos "$APLICADAS_FILE" >> loop.log 2>&1 || true
     FP_DEPOIS=$(fingerprint "$APLICADAS_FILE")
     if [ "$FP_ANTES" != "-1" ] && [ "$FP_DEPOIS" != "-1" ] && [ "$FP_ANTES" = "$FP_DEPOIS" ]; then
       VAZIAS=$((VAZIAS + 1))

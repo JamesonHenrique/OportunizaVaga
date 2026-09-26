@@ -42,7 +42,10 @@ jobs:
           python3 -m json.tool examples/aplicadas.example.json > /dev/null
           python3 -m json.tool config/aplicadas.schema.json > /dev/null
       - name: python compile (bot/*.py)
-        run: python3 -m py_compile bot/estado.py
+        run: |
+          python3 -m py_compile bot/estado.py
+          python3 -m py_compile bot/arquivar-logs-rodada.py
+          python3 -m py_compile bot/rodizio-saude.py
       - name: validate (schemas + novos .sh)
         run: |
           bash -n bot/dry-run.sh
@@ -54,6 +57,7 @@ jobs:
           bash tests/test_validate.sh
           bash tests/test_dry_run.sh
           bash tests/test_estado.sh
+          bash tests/test_rodizio_saude.sh
       - name: node --test monitor/
         run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)

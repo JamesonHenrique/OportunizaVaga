@@ -120,8 +120,10 @@ b) RODÍZIO DE SITES: veja rodizio.proximo no RESUMO DO ESTADO. Use EXATAMENTE 1
    "desenvolvedor fullstack junior", "backend java junior", "backend junior remoto", "angular junior",
    "typescript junior", "node junior", "desenvolvedor junior remoto", "trainee desenvolvedor remoto",
    "RPA junior", "automacao junior", "integracoes junior", "sustentacao sistemas junior", "suporte tecnico junior remoto".
-   SITE ESGOTADO / PRIORIDADE: alto retorno = gupy, linkedin, indeed, programathor, remotar. Se um site deu
-   zero vaga nova 2 rodadas seguidas (ex.: Trampardecasa com spam, GeekHunter com envio quebrado, Vagas zero RPA), pule-o por 24h e avance o rodízio sem registrar bloqueado.
+   SITE ESGOTADO / PRIORIDADE: alto retorno = gupy, linkedin, indeed, programathor, remotar. O loop
+   (bot/rodizio-saude.py) pausa SOZINHO por 48h o site com 4 rodadas seguidas sem nenhuma candidatura
+   nova e já ajusta rodizio.proximo antes da próxima rodada começar. NÃO troque de site por conta
+   própria nem registre bloqueado por "site esgotado": faça o site da vez.
    - indeed: https://br.indeed.com/jobs?q=...&l=Remoto&sort=date — termos: "desenvolvedor java spring boot",
      "desenvolvedor fullstack junior", "RPA"
    - linkedin: https://www.linkedin.com/jobs/search/?keywords=Java%20Spring%20Boot&location=Brasil&f_WT=2&sortBy=DD
