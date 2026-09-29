@@ -61,7 +61,43 @@ export function buildDemoSnapshot(now = Date.now()) {
   }
   applied.sort((a, b) => a.quando.localeCompare(b.quando));
 
+  // Reply statuses, as the Gmail reader records them (historico_status[].email_data = date of the e-mail itself).
+  const dia = (msAgo) => ymd(now - msAgo);
+  const resposta = (idx, status, diasAtras, de = 'enviada') => {
+    const a = applied[applied.length - 1 - idx];
+    if (!a) return;
+    a.status = status;
+    a.url = `https://vagas.example.com/${a.chave}`;
+    a.historico_status = [{ de, para: status, em: new Date(now - diasAtras * DAY + 3600000).toISOString(), email_data: dia(diasAtras * DAY), fonte: 'gmail' }];
+  };
+  resposta(1, 'etapa_teste', 1);
+  resposta(3, 'proxima_etapa', 2);
+  resposta(5, 'em_analise', 3);
+  resposta(7, 'entrevista', 4, 'proxima_etapa');
+  resposta(9, 'encerrada', 5);
+
   const em = (h) => new Date(now - h * 3600000).toISOString();
+  const aguardandoLogin = [
+    { chave: 'nimbus_backend_jr', perfil: 'backend', canal: 'linkedin', empresa: 'Nimbus Tecnologia', vaga: 'Desenvolvedor(a) Backend Júnior (remoto)',
+      url: 'https://vagas.example.com/nimbus-backend-jr', score: 8, motivo: 'Sessão expirada: pede login antes do envio.', em: em(3),
+      checagem: { logado: 'nao', em: em(1) } },
+    { chave: 'vento_sul_node_jr', perfil: 'backend', canal: 'linkedin', empresa: 'Vento Sul Software', vaga: 'Desenvolvedor(a) Node.js Júnior',
+      url: 'https://vagas.example.com/vento-sul-node-jr', score: 7, motivo: 'Sessão expirada: pede login antes do envio.', em: em(6),
+      checagem: { logado: 'nao', em: em(1) } },
+    { chave: 'pitanga_java_jr', perfil: 'backend', canal: 'indeed', empresa: 'Pitanga Pay', vaga: 'Desenvolvedor(a) Java Júnior',
+      url: 'https://vagas.example.com/pitanga-java-jr', score: 6, motivo: 'Exige login no Indeed.', em: em(12),
+      checagem: { logado: 'sim', em: em(1) } }
+  ];
+  const descoberta = {
+    ultimaColeta: em(2), porStatus: { nova: 3, enviada: 41, descartada: 120 },
+    filtradasTotal: { nivel: 210, modelo: 64, stack: 38, antiga: 17 }, ultima: { lidas: 96, novas: 3 },
+    proximas: [
+      { empresa: 'Arvoredo Sistemas', titulo: 'Desenvolvedor(a) Python Júnior', fonte: 'gupy', url: 'https://vagas.example.com/arvoredo-python-jr', score: 9, publicada: ymd(now - DAY) },
+      { empresa: 'Carnaúba Tech', titulo: 'Analista de Automação RPA Júnior', fonte: 'linkedin', url: 'https://vagas.example.com/carnauba-rpa-jr', score: 7, publicada: ymd(now - 2 * DAY) },
+      { empresa: 'Seriguela Apps', titulo: 'Desenvolvedor(a) Front-end Júnior (Angular)', fonte: 'gupy', url: 'https://vagas.example.com/seriguela-front-jr', score: 6, publicada: hoje }
+    ]
+  };
+  const gmailStatus = { atualizado: em(1), lidas: 240, achados: 5 };
   const blocked = [
     { chave: 'farol_dados_node_jr', empresa: 'Farol Dados', motivo: 'Cadastro quebrado: ATS pede CPF antes do envio (dado ausente em dados_candidato.json).', em: em(5) },
     { chave: 'ipe_cloud_backend_jr', empresa: 'Ipê Cloud', motivo: 'Descartada: título oficial Pleno (regra 3 · nível).', em: em(9) },
@@ -93,6 +129,8 @@ export function buildDemoSnapshot(now = Date.now()) {
   for (const a of applied) porDia[a.data] = (porDia[a.data] || 0) + 1;
   const aplicadas7d = applied.filter(a => new Date(a.quando).getTime() > now - 7 * DAY).length;
   const rodadas7d = 52 + Math.floor(r() * 12);
+  const porStatus = {};
+  for (const a of applied) porStatus[a.status] = (porStatus[a.status] || 0) + 1;
   const descartes = { nivel: 412, modelo: 138, stack: 96, total: 646 };
   const perfis = [{ nome: 'backend', aplicadas: applied.length, bloqueados: blocked.length, descartes: descartes.total, rodizio: 'gupy', ativo: true }];
 
@@ -118,8 +156,11 @@ export function buildDemoSnapshot(now = Date.now()) {
     applied,
     porFonte,
     porDia,
-    porStatus: { enviada: applied.length },
+    porStatus,
     blocked,
+    aguardandoLogin,
+    descoberta,
+    gmailStatus,
     dadosFaltantes: [{ campo: 'CR (coeficiente)', vagas: 1 }, { campo: 'CPF', vagas: 1 }],
     descartes,
     rodizio: { ordem: SITES, proximo: 'programathor' },
