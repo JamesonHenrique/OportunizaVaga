@@ -10,7 +10,7 @@ short line.
   estado.py [--file F] add-bloqueado CHAVE JSON   set bloqueados[CHAVE] (JSON object or plain motivo)
   estado.py [--file F] set-quase-la CHAVE JSON    set quase_la[CHAVE]; JSON=null removes it
   estado.py [--file F] descartes NIVEL MODELO STACK   increments descartes_listagem counters
-  estado.py [--file F] status CHAVE ST [MSG]   follow-up: em_analise/entrevista/encerrada/sem_resposta/sem_retorno_verificavel
+  estado.py [--file F] status CHAVE ST [MSG] [EMAIL_DATA]   follow-up: em_analise/entrevista/encerrada/sem_resposta/sem_retorno_verificavel
   estado.py [--file F] conta SITE JSON            set contas_criadas[SITE]
   estado.py [--file F] rodizio-avancar            rodizio.proximo -> next in ordem; ultima_rodada=today
 
@@ -159,14 +159,18 @@ def main(argv):
             dl[name] = int(dl.get(name, 0)) + int(n)
         dl["total"] = sum(int(dl.get(x, 0)) for x in ("nivel", "modelo", "stack"))
     elif cmd == "status":
-        # status CHAVE STATUS [FOLLOWUP_MSG] — used by the weekly follow-up
+        # status CHAVE STATUS [FOLLOWUP_MSG] [EMAIL_DATA] — used by the weekly follow-up and gmail-status.py.
+        # EMAIL_DATA (YYYY-MM-DD) = date of the e-mail that caused the change, shown by the monitor.
         k, st = args[0], args[1]
         rec = next((a for a in d.get("aplicadas", []) if a.get("chave") == k), None)
         if rec is None:
             print(f"nao existe em aplicadas: {k}")
             return 1
         if rec.get("status") != st:
-            rec.setdefault("historico_status", []).append({"de": rec.get("status"), "para": st, "em": datetime.now().astimezone().isoformat(timespec="seconds")})
+            h = {"de": rec.get("status"), "para": st, "em": datetime.now().astimezone().isoformat(timespec="seconds")}
+            if len(args) > 3 and args[3]:
+                h["email_data"], h["fonte"] = args[3][:10], "gmail"
+            rec.setdefault("historico_status", []).append(h)
         rec["status"] = st
         rec["followup_em"] = datetime.now().astimezone().isoformat(timespec="seconds")
         if len(args) > 2 and args[2]:

@@ -55,6 +55,17 @@ Sem `MONITOR_URL`, o bot funciona normalmente — só não publica nada.
 | `BOT_TZ` / `NEXT_PUBLIC_BOT_TZ` | PC / painel | fuso (padrão `America/Sao_Paulo`) |
 | `MONITOR_CORS_ORIGIN` | Vercel | libera CORS para outra origem (padrão: mesma origem) |
 
+### Arquivos de estado opcionais
+
+Além de `aplicadas.json`, o snapshot lê (se existirem; ausência não quebra nada):
+
+- `state/vagas_fila.json` — fila da busca por script (painel "Busca por script"; títulos e links só com `MONITOR_INCLUDE_DETAILS=1`);
+- `state/gmail_status.json` — resumo do leitor de respostas do Gmail (`atualizado`, `linhas_lidas`, `achados`);
+- `aguardando_login` / `login_checagens` dentro de `aplicadas.json` — fila "Esperando login" (só no modo detalhado);
+- `status` (`etapa_teste`, `proxima_etapa`, `entrevista`...) e `historico_status[].email_data` (data do e-mail) em cada candidatura.
+
+E-mails, CPFs e telefones em texto livre são trocados por `[e-mail]`, `[cpf]`, `[telefone]` antes de publicar.
+
 ## Rodando com Docker (demo)
 
 Demonstração com dados de exemplo — **nunca** monta seu `bot/` real:

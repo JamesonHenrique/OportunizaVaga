@@ -36,7 +36,7 @@ const estado = (applied, blocked) => ({
   rodizio: { proximo: 'indeed', ultima_rodada: '2026-09-18' }
 });
 
-function makeRoot() {
+function makeRoot({ extras = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-snapshot-'));
   const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
   fs.mkdirSync(path.join(root, 'state', 'frontend'), { recursive: true });
@@ -47,6 +47,22 @@ function makeRoot() {
     `[${hoje} 10:01:00] rodada ok, vaga nova processada, dormindo 20min`,
     `[${hoje} 10:21:00] modelo openrouter/nex-agi/nex-n2.5-pro:free no limite, cascateando para o proximo`
   ].join('\n') + '\n');
+  if (extras) {
+    // New optional inputs: Gmail replies in historico_status, login queue, discovery queue, Gmail summary.
+    const doc = JSON.parse(fs.readFileSync(path.join(root, 'aplicadas.json'), 'utf8'));
+    doc.aplicadas[0].status = 'etapa_teste';
+    doc.aplicadas[0].historico_status = [{ de: 'enviada', para: 'etapa_teste', em: '2026-09-19T09:00:00-03:00', email_data: '2026-09-18', fonte: 'gmail' }];
+    doc.aplicadas[0].como = 'Gupy https://exemplo.gupy.io/jobs/1234567 contato exemplo@example.com';
+    doc.bloqueados.exemplo = { motivo: 'sessao expirada, telefone 11987654321', url: 'https://jobs.example.com/vaga/9' };
+    doc.aguardando_login = { 'linkedin-x': { canal: 'linkedin', empresa: 'Exemplo LTDA', vaga: 'Dev Jr', score: 7, motivo: 'exige login', bloqueado_em: '2026-09-18T08:00:00-03:00' } };
+    doc.login_checagens = { linkedin: { logado: 'nao', em: '2026-09-18T09:00:00-03:00' } };
+    fs.writeFileSync(path.join(root, 'aplicadas.json'), JSON.stringify(doc));
+    fs.writeFileSync(path.join(root, 'state', 'vagas_fila.json'), JSON.stringify({
+      ultima_coleta: '2026-09-18T07:00:00-03:00', totais: { nivel: 3 }, stats: { lidas: 10, novas: 1 },
+      vagas: { a: { status: 'nova', empresa: 'Exemplo LTDA', titulo: 'Dev Jr', fonte: 'gupy', url: 'https://jobs.example.com/vaga/1', score: 5 }, b: { status: 'enviada' } }
+    }));
+    fs.writeFileSync(path.join(root, 'state', 'gmail_status.json'), JSON.stringify({ atualizado: '2026-09-18T10:00:00-03:00', linhas_lidas: 50, achados: [{}, {}] }));
+  }
   return root;
 }
 
@@ -105,4 +121,76 @@ test('details opt-in: aplicadas e eventos aparecem', () => {
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('arquivos opcionais ausentes: sem fila, sem gmail, sem login -> campos nulos/vazios', () => {
+  const root = makeRoot();
+  try {
+    const s = runSnapshot(root, true);
+    assert.equal(s.descoberta, null);
+    assert.equal(s.gmailStatus, null);
+    assert.deepEqual(s.aguardandoLogin, []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('arquivos opcionais corrompidos nao derrubam o retrato', () => {
+  const root = makeRoot();
+  try {
+    fs.writeFileSync(path.join(root, 'state', 'vagas_fila.json'), '{nao e json');
+    fs.writeFileSync(path.join(root, 'state', 'gmail_status.json'), '[1,2]');
+    const s = runSnapshot(root, true);
+    assert.equal(s.descoberta, null);
+    assert.equal(s.gmailStatus, null);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('details: etapa_teste com email_data, fila de login, descoberta, gmail, links e sem PII', () => {
+  const root = makeRoot({ extras: true });
+  try {
+    const s = runSnapshot(root, true);
+    const teste = s.applied.find(a => a.status === 'etapa_teste');
+    assert.ok(teste);
+    assert.equal(teste.historico_status[0].para, 'etapa_teste');
+    assert.equal(teste.historico_status[0].email_data, '2026-09-18');
+    assert.equal(teste.url, 'https://exemplo.gupy.io/jobs/1234567');
+    assert.equal(s.telemetry.porStatus.etapa_teste, 1);
+    assert.match(teste.como, /\[e-mail\]/);
+    assert.equal(JSON.stringify(s).includes('exemplo@example.com'), false);
+    assert.equal(JSON.stringify(s).includes('11987654321'), false);
+    assert.equal(s.aguardandoLogin.length, 1);
+    assert.equal(s.aguardandoLogin[0].canal, 'linkedin');
+    assert.equal(s.aguardandoLogin[0].checagem.logado, 'nao');
+    assert.equal(s.blocked.find(b => b.chave === 'exemplo').url, 'https://jobs.example.com/vaga/9');
+    assert.equal(s.descoberta.porStatus.nova, 1);
+    assert.equal(s.descoberta.proximas.length, 1);
+    assert.deepEqual(s.gmailStatus, { atualizado: '2026-09-18T10:00:00-03:00', lidas: 50, achados: 2 });
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('aggregate: fila de login e vagas da descoberta nao saem, so contagens', () => {
+  const root = makeRoot({ extras: true });
+  try {
+    const s = runSnapshot(root, false);
+    assert.equal(s.aguardandoLogin, undefined);
+    assert.equal(s.descoberta.proximas, undefined);
+    assert.equal(s.descoberta.porStatus.nova, 1);
+    assert.equal(s.telemetry.porStatus.etapa_teste, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('linkDaVaga: campo explicito, URL no texto, id verificado e nunca chuta', async () => {
+  const { linkDaVaga } = await import('./snapshot.mjs');
+  assert.equal(linkDaVaga({ url: 'https://jobs.example.com/x1' }), 'https://jobs.example.com/x1');
+  assert.equal(linkDaVaga({ motivo: 'ver https://jobs.example.com/x2).' }), 'https://jobs.example.com/x2');
+  assert.equal(linkDaVaga({ como: 'LinkedIn vaga 4470852208' }), 'https://www.linkedin.com/jobs/view/4470852208/');
+  assert.equal(linkDaVaga({ como: 'Gupy vaga 1234567' }), null);
+  assert.equal(linkDaVaga({ url: 'https://www.linkedin.com/in/alguem' }), null);
 });

@@ -52,7 +52,7 @@ FIXED RULES:
      guess. Log it via `estado.py --file $APLICADAS_FILE set-quase-la KEY '<json>'` (NOT in bloqueados
      — fields chave, empresa, vaga, falta, bloqueado_em) and move to the next job. See a1 to resume it
      once the datum exists.
-   - New sign-ups (GeekHunter, Remotar/Inhire, Talentbrand): create with the candidate's e-mail + CV data;
+   - New sign-ups (GeekHunter, Remotar/Inhire, Talentbrand): create with the "email_contas" from dados_candidato.json (falls back to "email"; NEVER the contact "email" when email_contas exists) + CV data;
      note where you created them and which data in aplicadas.json ("contas_criadas" field).
 5. At most 3 new applications per round. If there is no compatible new job, finish doing nothing.
 6. RAM ECONOMY: at the start list the tabs (agent-browser tabs) and CLOSE all unnecessary ones, keeping at
@@ -164,14 +164,56 @@ c) CHANNEL (priority — avoids abandoned applications and wasted effort):
        log in bloqueados and move on — never leave an application half-done because of sign-up.
    Forms: use respostas_padrao_gupy.
 
-c1) PER-JOB CV (effort rule): only generate the tailored PDF with reportlab (1 column, filename
-   $BOT_ROOT/bot/CV_YOUR_NAME_<Company>.pdf, WITHOUT "ATS" in the name) when the channel REALLY attaches
-   a file of YOURs: e-mail (Gmail), LinkedIn upload, Indeed. On top of the CV use the frase_transferencia from
-   dados_candidato.json + palavras_chave_ats in SUMMARY/SKILLS (all truthful, only reorder per job:
-   e.g. React job → push Angular/TS up + transfer phrase; litigation job → push PJe/hearings up).
-   ON GUPY DON'T GENERATE a per-job PDF — Gupy sends the PROFILE CV. On Gupy trust the profile CV; if it
-   is bad/outdated, note it in manutencao_gupy for outside this round (checklist: summary with ATS,
-   experiences with ago/2026-present period without claiming years, PT/B1/A2 languages without German, https links).
+c1) PER-JOB CV (effort rule): only generate the PDF when the channel REALLY attaches a file of
+   YOURS: e-mail (Gmail), LinkedIn upload, Indeed. ON GUPY DON'T GENERATE a per-job PDF — Gupy sends
+   the PROFILE CV (if the profile is bad/outdated, note it in manutencao_gupy for outside this round:
+   ATS summary, experiences with MM/YYYY-present period without claiming years, only real languages,
+   https links).
+
+   IMMUTABLE SOURCES: all content comes from bot/cv_base.md (master CV — if it doesn't exist, create
+   it ONCE from examples/cv_base.example.md filling only from dados_candidato.json) +
+   dados_candidato.json. NEVER write HTML/tex/reportlab by hand, NEVER invent company, period, year,
+   language, skill or number. There is always the same generator script — don't create another.
+
+   FLOW (5 steps):
+   1) Read the job description and extract ONLY what is true in your profile. Copy the EXACT wording
+      from the posting for the top-3 truthful keywords (same spelling: "Spring Boot" must not become
+      "springboot"). On the 1st mention of an acronym in the summary, write it out in parentheses
+      (e.g. "continuous integration/delivery (CI/CD)", "robotic process automation (RPA)") — ATS and
+      recruiters understand better.
+   2) Build the spec at /tmp/cv_spec.json:
+        { "empresa": "...", "vaga": "...",
+          "frase_key": "default",
+          "resumo_custom": "...",              // <=800 chars, 3-4 sentences, truthful, with job keywords
+          "categorias_ordem": ["...", "..."],   // subsections of "Habilidades técnicas" for the top
+          "so_categorias": ["...", "..."],      // 3-7 subsections to SHOW; the rest stay hidden
+          "palavras_chave_vaga": ["..."] }      // only real job skills that exist in my profile
+      Valid names are the "###" items under "## Habilidades técnicas" in YOUR bot/cv_base.md (if the
+      spec is wrong, the script fails and lists the valid ones). so_categorias is MANDATORY (3-7
+      subsections relevant to the job): without it the script FAILS (exit 2) — it is what keeps the
+      body at 10pt and the CV away from a wall of irrelevant skills. Map by job area (e.g. dev job →
+      "Backend"/"Frontend"/"Banco de dados"; automation job → the automation/integration category of
+      YOUR cv_base).
+   3) Generate the PDF (the script only returns exit 0 if the file has 1 page and the text passes the
+      name + sections self-check; any ERROR = fix the spec and run again):
+        python3 "$BOT_ROOT/bot/gerar_cv.py" /tmp/cv_spec.json \
+          "$BOT_ROOT/bot/CV_YOUR_NAME_<Company>.pdf"
+      filename WITHOUT the word "ATS" and with the candidate's real name (from dados_candidato.json
+      -> nome) instead of YOUR_NAME. The script prints "kw no CV: ..." and "kw DESCARTADAS (fora do
+      perfil): ..." — if something you asked for was dropped, it does NOT exist in the profile: DON'T
+      work around it nor regenerate the PDF with invented content; proceed with what passed.
+   4) Save the posting text to /tmp/anuncio.txt and measure coverage BEFORE attaching:
+        python3 "$BOT_ROOT/bot/check_ats.py" /tmp/anuncio.txt \
+          "$BOT_ROOT/bot/CV_YOUR_NAME_<Company>.pdf"
+      Target: coverage of PROFILE terms >= 75% (exit 0 = "OK"). If it failed, adjust the spec
+      (resumo_custom with the MISSING terms in the posting's wording, palavras_chave_vaga,
+      so_categorias) and regenerate — NEVER try to cover an "outside profile" term (the script itself
+      lists those as a job misalignment).
+   5) Attach the generated PDF (1 page) to the submission.
+
+   TRANSFER PHRASE: use respostas_padrao_gupy -> frase_transferencia without editing it (if empty,
+   build a truthful phrase in the same pattern using only REAL + SIMILAR from rule 4); log the PDF
+   path next to "(frase:custom)".
 
 c-LinkedIn) LINKEDIN IN FULL (not just "Easy Apply"):
    - Easy Apply available: apply directly (attach the per-job tailored CV).
@@ -186,17 +228,19 @@ c-Externo) NON-STANDARD ATS / SITE (rippling, greenhouse, lever, inhire.app, fac
       ats.rippling.com/...)? That's NORMAL — keep going through the flow to the final submit button.
       Do not log a block for a redirect.
    2. Order of preference: form WITHOUT an account (greenhouse/lever/rippling often are) → "Continue
-      with Google"/"Sign in with LinkedIn" (candidate's e-mail, already logged into Chrome) → sign up
+      with Google"/"Sign in with LinkedIn" ("email_contas" account, already logged into Chrome) → sign up
       with e-mail+password.
-   3. Sign-up with a password: generate a NEW strong password per site
-      (python3 -c "import secrets;print(secrets.token_urlsafe(18))") and save it IMMEDIATELY, before
-      submitting the form, to a file OUTSIDE the repo and the published state (e.g.
-      ~/.config/oportunizavaga/credenciais.tsv, chmod 600):
-      printf '%s\t%s\t%s\n' "<domain>" "<email>" "<password>" >> ~/.config/oportunizavaga/credenciais.tsv
-      NEVER write a password into aplicadas.json, a log, the final reply or the CV — aplicadas.json can
-      be published to the monitor. In contas_criadas note only the site, e-mail, date and "password in
-      credenciais.tsv". E-mail confirmation: open logged-in Gmail, click the verification link and go
-      back to the form.
+   3. Sign-up with a password: NEW strong password per site, always through the script:
+      NEVER generate, type or read the password yourself (shell commands and fill_form go to the log). With
+      the form open and the password fields visible, run:
+      node $BOT_ROOT/bot/nova-senha.mjs <domain> <email_contas>
+      It generates the password, saves it to ~/.config/oportunizavaga/credenciais.tsv (chmod 600, OUTSIDE
+      the repo; path overridable via OV_CREDENTIALS_FILE) and fills password + confirmation straight into
+      the tab. Fill the other fields with fill_form, without touching the password fields. NEVER write a
+      password into aplicadas.json, a log, the final reply or the CV — aplicadas.json can be published to
+      the monitor. In contas_criadas note only the site, e-mail, date and "password in credenciais.tsv".
+      E-mail confirmation: open the Gmail of the "email_contas" account
+      (mail.google.com/mail/?authuser=<email_contas>), click the verification link and go back to the form.
    4. Aggregator with no application link (e.g. a post with no external button): look for the SAME job
       (company + title) on LinkedIn, Gupy, Inhire or the company's careers site
       ("<company> careers" / "<company> we're hiring") and apply there. Only log a block if you can't

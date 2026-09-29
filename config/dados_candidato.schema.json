@@ -9,6 +9,8 @@
     "_COMO_USAR": { "type": "string" },
     "nome": { "type": "string", "minLength": 1 },
     "email": { "type": "string", "format": "email" },
+    "email_contas": { "type": "string", "format": "email", "description": "Opcional. E-mail de LOGIN (cadastros, OAuth, verificacao). Sem ele, usa-se 'email'." },
+    "regra_emails": { "type": "string", "description": "Opcional. Regra em texto livre sobre qual caixa usar para contato vs. login." },
     "telefone": { "type": "string", "minLength": 1 },
     "linkedin": { "type": "string", "format": "uri" },
     "github": { "type": "string" },

@@ -40,13 +40,16 @@ O setup copia os exemplos, valida dependências e imprime os comandos `schtasks`
 
 ```bash
 cp examples/dados_candidato.example.json bot/dados_candidato.json
+cp examples/cv_base.example.md bot/cv_base.md
 cp examples/aplicadas.example.json bot/aplicadas.json
 ```
 
 Edite `bot/dados_candidato.json`: nome, e-mail, stack real (`experiencia.tecnologias`),
 similares (`experiencia.stacks_similares`), pretensão (`SEU_VALOR_BASE`),
 respostas padrão de formulário. **Campo vazio = o robô registra "bloqueado" em vez
-de inventar.** Veja `docs/PROMPTS.md` para adaptar `bot/prompt_loop.md` ao seu stack.
+de inventar.** Edite `bot/cv_base.md` com seu currículo mestre (é dele que sai o PDF
+por vaga da regra `c1`; ver `docs/PROMPTS.md`). Veja `docs/PROMPTS.md` para adaptar
+`bot/prompt_loop.md` ao seu stack.
 
 ## Múltiplos perfis
 

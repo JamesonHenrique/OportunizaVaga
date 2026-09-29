@@ -1,0 +1,7 @@
+{
+  "aplicadas": [
+    {"chave": "linkedin_acme_6666666666", "empresa": "Ja Aplicada", "vaga": "Dev Backend Junior", "url": "https://www.linkedin.com/jobs/view/6666666666/"}
+  ],
+  "bloqueados": {"gupy_exemplo_9000003": "vaga pleno"},
+  "pular_empresas": ["Empresa Bloqueada"]
+}
