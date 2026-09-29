@@ -6,6 +6,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Prompt modular e defesa contra injeção indireta** (`bot/prompt_cond.py`, usado por `loop.sh` e `loop.ps1`):
+  blocos `<!--se:site=X-->…<!--/se-->` (só a URL do site da rodada) e `<!--se:telegram-->` (só com colheita fresca),
+  fail-open para condição/site desconhecido; linha `SITE DESTA RODADA`; fila da descoberta e posts do Telegram entram
+  cercados por `<<<DADOS_EXTERNOS …>>>` (delimitadores removidos do conteúdo) e a regra 9 dos prompts (pt/en) manda
+  tratar texto de terceiros como dado, nunca instrução. Teste: `tests/test_prompt_cond.sh`.
 - **`estado.py ja-visto EMPRESA [TITULO]`** e **`resumo` compacto**: aplicadas como `empresa | vaga`; bloqueadas e
   arquivadas só como nomes de empresa com contagem (o detalhe vem sob demanda). Corta milhares de tokens por prompt;
   regra 2 e recheagem de bloqueados dos prompts (pt/en) usam o `ja-visto`.

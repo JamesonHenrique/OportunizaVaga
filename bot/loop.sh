@@ -322,6 +322,10 @@ import sys
 
 source, target, aplicadas, dados, perfil, perfil_nome, reconhecimento, modo, limite, limite_reconhecimento, bot_root = sys.argv[1:]
 text = Path(source).read_text(encoding='utf-8')
+sys.path.insert(0, str(Path(bot_root) / 'bot'))
+import prompt_cond
+# Conditional blocks (<!--se:site=X-->...<!--/se-->, <!--se:telegram-->): keep only what this round can use.
+text = prompt_cond.aplicar(text, prompt_cond.site_da_rodada(aplicadas), prompt_cond.telegram_fresco(Path(aplicadas).parent))
 text = text.replace('$APLICADAS_FILE', aplicadas)
 text = text.replace('$DADOS_CANDIDATO_FILE', dados)
 text = text.replace('$BOT_ROOT', bot_root)
@@ -329,7 +333,6 @@ text = text.replace('bot/perfil.json', perfil)
 text = text.replace('SEU_NOME', perfil_nome)
 text = text.replace('YOUR_NAME', perfil_nome)
 # Nivel/area/termos do perfil ativo -> placeholders {{...}} (bot/perfil_render.py).
-sys.path.insert(0, str(Path(bot_root) / 'bot'))
 import perfil_render
 text = perfil_render.render(text, perfil_render.carregar(perfil))
 if modo in {'1', 'true', 'True', 'sim', 'Sim'}:
@@ -375,7 +378,8 @@ if modo not in {'1', 'true', 'True', 'sim', 'Sim'}:
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if r.returncode == 0 and r.stdout.strip():
-                text += "\n\n" + r.stdout
+                # Titles/companies/posts come from third parties: fenced as DATA (rule 9 of the prompt).
+                text += prompt_cond.cercar('fila' if 'descobrir' in cmd[1] else 'telegram', r.stdout)
         except Exception:
             pass
 Path(target).write_text(text, encoding='utf-8')
