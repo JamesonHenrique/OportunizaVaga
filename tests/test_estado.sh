@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 ESTADO="bot/estado.py"
 
-TOTAL=12
+TOTAL=15
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -132,6 +132,33 @@ if [ "$OUT12" = "nao visto: pode avaliar" ]; then
 else
   relata 1 "ja-visto empresa desconhecida -> nao visto"
 fi
+
+# 13-15 — add-aplicada grava a cobertura ATS sozinho (anuncio salvo < 20 min); anuncio velho ou sem CV = nada.
+# check_ats.py real precisa de PDF + extrator; aqui um stub imprime as MESMAS linhas (formato conferido no teste 15).
+ATS_D="$(mktemp -d)"
+trap 'cleanup; rm -rf "$ATS_D"' EXIT
+cat > "$ATS_D/check_ats_stub.py" <<'PYEOF'
+import sys
+print("termos tecnicos no anuncio: 8 (perfil: 5 | fora do perfil: 3)")
+print("cobertura geral do CV: 62%")
+print("cobertura dos termos DO PERFIL: 80%")
+PYEOF
+: > "$ATS_D/CV_Teste.pdf"
+echo "Vaga Desenvolvedor Backend Junior Python remoto" > "$ATS_D/anuncio.txt"
+export OV_CHECK_ATS="$ATS_D/check_ats_stub.py"
+ANUNCIO_FILE="$ATS_D/anuncio.txt" python3 "$ESTADO" --file "$TMP_STATE" add-aplicada "{\"chave\":\"ats-1\",\"empresa\":\"AtsCo\",\"vaga\":\"Dev Jr\",\"cv\":\"$ATS_D/CV_Teste.pdf\"}" >/dev/null
+python3 "$ESTADO" --file "$TMP_STATE" get ats-1 | tr -d ' \n' | grep -q '"ats":{"geral":62,"perfil":80}'
+relata $? "add-aplicada grava ats {geral, perfil} com anuncio recente"
+
+touch -d '-1 hour' "$ATS_D/anuncio.txt"
+ANUNCIO_FILE="$ATS_D/anuncio.txt" python3 "$ESTADO" --file "$TMP_STATE" add-aplicada "{\"chave\":\"ats-2\",\"empresa\":\"AtsCo2\",\"vaga\":\"Dev Jr 2\",\"cv\":\"$ATS_D/CV_Teste.pdf\"}" >/dev/null
+ANUNCIO_FILE="$ATS_D/anuncio.txt" python3 "$ESTADO" --file "$TMP_STATE" add-aplicada '{"chave":"ats-3","empresa":"AtsCo3","vaga":"Dev Jr 3"}' >/dev/null
+! python3 "$ESTADO" --file "$TMP_STATE" get ats-2 | grep -q '"ats"' && ! python3 "$ESTADO" --file "$TMP_STATE" get ats-3 | grep -q '"ats"'
+relata $? "anuncio velho (> 20 min) ou registro sem CV_*.pdf: nada e gravado"
+
+unset OV_CHECK_ATS
+grep -q 'cobertura geral do CV: %d%%' bot/check_ats.py && grep -q 'cobertura dos termos DO PERFIL: %d%%' bot/check_ats.py
+relata $? "formato lido do check_ats.py real continua igual ao que estado.py espera"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "# verde: $N/$TOTAL"
