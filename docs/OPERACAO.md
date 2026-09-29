@@ -70,7 +70,7 @@ o ganho no seu ambiente depende de quais MCPs você tem configurados.
 Precedência em `loop.sh`/`loop.ps1`: `OV_OPENCODE_CONFIG_CONTENT` explícito > este script > nada. O `followup.sh`/`.ps1`
 usa a mesma ordem (o `.sh` cai na config fixa antiga se o script não gerar nada). **Fail-open**: config não encontrada,
 MCP de browser ausente ou JSONC inválido = saída vazia e o robô segue com a config do opencode intacta.
-`OV_OPENCODE_ENXUTO=0` desliga. Arquivo lido: `OV_OPENCODE_USER_CONFIG`, `OPENCODE_CONFIG` ou
+`OV_OPENCODE_ENXUTO=1` liga (desligado por padrão: nega ferramentas embutidas). Arquivo lido: `OV_OPENCODE_USER_CONFIG`, `OPENCODE_CONFIG` ou
 `~/.config/opencode/opencode.jsonc|json`. Teste: `tests/test_opencode_enxuto.sh`.
 
 ## Bloco do Telegram só enquanto há vaga nova
