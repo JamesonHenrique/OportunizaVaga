@@ -1,4 +1,4 @@
-# scripts/ctl.ps1 — espelho Windows de scripts/ctl.sh: inspeciona o bot sem abrir logs grandes.
+# scripts/ctl.ps1 - espelho Windows de scripts/ctl.sh: inspeciona o bot sem abrir logs grandes.
 # So le; nao altera nada. Requer PowerShell 5.1+.
 #   powershell -File scripts\ctl.ps1 status   saude de cada parte em ~20 linhas (comece por aqui)
 #   powershell -File scripts\ctl.ps1 rodada   resultado da ultima rodada (modelo, final)
@@ -72,11 +72,11 @@ function Show-Rodada {
     $f = Get-ChildItem 'logs\rodada-*.log' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $f) { Write-Output 'sem log de rodada'; return }
     Write-Output ("arquivo: logs\{0} ({1} bytes)" -f $f.Name, $f.Length)
-    $m = Select-String -Path $f.FullName -Pattern 'build · \S+' | Select-Object -First 1
+    $m = Select-String -Path $f.FullName -Pattern 'build \u00b7 \S+' | Select-Object -First 1
     if ($m) { $m.Matches[0].Value }
     Write-Output '--- final:'
     Get-Content $f.FullName -Encoding UTF8 | ForEach-Object { $_ -replace '\x1b\[[0-9;]*m', '' } |
-        Where-Object { $_.Trim() -ne '' -and $_ -notmatch '^[⚙→$✗]' } | Select-Object -Last 12 |
+        Where-Object { $_.Trim() -ne '' -and $_ -notmatch '^[\u2699\u2192$\u2717]' } | Select-Object -Last 12 |
         ForEach-Object { $_.Substring(0, [Math]::Min(200, $_.Length)) }
 }
 

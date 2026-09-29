@@ -116,7 +116,7 @@ else
 fi
 
 # 11 — ja-visto: mesma vaga (titulo parecido) x mesma empresa (outro titulo).
-OUT11A="$(python3 "$ESTADO" --file "$TMP_STATE" ja-visto "ZetaSoft" "Backend Java Junior")"
+OUT11A="$(python3 "$ESTADO" --file "$TMP_STATE" ja-visto "Zeta Soft" "Backend Java Junior")"
 OUT11B="$(python3 "$ESTADO" --file "$TMP_STATE" ja-visto "ZetaSoft" "Analista de Marketing")"
 if echo "$OUT11A" | grep -q "^MESMA VAGA provavel | bloqueados" && echo "$OUT11B" | grep -q "^mesma empresa"; then
   relata 0 "ja-visto separa MESMA VAGA provavel de mesma empresa"

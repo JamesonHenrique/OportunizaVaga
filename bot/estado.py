@@ -106,7 +106,9 @@ def ja_visto(d, empresa, titulo=""):
             rec = rec if isinstance(rec, dict) else {"motivo": str(rec)}
             re_ = _norm(rec.get("empresa") or "")
             ch = _norm(k)
-            if not e or not (e in re_ or (re_ and re_ in e) or e in ch):
+            # also compare without spaces: "Zeta Soft" x "ZetaSoft" is the same company
+            e2, re2, ch2 = e.replace(" ", ""), re_.replace(" ", ""), ch.replace(" ", "")
+            if not e2 or not (e2 in re2 or (re2 and re2 in e2) or e2 in ch2):
                 continue
             rt = {w for w in _norm(rec.get("vaga") or k).split() if len(w) >= 3 and w not in _STOP}
             score = len(tt & rt) / len(tt) if tt else 0
