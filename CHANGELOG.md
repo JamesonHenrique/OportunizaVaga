@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Rodízio reordenado 1x/dia pelo rendimento** (`bot/rodizio-saude.py`): mesma quantidade de vagas de rodada, ≥ 1 por site,
+  o resto proporcional a uma nota suavizada (candidaturas por rodada + respostas positivas), intercalado por round-robin
+  ponderado suave (sem repetir site em sequência quando dá); guarda `rodizio.ordem_calculada_em`. Desliga com
+  `OV_RODIZIO_REORDENAR=0`. Testes determinísticos em `tests/test_rodizio_saude.sh`.
 - **`bot/podar-sessoes.py`** (opt-in): apaga as sessões antigas do robô no opencode (banco com argumentos de tool-calls) via
   `opencode session list --format json` / `session delete`; filtra por prefixo de título **e** pasta, idade por `created`,
   `--dry`, banco em `chmod 600`. Documentado em `docs/SEGURANCA.md`, cron e Task Scheduler. Teste: `tests/test_podar_sessoes.sh`.
