@@ -181,6 +181,12 @@ b) RODÍZIO DE SITES: veja rodizio.proximo no RESUMO DO ESTADO. Use EXATAMENTE 1
    (incompatível, dado faltante, vaga encerrada). Re-encontrar a mesma lista sem novidade
    não cria chave nova com sufixo (_15b, _15d, _15e...).
 
+c0) TRIAGEM POR SCRIPT (toda vaga aberta, ANTES de CV/formulário): salve o texto do anúncio em
+    /tmp/anuncio.txt e rode `python3 "$BOT_ROOT/bot/vaga_check.py" checar /tmp/anuncio.txt "<título>" "<Nível de
+    experiência do LinkedIn, se a página mostrar>"`. INCOMPATIVEL → add-bloqueado com esse motivo e vá para a
+    próxima vaga (não gere CV). COMPATIVEL → siga as regras 1-4 normalmente (o script só corta o óbvio, conforme
+    o perfil). Vaga da fila com [descrição ok] já passou por esta triagem: pule o c0.
+
 c) CANAL (prioridade — evita candidatura abandonada e esforço perdido):
    1º) canais com CONTA PRONTA e envio rápido: Gupy (conta Google), LinkedIn (ver c-LinkedIn),
        e-mail via Gmail logado, Candidatura Fácil do Indeed, Remotar/Inhire (conta já criada).
