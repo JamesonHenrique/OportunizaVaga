@@ -18,6 +18,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+from jsonlock import gravar, travado  # noqa: E402
 DEFAULT_APLICADAS = SCRIPT_DIR / "aplicadas.json"
 NOTIFICAR_SH = SCRIPT_DIR.parent / "scripts" / "notificar.sh"
 PAUSE_AFTER = 4
@@ -32,11 +34,8 @@ def load(p, default):
 
 
 def save(p, d):
-    p = Path(p)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_suffix(p.suffix + ".tmp")
-    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
-    os.replace(tmp, p)
+    Path(p).parent.mkdir(parents=True, exist_ok=True)
+    gravar(str(p), d, indent=1)   # jsonlock.py: unique tmp + atomic replace
 
 
 def notify(msg):
@@ -144,4 +143,6 @@ if __name__ == "__main__":
         i = args.index("--perfil")
         perfil = args[i + 1] if i + 1 < len(args) else None
         del args[i:i + 2]
-    sys.exit(main(sys.argv[1], args[0] if args else str(DEFAULT_APLICADAS), perfil))
+    _ap = args[0] if args else str(DEFAULT_APLICADAS)
+    with travado(_ap):   # same exclusive lock as estado.py
+        sys.exit(main(sys.argv[1], _ap, perfil))
