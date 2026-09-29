@@ -44,4 +44,8 @@ BOT_DIR=$HOME/opensource/oportunizavaga
 # (created); nunca sessoes interativas suas. Teste antes com --dry. Config: OV_PODAR_PREFIXOS, OV_PODAR_PASTAS.
 #30 4 * * *                   python3 $BOT_DIR/bot/podar-sessoes.py 3 >> $BOT_DIR/bot/logs/podar-sessoes.log 2>&1
 
+# Dead man's switch: Telegram se o loop parar (2 checagens seguidas), o heartbeat do monitor envelhecer
+# (so com MONITOR_URL no ambiente do cron; sem ele essa checagem e pulada) ou o aplicadas.json quebrar
+*/15 * * * *                  $BOT_DIR/bot/vigia-vida.sh >> $BOT_DIR/bot/logs/vigia-vida.log 2>&1
+
 # Relatorio de tokens por job (manual): python3 $BOT_DIR/scripts/tokens-relatorio.py 1

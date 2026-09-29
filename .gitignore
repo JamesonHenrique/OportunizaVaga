@@ -58,3 +58,4 @@ __pycache__/
 
 # Estado do bot fora de um perfil (execucao avulsa)
 **/state/*.json
+**/state/*.falhas

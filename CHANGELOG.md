@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Dead man's switch (`bot/vigia-vida.sh` / `bot/vigia-vida.ps1`)**: a cada 15 min avisa no Telegram se o loop não estiver
+  rodando em 2 checagens seguidas, se o heartbeat do monitor (`MONITOR_URL/api/status?ping=1`) tiver mais de `HB_MAX_MIN`
+  minutos (`MONITOR_URL` opcional e sem padrão: sem ele a checagem é pulada) ou se o `aplicadas.json` estiver ausente/ilegível.
+  Exemplos em `config/crontab.example` e `config/TaskScheduler.md`. Teste: `tests/test_vigia_vida.sh`.
 - **Cobertura ATS gravada sozinha** em `estado.py add-aplicada`: com `cv` = `CV_*.pdf` existente e anúncio (`ANUNCIO_FILE`)
   salvo há < 20 min, roda `check_ats.py` e grava `ats: {geral, perfil}` (campo novo no `aplicadas.schema.json`).
 - **Bloco do Telegram só enquanto há vaga colhida ainda não oferecida** (`bot/prompt_cond.py`): `<!--se:telegram-->` exige

@@ -151,6 +151,20 @@ schtasks /Create /TN 'OportunizaVaga\PodarSessoes' `
 
 Relatório de tokens (manual): `py "$BOT_DIR\scripts\tokens-relatorio.py" 1`.
 
+## 13. Vigia de vida / dead man's switch (a cada 15 min)
+
+Avisa no Telegram (`scripts\notificar.ps1`) se o `loop.ps1` estiver parado em 2 checagens seguidas, se o heartbeat do
+monitor tiver mais de `HB_MAX_MIN` minutos (só checa com `MONITOR_URL` definido; sem ele a checagem é pulada) ou se o
+`aplicadas.json` estiver ausente/ilegível. Defina `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` (e, se usar o monitor,
+`MONITOR_URL`) como variáveis de ambiente do usuário (`setx`), pois a tarefa herda o ambiente do usuário.
+
+```powershell
+schtasks /Create /TN 'OportunizaVaga\VigiaVida' `
+  /TR "powershell -ExecutionPolicy Bypass -File `"$BOT_DIR\bot\vigia-vida.ps1`"" /SC MINUTE /MO 15 /F
+```
+
+Equivale a `*/15 * * * * $BOT_DIR/bot/vigia-vida.sh`. Limite: roda na própria máquina; PC desligado não avisa.
+
 ## Conferir / remover
 
 ```powershell

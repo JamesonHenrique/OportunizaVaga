@@ -91,3 +91,19 @@ então ninguém sabia se o CV por vaga compensa. Agora `estado.py add-aplicada` 
 20 minutos (para nunca usar o texto de outra vaga), roda `bot/check_ats.py` e grava
 `"ats": {"geral": <%>, "perfil": <%|null>}`. Best effort: qualquer falha deixa o registro como veio. `OV_CHECK_ATS`
 troca o script (testes). Teste: `tests/test_estado.sh`.
+
+## Vigia de vida / dead man's switch (`bot/vigia-vida.sh`, `bot/vigia-vida.ps1`)
+
+Cron (ou Task Scheduler) a cada 15 min. Manda um alerta por `scripts/notificar.sh`/`.ps1` (Telegram, com dedupe de 6 h) quando:
+
+1. o loop **não** está rodando em 2 checagens seguidas (uma falta é normal: o `guardiao` religa);
+2. o heartbeat do monitor (`$MONITOR_URL/api/status?ping=1`, campo `updatedAt`) tem mais de `HB_MAX_MIN` (padrão 20) minutos,
+   está ausente ou o servidor não responde. **`MONITOR_URL` é opcional e não tem padrão**: vazio (ou um placeholder
+   `sua-url`/`example.invalid`) pula esta checagem, então quem não usa o painel não recebe alarme falso;
+3. o `aplicadas.json` do perfil ativo (ou o mais recente de `bot/state/*/`) está ausente ou não é JSON válido.
+
+Por que não olhar só o log: o loop dorme de 1 h a 4 h legitimamente quando não há vaga nova, então "log parado" gera
+alarme falso o tempo todo; o vigia olha o **processo**. Limite: roda na própria máquina, então PC desligado não avisa
+(para isso é preciso um pinger externo no `/api/status`). Variáveis: `HB_MAX_MIN`, `VIGIA_INTERVALO_MIN` (só a mensagem),
+`NOTIFY`/`VIGIA_NOTIFY` (notificador), `VIGIA_STATE`, `VIGIA_LOOP_PATTERN` (testes). Sai com 2 quando alertou.
+Teste: `tests/test_vigia_vida.sh`. O `.ps1` não tem teste automatizado (ver `docs/TESTES.md`).
