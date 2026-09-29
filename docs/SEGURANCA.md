@@ -44,6 +44,13 @@ ln -s ../../scripts/sanitize.sh .git/hooks/pre-commit
   estados, perfis e totais); detalhes brutos só saem com `MONITOR_INCLUDE_DETAILS=1`.
   Nada de CPF, documentos, segredos, host/pid ou caminho local.
 
+- **Logs mascarados**: `bot/redact-logs.py` troca por `[REDACTED]` as senhas do `credenciais.tsv`, campos de senha
+  de tool-calls, o último argumento de `printf ... >> credenciais.tsv`, tokens de API/bot, CPF e códigos de 6 dígitos.
+  O `loop.sh`/`loop.ps1` limpam o log de cada rodada assim que ela termina; agende a varredura geral
+  (`config/crontab.example` / `config/TaskScheduler.md`). Arquivos escritos há menos de 30 min só são tocados com
+  `--forcar` (reescrever um log aberto congelaria a rodada). Complementa — não substitui — a regra 3 do prompt
+  (a senha nunca passa pelo modelo: `bot/nova-senha.mjs`).
+
 ## Se vazar
 
 1. Rotacione a chave/senha **no provedor** (novo token, revogue o antigo).

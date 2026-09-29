@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **`bot/redact-logs.py`**: mascara segredos nos logs (senhas do `credenciais.tsv`, campos de senha de tool-calls,
+  `printf … >> credenciais`, tokens de API/bot, CPF, códigos de 6 dígitos; `.gz`), portável, globs e arquivo de
+  credenciais configuráveis (`OV_REDACT_GLOBS`, `OV_CREDENTIALS_FILE`). Pula arquivo escrito há < 30 min salvo `--forcar`;
+  `loop.sh`/`loop.ps1` limpam o log de cada rodada ao fim dela. Exemplos de cron/Task Scheduler. Teste: `tests/test_redact_logs.sh`.
 - **`bot/chrome-lock.sh` / `bot/chrome-lock.ps1`**: protocolo único do Chrome compartilhado (`NOME alta|normal ESPERA -- CMD`):
   jobs curtos (follow-up, Gmail) marcam prioridade por flag e o loop cede a rodada (`CHROME_LOCK_YIELD_RC`); flag do job pai
   não é removida; log em `bot/logs/chrome-lock.log`. Usado por `loop.sh/.ps1`, `followup.sh/.ps1` e `gmail-status.py`.

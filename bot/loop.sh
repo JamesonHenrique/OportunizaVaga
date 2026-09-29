@@ -541,6 +541,10 @@ while true; do
 
   [ -n "$MODELO_OK" ] && log "rodada usou o modelo ${MODELO_OK}"
 
+  # A rodada acabou e o opencode fechou o log: mascara segredos AGORA (antes do tail ir para o loop.log),
+  # sem esperar a varredura do cron. Falha aqui nunca derruba o loop.
+  python3 "$BOT_ROOT/bot/redact-logs.py" --forcar "$ROUND_LOG" >> loop.log 2>&1 || true
+
   # loop.log fica legivel: so o fim da rodada. Dump completo vive em logs/.
   { echo "--- saida da rodada (completa em ${ROUND_LOG}) ---"; tail -n 40 "$ROUND_LOG"; } >> loop.log
 

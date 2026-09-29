@@ -676,6 +676,14 @@ while ($true) {
 
     if ($MODELO_OK -ne '') { Write-LoopLog ("rodada usou o modelo {0}" -f $MODELO_OK) }
 
+    # A rodada acabou: mascara segredos AGORA no log dela (antes do tail ir para o loop.log). Sem python, pula.
+    if ($Py -and (Test-Path $ROUND_LOG)) {
+        try {
+            $o = & $Py (Join-Path $BOT_ROOT 'bot\redact-logs.py') --forcar $ROUND_LOG 2>&1
+            if ($o) { Add-Content -Path 'loop.log' -Value $o }
+        } catch { }
+    }
+
     try {
         $tail = Get-Content $ROUND_LOG -Tail 40 -ErrorAction SilentlyContinue
         Add-Content -Path 'loop.log' -Value ("--- saida da rodada (completa em {0}) ---" -f $ROUND_LOG)

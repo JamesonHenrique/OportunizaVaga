@@ -124,6 +124,20 @@ schtasks /Create /TN 'OportunizaVaga\ValidateRodada' `
   /TR "powershell -ExecutionPolicy Bypass -File `"$BOT_DIR\scripts\validate-rodada.ps1`"" /SC MINUTE /MO 30 /F
 ```
 
+## 11. Mascarar segredos nos logs (a cada 10 min)
+
+O `loop.ps1` já limpa o log de cada rodada ao terminar (`--forcar`); esta tarefa varre o resto
+(`loop.log`, `followup.log`, rotacionados, `.gz`) e ignora arquivos escritos há menos de 30 min.
+Configuração opcional por variáveis: `OV_CREDENTIALS_FILE` (padrão `%USERPROFILE%\.config\oportunizavaga\credenciais.tsv`)
+e `OV_REDACT_GLOBS` (globs separados por `;`).
+
+```powershell
+schtasks /Create /TN 'OportunizaVaga\RedactLogs' `
+  /TR "py `"$BOT_DIR\bot\redact-logs.py`"" /SC MINUTE /MO 10 /F
+```
+
+Equivale a `*/10 * * * * python3 $BOT_DIR/bot/redact-logs.py`.
+
 Relatório de tokens (manual): `py "$BOT_DIR\scripts\tokens-relatorio.py" 1`.
 
 ## Conferir / remover
