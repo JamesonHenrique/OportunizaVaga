@@ -1,4 +1,4 @@
-# bot/chrome-lock.ps1 — espelho Windows de bot/chrome-lock.sh (mesmo protocolo, mesmos codigos de saida).
+# bot/chrome-lock.ps1 - espelho Windows de bot/chrome-lock.sh (mesmo protocolo, mesmos codigos de saida).
 #
 #   CLI:      chrome-lock.ps1 NOME alta|normal ESPERA_S -- CMD [ARGS...]
 #   Funcoes:  . chrome-lock.ps1   (dot-source; usado por loop.ps1 e followup.ps1)
