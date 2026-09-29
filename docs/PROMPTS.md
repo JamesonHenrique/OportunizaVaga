@@ -75,7 +75,8 @@ Anti-pattern proibido: HTML/tex/reportlab escritos à mão, keyword stuffing e t
 - Teste 1 rodada manual após cada mudança grande (`./bot/loop.sh` + Ctrl+C).
 - **Blocos condicionais** (`bot/prompt_cond.py`, avaliados no `render_prompt` do `loop.sh` e do `loop.ps1`):
   `<!--se:site=X-->…<!--/se-->` mantém o trecho só quando `rodizio.proximo == X` e `<!--se:telegram-->…<!--/se-->`
-  só com colheita do Telegram fresca (< 6 h). Condição desconhecida mantém o texto, e site da rodada desconhecido (sem
+  só com colheita do Telegram fresca (< 6 h) **e** ao menos uma vaga colhida oferecida menos de 2 vezes
+  (contador em `<estado>/telegram_oferecidas.json`, chave `id` ou `post`, contado uma vez por prompt renderizado). Condição desconhecida mantém o texto, e site da rodada desconhecido (sem
   bloco no prompt) mantém **todos** os blocos de site: nenhuma regra some por falha de consulta. O renderizado ganha a
   linha `SITE DESTA RODADA`. Ao adicionar um portal, coloque a linha de URL dele dentro de `<!--se:site=SEU_SITE-->`;
   sem bloco ela aparece em toda rodada (funciona, só gasta tokens). Nunca aninhe blocos.

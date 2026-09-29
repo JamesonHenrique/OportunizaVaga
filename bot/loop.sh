@@ -326,7 +326,7 @@ text = Path(source).read_text(encoding='utf-8')
 sys.path.insert(0, str(Path(bot_root) / 'bot'))
 import prompt_cond
 # Conditional blocks (<!--se:site=X-->...<!--/se-->, <!--se:telegram-->): keep only what this round can use.
-text = prompt_cond.aplicar(text, prompt_cond.site_da_rodada(aplicadas), prompt_cond.telegram_fresco(Path(aplicadas).parent))
+text = prompt_cond.aplicar(text, prompt_cond.site_da_rodada(aplicadas), prompt_cond.telegram_para_prompt(Path(aplicadas).parent))
 text = text.replace('$APLICADAS_FILE', aplicadas)
 text = text.replace('$DADOS_CANDIDATO_FILE', dados)
 text = text.replace('$BOT_ROOT', bot_root)
