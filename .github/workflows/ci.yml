@@ -52,6 +52,8 @@ jobs:
           python3 -m py_compile bot/arquivar-logs-rodada.py
           python3 -m py_compile bot/rodizio-saude.py
           python3 -m py_compile bot/perfil_render.py
+          python3 -m py_compile bot/jsonlock.py
+          python3 -m py_compile bot/prompt_cond.py
       - name: validate (schemas + novos .sh)
         run: |
           bash -n bot/dry-run.sh
@@ -65,6 +67,8 @@ jobs:
           bash tests/test_estado.sh
           bash tests/test_rodizio_saude.sh
           bash tests/test_perfil_render.sh
+          bash tests/test_jsonlock.sh
+          bash tests/test_prompt_cond.sh
       - name: node --test monitor/
         run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)
