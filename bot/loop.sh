@@ -33,6 +33,22 @@ RETRY_MAX="${OV_RETRY_MAX:-1800}"
 QUOTA_STEPS=(900 1800 3600)   # quota: 15min -> 30min -> 1h, reseta ao dar certo
 NORMAL_WAIT="${OV_NORMAL_WAIT:-1200}"         # sleep base apos rodada ok (20min)
 VAZIA_BASE="${OV_VAZIA_BASE:-3600}"           # backoff por rodada sem vaga nova: 1h na primeira
+VAZIA_MAX="${OV_VAZIA_MAX:-14400}"            # teto do backoff (4h): sem teto, 5 vazias seguidas = 16h parado
+# Descoberta deterministica (sem LLM, opt-in): bot/descobrir.py monta uma fila de vagas
+# pre-filtradas pelo perfil e o prompt da rodada as avalia ANTES de varrer o site do rodizio.
+# Consulta LinkedIn/Gupy publicos a cada ~90min; ligue com OV_DESCOBRIR=1 (ver docs/USO-ETICO.md).
+OV_DESCOBRIR="${OV_DESCOBRIR:-0}"
+# Modelo PAGO so para rodadas com algo pronto para ENVIAR (fila com score >= 3 ou login ja feito):
+# modelos gratuitos erram tool-call justamente ai. Opt-in: OV_USAR_PAGO_ENVIO=1 + OV_MODELO_PAGO=<id>.
+# OV_PAGO_MAX_DIA limita as rodadas pagas por dia (o credito da conta e finito).
+OV_USAR_PAGO_ENVIO="${OV_USAR_PAGO_ENVIO:-0}"
+OV_MODELO_PAGO="${OV_MODELO_PAGO:-}"
+OV_PAGO_MAX_DIA="${OV_PAGO_MAX_DIA:-2}"
+# Rodada enxuta (opcional): JSON de config do opencode desligando MCPs que o loop nao usa (cada MCP
+# custa dezenas de milhares de tokens de schema em TODA chamada). Ex.:
+#   OV_OPENCODE_CONFIG_CONTENT='{"mcp":{"github":{"enabled":false},"context7":{"enabled":false}}}'
+# So desligue MCPs que voce realmente tem configurados. Vazio = nao mexe na config.
+OV_OPENCODE_CONFIG_CONTENT="${OV_OPENCODE_CONFIG_CONTENT:-}"
 # Cadeia de modelos GRATUITOS, em ordem de preferencia. Toda rodada comeca pelo
 # primeiro: por isso a volta ao preferido e automatica quando o limite dele passa,
 # sem precisar detectar recuperacao nem guardar estado.
@@ -117,6 +133,21 @@ fi
 # por padrao, ligue com USAR_COPILOT=1 se o resto secar; entra POR ULTIMO na fila).
 USAR_COPILOT=0
 [ "$USAR_COPILOT" = "1" ] && MODELOS+=("github-copilot/claude-sonnet-4.6")
+
+# Descarta modelos que o opencode nao lista mais (nome morto gasta uma vaga da cascata ou quebra a
+# rodada). Suave: se a listagem falhar, mantem a lista como esta.
+AVAILABLE_MODELS=$(timeout 30 "$OPENCODE_BIN" models 2>/dev/null)
+if [ -n "$AVAILABLE_MODELS" ]; then
+  MODELOS_VALIDOS=()
+  for M in "${MODELOS[@]}"; do
+    if printf '%s\n' "$AVAILABLE_MODELS" | grep -Fxq "$M"; then
+      MODELOS_VALIDOS+=("$M")
+    else
+      echo "[$(date '+%F %T')] modelo indisponivel removido da cascata: $M" >> loop.log
+    fi
+  done
+  [ "${#MODELOS_VALIDOS[@]}" -gt 0 ] && MODELOS=("${MODELOS_VALIDOS[@]}")
+fi
 
 WATCHDOG_AFTER=240        # limite maximo de espera do watchdog
 WATCHDOG_MIN_WAIT=45      # antes disso nao aborta: rodada boa pode demorar a produzir saida
@@ -224,28 +255,63 @@ quota_in_opencode_log() {   # $1 = timestamp ISO do inicio da rodada
   local f
   f=$(ls -t "$OC_LOG_DIR"/*.log 2>/dev/null | head -1)
   [ -n "$f" ] || return 1
-  awk -v since="$1" '
+  # O log e compartilhado por TODOS os agentes opencode da maquina: so conta erro de runs cuja
+  # instancia nasceu neste diretorio (quota de outro robo nao pode abortar a nossa rodada).
+  # Le so o fim do arquivo (pode passar de dezenas de MB).
+  tail -c 8000000 "$f" | awk -v since="$1" -v dir="$PWD" '
+    /message="creating instance"/ {
+      if (match($0, /run=[0-9a-f]+/)) { r = substr($0, RSTART + 4, RLENGTH - 4) }
+      if (index($0, "directory=" dir) && !index($0, "directory=" dir "/")) mine[r] = 1
+      next
+    }
     /Rate limit exceeded|AI_RetryError|AI_APICallError|[Tt]oo [Mm]any [Rr]equests/ {
+      if (!match($0, /run=[0-9a-f]+/)) next
+      r = substr($0, RSTART + 4, RLENGTH - 4)
+      if (!(r in mine)) next
       if (match($0, /timestamp=[0-9T:.-]+Z/)) {
         ts = substr($0, RSTART + 10, RLENGTH - 10)
         if (ts >= since) found = 1
       }
     }
     END { exit(found ? 0 : 1) }
-  ' "$f"
+  '
 }
 
-# Impressao digital do estado: soma de aplicadas + bloqueados + descartes da listagem.
-# Se nada disso mudou depois da rodada, NENHUMA vaga nova apareceu (nem p/ descarte) —
-# e o sinal para o backoff adaptativo. Mtime nao serve: o rodizio sempre regrava o arquivo.
+# Impressao digital do estado: hash de toda CHAVE de vaga que o robo registrou (aplicadas,
+# bloqueados, quase_la, aguardando_login). Descartes de listagem NAO contam como novidade: contar
+# fazia quase toda rodada parecer "com vaga nova" e o backoff de rodada vazia nunca disparava.
 fingerprint() {
   python3 - "$1" <<'PY'
-import json, sys
+import hashlib, json, sys
 try:
-    d=json.load(open(sys.argv[1], encoding='utf-8'))
-    print(len(d.get('aplicadas',[]))+len(d.get('bloqueados',{}))+d.get('descartes_listagem_total',0))
+    with open(sys.argv[1], encoding='utf-8') as fh:
+        d = json.load(fh)
+    ks = sorted(str(a.get('chave')) for a in d.get('aplicadas', []) if isinstance(a, dict))
+    for sec in ('bloqueados', 'quase_la', 'aguardando_login'):
+        v = d.get(sec)
+        if isinstance(v, dict):
+            ks += sorted(f'{sec}:{k}' for k in v)
+    print(hashlib.md5('|'.join(ks).encode()).hexdigest()[:16])
 except Exception:
     print('-1')
+PY
+}
+
+# Algo pronto para ENVIAR nesta rodada: fila da descoberta com score >= 3 ou (se o estado tiver a
+# secao) vaga aguardando login cujo canal ja esta logado. Usado p/ escolher o modelo pago (opt-in)
+# e para nao dormir horas em cima de uma fila que ainda tem vaga boa.
+tem_envio_pronto() {
+  python3 - "$APLICADAS_FILE" "$STATE_DIR/vagas_fila.json" <<'PY'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1], encoding='utf-8'))
+    chk = d.get('login_checagens') or {}
+    if any((chk.get(v.get('canal')) or {}).get('logado') == 'sim' for v in (d.get('aguardando_login') or {}).values() if isinstance(v, dict)):
+        sys.exit(0)
+    f = json.load(open(sys.argv[2], encoding='utf-8'))
+    sys.exit(0 if any(v.get('status') == 'nova' and v.get('score', 0) >= 3 for v in f.get('vagas', {}).values()) else 1)
+except Exception:
+    sys.exit(1)
 PY
 }
 
@@ -280,15 +346,48 @@ try:
         text += '\n\nRESUMO DO ESTADO (gerado agora de ' + aplicadas + '; NAO leia o arquivo inteiro)\n' + res.stdout
 except Exception:
     pass
+# Blocos extras (so em rodada normal, nunca no modo reconhecimento: o "prompt" conta uma oferta
+# por vaga). Cada um e best-effort: falha silenciosa nunca impede a rodada.
+if modo not in {'1', 'true', 'True', 'sim', 'Sim'}:
+    import json as _json, os, subprocess
+    # Termos da rodada: sessao nova nao tem memoria, entao o loop rotaciona os termos do perfil
+    # com um contador persistente (2 termos por rodada).
+    try:
+        termos = perfil_render.carregar(perfil).get('termos') or []
+        termos = [t for t in termos if isinstance(t, str) and t.strip()]
+        if termos:
+            idx_file = Path(aplicadas).parent / 'termo_idx'
+            try:
+                idx = int(idx_file.read_text().strip())
+            except Exception:
+                idx = 0
+            escolhidos = [termos[(idx + i) % len(termos)] for i in range(min(2, len(termos)))]
+            idx_file.write_text(str((idx + 2) % len(termos)))
+            text += "\n\nTERMOS DESTA RODADA (use ESTES, nesta ordem, no site do rodizio): " + " | ".join(escolhidos) + "\n"
+    except Exception:
+        pass
+    cmds = []
+    if os.environ.get('OV_DESCOBRIR') == '1':
+        cmds.append([sys.executable, str(Path(bot_root) / 'bot' / 'descobrir.py'), 'prompt', '5'])
+    if (Path(aplicadas).parent / 'telegram_vagas.json').exists():
+        cmds.append([sys.executable, str(Path(bot_root) / 'bot' / 'tg-garimpo.py'), 'prompt', '3'])
+    for cmd in cmds:
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if r.returncode == 0 and r.stdout.strip():
+                text += "\n\n" + r.stdout
+        except Exception:
+            pass
 Path(target).write_text(text, encoding='utf-8')
 PY
 }
 
-# Backoff por rodada vazia: 1h na primeira e dobra SEM TETO a cada rodada vazia
-# seguinte (3600 -> 7200 -> 14400 -> ...). Reseta ao achar vaga nova.
+# Backoff por rodada vazia: 1h na primeira e dobra a cada rodada vazia seguinte
+# (3600 -> 7200 -> 14400), com teto em VAZIA_MAX. Reseta ao achar vaga nova.
 vazia_wait() {   # $1 = rodadas vazias seguidas (1 = primeira)
   local w=$VAZIA_BASE n=$(( $1 - 1 ))
   while [ "$n" -gt 0 ]; do w=$((w * 2)); n=$((n - 1)); done
+  [ "$w" -gt "$VAZIA_MAX" ] && w=$VAZIA_MAX
   echo "$w"
 }
 
@@ -323,6 +422,11 @@ while true; do
 
   ROUND_LOG="logs/rodada-$(date '+%Y%m%d-%H%M%S').log"
   python3 "$BOT_ROOT/bot/rodizio-saude.py" pre "$APLICADAS_FILE" --perfil "$PERFIL_FILE" >> loop.log 2>&1 || true
+  # Descoberta deterministica (opt-in, sem LLM; a coleta respeita o intervalo dentro do script):
+  # enche <estado>/vagas_fila.json, que o render_prompt injeta no prompt.
+  if [ "$OV_DESCOBRIR" = "1" ]; then
+    timeout 180 python3 "$BOT_ROOT/bot/descobrir.py" coletar >> loop.log 2>&1 || log "descobrir: coleta falhou (segue sem fila)"
+  fi
   render_prompt
   FP_ANTES=$(fingerprint "$APLICADAS_FILE")
   log "rodada iniciada (perfil ${PERFIL_NOME}, rodadas vazias seguidas: ${VAZIAS})"
@@ -343,6 +447,15 @@ while true; do
     CASCATA+=("$M")
   done
   [ "${#CASCATA[@]}" -eq 0 ] && CASCATA=("${MODELOS[@]}")   # todos em resfriamento: tenta assim mesmo
+  # Modelo pago (opt-in) na frente da cascata so quando ha algo pronto para enviar, ate OV_PAGO_MAX_DIA/dia.
+  if [ "$OV_USAR_PAGO_ENVIO" = "1" ] && [ -n "$OV_MODELO_PAGO" ] && tem_envio_pronto; then
+    PAGO_HOJE=$(awk -v d="$(date +%F)" '$1==d {print $2}' "$STATE_DIR/pago_dia" 2>/dev/null | tail -1)
+    if [ "${PAGO_HOJE:-0}" -lt "$OV_PAGO_MAX_DIA" ]; then
+      CASCATA=("$OV_MODELO_PAGO" "${CASCATA[@]}")
+      echo "$(date +%F) $(( ${PAGO_HOJE:-0} + 1 ))" >> "$STATE_DIR/pago_dia"
+      log "rodada com envio pronto: ${OV_MODELO_PAGO} na frente da cascata ($(( ${PAGO_HOJE:-0} + 1 ))/${OV_PAGO_MAX_DIA} hoje)"
+    fi
+  fi
   [ "${#CASCATA[@]}" -lt "${#MODELOS[@]}" ] && log "cascata sem $(( ${#MODELOS[@]} - ${#CASCATA[@]} )) modelo(s) em resfriamento"
 
   for MODELO in "${CASCATA[@]}"; do
@@ -350,7 +463,10 @@ while true; do
   # </dev/null: opencode le stdin; sem TTY isso gerava "EBADF: bad file descriptor".
   # 9>&-: nao vaza o fd do flock para o filho.
   # Sessao nova a cada rodada: o historico nao carrega nada que aplicadas.json nao tenha.
-  setsid timeout --kill-after=30s "$RUN_TIMEOUT" \
+  # Rodada enxuta: OPENCODE_CONFIG_CONTENT (opcional) desliga MCPs que o loop nao usa.
+  OC_ENV=()
+  [ -n "$OV_OPENCODE_CONFIG_CONTENT" ] && OC_ENV=(OPENCODE_CONFIG_CONTENT="$OV_OPENCODE_CONFIG_CONTENT")
+  setsid env "${OC_ENV[@]}" timeout --kill-after=30s "$RUN_TIMEOUT" \
     flock -w 900 -E 75 "$BROWSER_LOCK" \
     "$OPENCODE_BIN" run -m "$MODELO" --title "candidaturas-$(date '+%F-%H%M')" "$(cat "$RUNTIME_PROMPT")" \
     </dev/null 9>&- >"$ROUND_LOG" 2>&1 &
@@ -405,6 +521,14 @@ while true; do
       IMPRODUTIVA=1
       continue
     fi
+    # Sessao que morreu logo apos uma tool-call com erro (ex.: alvo de clique invalido; a rodada
+    # termina em "Error:" sem resumo final). Ela navegou, entao o teste acima deixa passar e o
+    # loop dormiria horas sem ter feito o trabalho: cascateia para o proximo modelo.
+    if [ "$STATUS" -ne 75 ] && tail -n 8 "$ROUND_LOG" 2>/dev/null | grep -qE "Error: |^.{0,12}✗ "; then
+      log "modelo ${MODELO} morreu apos erro de ferramenta (sem resumo final), cascateando para o proximo"
+      IMPRODUTIVA=1
+      continue
+    fi
     IMPRODUTIVA=0
     MODELO_OK="$MODELO"
     TODOS_NO_LIMITE=0
@@ -419,6 +543,20 @@ while true; do
   # O agente as vezes grava log_rodada_* em aplicadas.json; arquiva pra logs/rodadas.jsonl
   # (o resumo de estado nao precisa cargar esse historico a cada rodada).
   python3 "$BOT_ROOT/bot/arquivar-logs-rodada.py" "$APLICADAS_FILE" "$BOT_ROOT/bot/logs/rodadas.jsonl" >> loop.log 2>&1 || true
+
+  # Fecha na fila as vagas que o robo registrou (ou ofertou demais); barato e idempotente.
+  if [ "$OV_DESCOBRIR" = "1" ]; then
+    python3 "$BOT_ROOT/bot/descobrir.py" marcar >> loop.log 2>&1 || true
+  fi
+  # Checagem semantica do estado apos cada rodada (o monitor le a ultima linha do log).
+  if [ -f "$BOT_ROOT/scripts/validate-rodada.py" ]; then
+    if python3 "$BOT_ROOT/scripts/validate-rodada.py" "$APLICADAS_FILE" >> validate-rodada.log 2>&1; then
+      echo "validate-rodada: OK ($(date '+%F %T'))" >> validate-rodada.log
+    else
+      log "ALERTA: validate-rodada reprovou o estado (ver bot/validate-rodada.log)"
+      "$BOT_ROOT/scripts/notificar.sh" "Candidaturas: validate-rodada reprovou o aplicadas.json — $(tail -1 validate-rodada.log | cut -c1-200)" || true
+    fi
+  fi
 
   if is_broken_session "$ROUND_LOG"; then
     FAILS=$((FAILS + 1))
@@ -457,6 +595,8 @@ while true; do
     if [ "$FP_ANTES" != "-1" ] && [ "$FP_DEPOIS" != "-1" ] && [ "$FP_ANTES" = "$FP_DEPOIS" ]; then
       VAZIAS=$((VAZIAS + 1))
       W=$(vazia_wait "$VAZIAS")
+      # Ainda ha vaga boa na fila/login pronto: nao durma horas em cima dela.
+      if tem_envio_pronto && [ "$W" -gt "$NORMAL_WAIT" ]; then W=$NORMAL_WAIT; fi
       log "rodada ok, NENHUMA vaga nova (${VAZIAS}x seguidas), dormindo $((W / 60))min"
       sleep "$W"
     else

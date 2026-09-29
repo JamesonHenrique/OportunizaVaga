@@ -1,0 +1,14 @@
+{
+  "_COMO_USAR": "Opcional. Copie para bot/descoberta.json (ou bot/state/<perfil>/descoberta.json). Ajusta bot/descobrir.py; nivel, modelo, termos e pular_tipos vem do perfil. Todas as chaves sao opcionais.",
+  "fontes": ["linkedin", "gupy"],
+  "intervalo_min": 90,
+  "termos_por_coleta": 4,
+  "gupy_por_coleta": 4,
+  "max_ofertas": 2,
+  "max_dias": 14,
+  "linkedin_geo_id": "106057199",
+  "linkedin_dias": 7,
+  "gupy_termos": ["desenvolvedor", "programador", "trainee"],
+  "stack_evitar": ["php", "flutter", "android", "ios"],
+  "stack_preferida": ["python", "java", "node", "typescript"]
+}

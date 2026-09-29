@@ -76,6 +76,48 @@ const parseFonte = (como) => {
   return { fonte, via: via && via !== fonte ? via : null };
 };
 
+// Job link for the dashboard (the title becomes clickable). Order of trust:
+// 1) an explicit field the robot saved, 2) a full job URL cited in the text,
+// 3) an id in a verified URL format (LinkedIn jobs/view, Indeed viewjob).
+// Never guesses formats not seen working (e.g. Gupy by bare id gave 404).
+const CAMPOS_URL = ['url', 'url_vaga', 'link', 'link_vaga', 'url_formulario'];
+const URL_RUIM = /linkedin\.com\/(in|feed|search)|\/jobs\/search|instagram\.com|facebook\.com|secure\.indeed\.com|applystart|\/auth\b|\/login|\/signin|job-search|accounts\.google|mail\.google/i;
+const URL_ATS = /^(?:[\w-]+\.)+(?:gupy\.io|inhire\.app|greenhouse\.io|ashbyhq\.com|lever\.co|recrutei\.com\.br|recruitee\.com|factorialhr\.com\.br|rippling\.com|solides\.jobs|programathor\.com\.br|remotar\.com\.br|infojobs\.com\.br|catho\.com\.br|vagas\.com\.br|geekhunter\.com\.br|join\.com)\/\S{6,}/i;
+const limpaUrl = (u) => String(u).replace(/[)\]}>.,;'"]+$/, '');
+export function linkDaVaga(o, chave = '') {
+  for (const k of CAMPOS_URL) {
+    const v = o?.[k];
+    if (typeof v === 'string' && /^https?:\/\//.test(v) && !URL_RUIM.test(v)) return limpaUrl(v);
+  }
+  const t = `${chave} ${o?.motivo || ''} ${o?.como || ''} ${o?.vaga || ''} ${o?.detalhe || ''}`;
+  for (const m of t.matchAll(/https?:\/\/[^\s"'<>]+/g)) if (!URL_RUIM.test(m[0])) return limpaUrl(m[0]);
+  for (const m of t.matchAll(/(?<![\w@/.])(?:[\w-]+\.)+[a-z]{2,}(?:\.br)?\/[^\s"'<>]+/gi)) {
+    if (URL_ATS.test(m[0]) && !URL_RUIM.test(m[0])) return `https://${limpaUrl(m[0])}`;
+  }
+  const li = /linkedin[^0-9]{0,20}?(\d{10})(?!\d)/i.exec(t);
+  if (li) return `https://www.linkedin.com/jobs/view/${li[1]}/`;
+  const jk = /\bjk=([0-9a-f]{16})\b/i.exec(t);
+  if (jk) return `https://br.indeed.com/viewjob?jk=${jk[1]}`;
+  return null;
+}
+
+// Personal data never leaves the machine: the robot writes contact data inside free-text
+// reasons ("account created (<e-mail>...)"). Only formatted patterns — bare digit runs
+// are job ids (LinkedIn has 10 digits) and must stay.
+const PII = [
+  [/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '[e-mail]'],
+  [/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, '[cpf]'],
+  [/(?:\+55\s?)?\(?\b\d{2}\)?\s?9?\d{4}-\d{4}\b/g, '[telefone]'],
+  // Bare BR mobile (DDD + 9 + 8 digits = 11, optional 55). Job ids never match: LinkedIn 10 digits, Gupy 7-9.
+  [/\b(?:55)?\d{2}9\d{8}\b/g, '[telefone]'],
+];
+export const semPII = (v) => {
+  if (typeof v === 'string') return PII.reduce((t, [re, sub]) => t.replace(re, sub), v);
+  if (Array.isArray(v)) return v.map(semPII);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, semPII(x)]));
+  return v;
+};
+
 const CAMPOS_CADASTRO = [
   ['RG', /\brg\b/],
   ['Facebook', /facebook/],
@@ -178,7 +220,7 @@ const escada = ESCADA.map(id => ({ id, tier: id.split('/')[0], tetoHoje: tetoPor
 const candLast = events.filter(e => e.source === 'candidaturas').at(-1) || null;
 const applied = allAppliedRaw.map(a => {
   const { fonte, via } = parseFonte(a.como);
-  return { ...a, quando: a.enviada_em || a.enviada_em_aprox || null, data: a.data || null, exato: Boolean(a.enviada_em), fonte, via, status: a.status || 'enviada', respondida_em: a.respondida_em || null, desfecho: a.desfecho || null };
+  return { ...a, quando: a.enviada_em || a.enviada_em_aprox || null, data: a.data || null, exato: Boolean(a.enviada_em), fonte, via, url: linkDaVaga(a, a.chave), status: a.status || 'enviada', respondida_em: a.respondida_em || null, desfecho: a.desfecho || null };
 });
 const porFonte = {};
 for (const a of applied) porFonte[a.fonte] = (porFonte[a.fonte] || 0) + 1;
@@ -190,8 +232,51 @@ for (const a of applied) {
 }
 const blocked = allBlockedRaw.map(item => {
   const o = typeof item.value === 'object' && item.value ? item.value : { motivo: String(item.value) };
-  return { chave: item.chave, perfil: item.perfil, ...o, em: o.bloqueado_em || o.em || o.criadoEm || o.criado_em || o.at || null };
+  return { chave: item.chave, perfil: item.perfil, ...o, url: linkDaVaga(o, item.chave), em: o.bloqueado_em || o.em || o.criadoEm || o.criado_em || o.at || null };
 });
+// Compatible jobs held only by an expired login; the robot sends them once the channel logs in again.
+const aguardandoLogin = stateDocs.flatMap(item => {
+  const checagens = item.doc.login_checagens || {};
+  return Object.entries(item.doc.aguardando_login || {}).map(([chave, v]) => {
+    const o = typeof v === 'object' && v ? v : {};
+    const canal = String(o.canal || '?');
+    return {
+      chave, perfil: item.profile, canal,
+      empresa: o.empresa || null, vaga: o.vaga || null,
+      url: linkDaVaga(o, chave), score: o.score ?? null,
+      motivo: String(o.motivo || o.motivo_original || '').slice(0, 600),
+      em: o.bloqueado_em || o.data || null,
+      checagem: checagens[canal] || null
+    };
+  });
+});
+// Optional state files written by the side scripts (absent on a fresh install: every read is defensive).
+// descoberta = deterministic discovery queue; gmailStatus = Gmail reply reader summary.
+const asObj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
+const fila = asObj(readJson(path.join(ROOT, 'state', 'vagas_fila.json'), null));
+const descoberta = (() => {
+  if (!fila) return null;
+  const vs = Object.values(asObj(fila.vagas) || {}).filter(asObj);
+  const porStatus = {};
+  for (const v of vs) porStatus[v.status || '?'] = (porStatus[v.status || '?'] || 0) + 1;
+  return {
+    ultimaColeta: fila.ultima_coleta || null,
+    porStatus,
+    filtradasTotal: asObj(fila.totais) || {},
+    ultima: asObj(fila.stats),
+    // Job titles/links only in details mode (aggregate mode keeps counts).
+    proximas: INCLUDE_DETAILS
+      ? vs.filter(v => v.status === 'nova')
+        .sort((a, b) => (b.score || 0) - (a.score || 0) || (a.ofertas || 0) - (b.ofertas || 0))
+        .slice(0, 8)
+        .map(v => ({ empresa: v.empresa, titulo: v.titulo, fonte: v.fonte, url: v.url, score: v.score, publicada: v.publicada }))
+      : undefined
+  };
+})();
+const gmailDoc = asObj(readJson(path.join(ROOT, 'state', 'gmail_status.json'), null));
+const gmailStatus = gmailDoc
+  ? { atualizado: gmailDoc.atualizado || null, lidas: gmailDoc.linhas_lidas ?? null, achados: Array.isArray(gmailDoc.achados) ? gmailDoc.achados.length : 0 }
+  : null;
 const contadorFalta = {};
 for (const b of blocked) for (const campo of faltantesDe(`${b.chave || ''} ${b.motivo || b.detalhe || ''}`)) contadorFalta[campo] = (contadorFalta[campo] || 0) + 1;
 const dadosFaltantes = Object.entries(contadorFalta).map(([campo, vagas]) => ({ campo, vagas })).sort((a, b) => b.vagas - a.vagas);
@@ -227,7 +312,7 @@ export function buildSnapshot() {
     modelos: { emUso: ultimoModelo ? nomeModelo(ultimoModelo.text) : null, noTetoHoje: [...new Set(doTetoDia.map(e => nomeModelo(e.text)).filter(Boolean))], openrouterQuota },
     ultimoEvento: candLast?.at || null
   };
-  return {
+  return semPII({
     updatedAtLocal: new Date().toLocaleString('pt-BR', { timeZone: TZ }),
     builtAt: new Date().toISOString(),
     publisher: { mode: 'aggregate', version: '1.0.0' },
@@ -247,6 +332,9 @@ export function buildSnapshot() {
     porFonte,
     porDia,
     blocked: INCLUDE_DETAILS ? blocked : undefined,
+    aguardandoLogin: INCLUDE_DETAILS ? aguardandoLogin : undefined,
+    descoberta,
+    gmailStatus,
     dadosFaltantes,
     descartes: INCLUDE_DETAILS ? Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.descartes_listagem || null])) : { total: descarteTotal },
     pularTipos: INCLUDE_DETAILS ? Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.pular_tipos || []])) : undefined,
@@ -258,5 +346,5 @@ export function buildSnapshot() {
     logTail: INCLUDE_DETAILS ? { candidaturas: tailOf([loopLog1, loopLog], 80) } : undefined,
     totals: { candidaturas: applied.length, bloqueios: blocked.length, eventos: events.length },
     telemetry
-  };
+  });
 }

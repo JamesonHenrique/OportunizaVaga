@@ -23,3 +23,15 @@ BOT_DIR=$HOME/opensource/oportunizavaga
 # Resumo diario com alertas de anomalia (21h; --send exige TELEGRAM_BOT_TOKEN
 # e TELEGRAM_CHAT_ID no ambiente do cron, ex.: via cron.env)
 5 21 * * *                    $BOT_DIR/scripts/digest.sh --send >> $BOT_DIR/bot/digest.log 2>&1
+
+# Respostas de recrutadores no Gmail (08:40 e 18:40; espera o lock do Chrome por ate 15 min).
+# Le as caixas de "email" e "email_contas" do dados_candidato.json; so avanca o status.
+40 8,18 * * *                 python3 $BOT_DIR/bot/gmail-status.py >> $BOT_DIR/bot/gmail-status.log 2>&1
+
+# Telegram (opcional; exige bot/telegram_canais.json + credenciais + --login uma vez)
+0 8,13,18 * * *               $BOT_DIR/bot/tg-garimpo.sh
+
+# Validacao semantica do estado (o loop ja roda apos cada rodada; isto e redundancia barata)
+*/30 * * * *                  $BOT_DIR/scripts/validate-rodada.sh >> $BOT_DIR/bot/validate-rodada.log 2>&1
+
+# Relatorio de tokens por job (manual): python3 $BOT_DIR/scripts/tokens-relatorio.py 1

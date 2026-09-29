@@ -47,6 +47,8 @@
 | `bot/followup.sh` | Rotina semanal (só leitura de status, nunca se candidata) |
 | `bot/prompt_*.md` | O "cérebro": regras, rodízio, pré-filtros, canais, formato de registro |
 | `bot/estado.py` | CLI compacta e atômica p/ ler/escrever `aplicadas.json` sem o agente ler o arquivo inteiro |
+| `bot/gerar_cv.py` | Gera o PDF por vaga (regra `c1`) só a partir de `bot/cv_base.md` + `dados_candidato.json`; 1 página ou exit 2 |
+| `bot/check_ats.py` | Mede a cobertura dos termos do anúncio no CV (meta >= 75%) antes de anexar |
 | `bot/rodizio-saude.py` | Pausa (48h) site com 4 rodadas seguidas sem candidatura nova; hooks `pre`/`pos` no `loop.sh` |
 | `bot/sites/lib.sh` | Descoberta automática de adaptadores e contrato comum (`site_adapter_*`) |
 | `bot/sites/*.sh` | Adaptadores de portal: URL de busca, dica de remoto e termos por site |

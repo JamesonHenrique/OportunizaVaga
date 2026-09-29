@@ -1,7 +1,10 @@
 # Dados pessoais — NUNCA commitar (vale em qualquer subdir)
 **/dados_candidato.json
+**/cv_base.md
 **/aplicadas.json
 bot/perfil.json
+**/credenciais.tsv
+**/gmail_status.json
 **/quota-cache.json
 **/state/*/
 **/backups/
@@ -39,3 +42,15 @@ node_modules/
 .claude/worktrees/
 __pycache__/
 *.pyc
+
+# Descoberta deterministica / Telegram (config e estado locais; sessao do Telegram fica em ~/.config)
+**/telegram_canais.json
+**/descoberta.json
+**/vagas_fila.json
+**/telegram_vagas.json
+**/termo_idx
+**/pago_dia
+**/model_cooldown
+**/telegram.env
+*.session
+.venv-tg/

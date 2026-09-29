@@ -88,20 +88,64 @@ export const ROTULO = {
 };
 
 // Groups blocks by root cause to answer "why is it not applying?".
-// Simple heuristics over the text/key, no personal data exposed.
-export function causaRaiz(b) {
-  const t = `${b.chave || ''} ${(b.motivo || b.detalhe || '')}`.toLowerCase();
-  if (/presencial|h[ií]brido|somente remoto|regra 1/.test(t)) return 'regra 1 · não-remoto';
-  if (/pleno|senior|s[eê]nior|j[uú]nior|est[aá]gi|trainee|n[ií]vel|regra 3|somente jr|recusad/.test(t)) return 'regra 3 · nível';
-  if (/evid[eê]ncia|inventar|regra 4|sem evidencia|experi[eê]ncia/.test(t)) return 'regra 4 · skill sem evidência';
-  if (/cpf|rg|facebook|instagram|estado civil|nome.*m[aã]e|coeficiente|cr\b|grade hor[aá]ria|obrigat[oó]rio|n[aã]o consta/.test(t)) return 'dado ausente (não inventar)';
-  if (/404|encerrad|expirad|p[aá]gina.*home|zero resultados/.test(t)) return 'vaga encerrada';
-  if (/pcd|exclusiva/.test(t)) return 'exclusiva PCD';
-  if (/ingl[eê]s|superior completo|cursando/.test(t)) return 'requisito (idioma/formação)';
-  if (/cadastro|oauth|redirect_uri|allowlist|google quebrado/.test(t)) return 'cadastro quebrado';
-  if (/spam|paywall|premium/.test(t)) return 'fonte com spam/paywall';
-  if (/linkedin|nota|convite|limite/.test(t)) return 'linkedin/quota';
-  return 'outros';
+// Heuristics over the text the robot wrote. First match wins, so final-verdict rules
+// (remote/level/language) come before channel rules; explicit "CAUSA ..." markers
+// and negations ("sem ingles") are handled in classificar().
+// grupo: 'voce' = needs the candidate, 'robo' = the robot retries, 'final' = discarded for good.
+// [label, regex, grupo] — first match wins; grupo: voce | robo | final
+export const CAUSAS = [
+  ['exclusiva PCD', /\bpcd\b|exclusiva para pessoas com defici/, 'final'],
+  ['não-remoto', /presencial|h[ií]brid|somente remoto|regra 1\b|modalidade=hibrido/, 'final'],
+  ['nível acima de JR', /\bpleno\b|s[eê]nior|\bregra 3\b|somente jr|anos de experi[eê]ncia|\d\+? anos/, 'final'],
+  ['idioma', /ingl[eê]s|english|espanhol/, 'final'],
+  ['formação', /superior completo|gradua[cç][aã]o completa|formad[oa] em/, 'final'],
+  ['vaga encerrada', /\b404\b|encerrad|expirad|n[aã]o (est[aá] )?mais dispon|zero resultados|vaga sumiu/, 'final'],
+  ['formulário travado', /captcha|disabled|requestsubmit|bot[aã]o .*(trav|n[aã]o)|erro ao enviar|form.*(quebr|trav)|n[aã]o pode se candidatar/, 'robo'],
+  ['login / sessão', /sess[aã]o|n[aã]o (est[aá] )?logad|exige login|modal de login|\/login|passport|c[oó]digo de (6|verifica)|senha google/, 'voce'],
+  ['dado ausente', /\bcpf\b|\brg\b|facebook|nome.*m[aã]e|coeficiente|grade hor[aá]ria|\bpis\b|n[aã]o consta|dado ausente/, 'voce'],
+  ['cadastro quebrado', /cadastro|oauth|redirect_uri|conta \w+ inexistente|exige conta|google quebrado|canal travado/, 'voce'],
+  ['skill sem evidência', /evid[eê]ncia|inventar|regra 4|stack|n[aã]o possui|requisito|exige/, 'final'],
+  ['fonte spam/paywall', /spam|paywall|premium|golpe/, 'final'],
+  ['linkedin/quota', /linkedin|nota|convite|limite/, 'robo'],
+];
+// Site-wide channel problems (not a job): recognized by the key the robot chose.
+const CANAL = /login|captcha|sess(ao|ion)|cloudflare|degradad|_canal|site_?wide/;
+// Explicit cause markers the robot writes inside long texts ("CAUSA REAL agora: ...").
+const MARCADOR = /(causa(?: real| atual| nova| do bloqueio)?(?: agora)?|causas atuais|canal (?:travado|fechado))\s*[:=-]\s*/;
+// Negations that would false-match a rule ("sem anos/ingles/grad", "sem exigencia de tempo").
+const NEGACAO = /\bsem (?:exig[eê]ncia (?:de )?)?[\w\/+-]+(?:\/[\w+-]+)*/g;
+
+function porRegra(t) {
+  for (const [causa, re, grupo] of CAUSAS) if (re.test(t)) return { causa, grupo };
+  return null;
+}
+
+export function classificar(b) {
+  const chave = String(b.chave || '').toLowerCase();
+  const t = String(b.motivo || b.detalhe || '').toLowerCase();
+  if (b.origem === 'linkedin') return /sess/.test(t + chave) ? { causa: 'login / sessão', grupo: 'voce' } : { causa: 'linkedin/quota', grupo: 'robo' };
+  if (CANAL.test(chave)) return { causa: 'site/canal fora do ar', grupo: 'robo' };
+  const m = MARCADOR.exec(t);
+  if (m) {
+    const r = porRegra(t.slice(m.index + m[0].length, m.index + m[0].length + 300).replace(NEGACAO, ''));
+    if (r) return r;
+  }
+  return porRegra(`${chave} ${t.replace(NEGACAO, '')}`) || { causa: 'outros', grupo: 'final' };
+}
+
+export const causaRaiz = (b) => classificar(b).causa;
+
+export const GRUPO_ROTULO = { voce: 'depende de você', robo: 'robô retenta', final: 'descartada' };
+
+// Readable title: "Empresa — Vaga" when recorded; otherwise the head of the text
+// (before the first parenthesis/colon), falling back to the humanized key.
+export function tituloBloq(b) {
+  if (b.empresa && b.vaga) return `${b.empresa} — ${b.vaga}`;
+  if (b.empresa || b.vaga) return b.empresa || b.vaga;
+  const t = String(b.motivo || '').replace(/^(descartada?|retentor|bloqueio de canal)[^:]*:\s*/i, '');
+  const head = t.split(/\s\(|:\s|\.\s/)[0].trim();
+  if (head && head.length >= 8 && head.length <= 90) return head;
+  return String(b.chave || '—').replace(/[_-]+/g, ' ');
 }
 
 // Escapes one CSV cell: duplicated quotes + wraps if it has comma/quote/newline.
@@ -114,10 +158,17 @@ export function rotuloStatus(s) {
   const v = (s || 'enviada').toLowerCase();
   if (v === 'enviada') return 'ENVIADA';
   if (v === 'entrevista') return 'ENTREVISTA';
+  if (v === 'etapa_teste') return 'TESTE / FIT CULTURAL';
+  if (v === 'proxima_etapa') return 'PRÓXIMA ETAPA';
   if (v === 'respondida') return 'RESPONDIDA';
   if (v === 'followup' || v === 'follow-up') return 'FOLLOW-UP';
   if (v === 'quase_la' || v === 'quase-la') return 'QUASE LÁ';
-  return v.toUpperCase();
+  if (v === 'em_analise') return 'EM ANÁLISE';
+  if (v === 'encerrada') return 'ENCERRADA';
+  if (v === 'sem_resposta') return 'SEM RESPOSTA';
+  if (v === 'sem_retorno_verificavel') return 'SEM RETORNO';
+  if (v.startsWith('enviada')) return 'ENVIADA';
+  return v.replace(/_/g, ' ').toUpperCase();
 }
 
 export function baixarCSV(nome, cabecalho, linhas) {

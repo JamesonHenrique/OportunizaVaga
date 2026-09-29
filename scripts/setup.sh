@@ -24,6 +24,7 @@ copiar() { # $1 = origem .example, $2 = destino
 
 echo "-- 1) Arquivos de dados (gitignored) --"
 copiar examples/dados_candidato.example.json bot/dados_candidato.json
+copiar examples/cv_base.example.md bot/cv_base.md
 copiar examples/aplicadas.example.json bot/aplicadas.json
 if [ -f "$HOME/.config/opencode/cron.env" ]; then
   ok "~/.config/opencode/cron.env existe (chaves fora do repo)."
@@ -38,6 +39,10 @@ HAVE_ALL=1
 for bin in bash python3 node flock fuser curl git timeout setsid; do
   if command -v "$bin" >/dev/null 2>&1; then ok "$bin"; else warn "$bin NÃO encontrado"; HAVE_ALL=0; fi
 done
+python3 -c "import reportlab" 2>/dev/null && ok "reportlab (gera o PDF por vaga)" \
+  || warn "reportlab ausente — pip install reportlab (sem ele o c1 não gera CV)"
+command -v pdftotext >/dev/null 2>&1 && ok "pdftotext (check_ats.py mede cobertura)" \
+  || warn "pdftotext ausente (poppler-utils) — check_ats.py cai no fallback pypdf"
 [ -x "$HOME/.opencode/bin/opencode" ] && ok "opencode" || { warn "opencode ausente em ~/.opencode/bin (https://opencode.ai)"; HAVE_ALL=0; }
 command -v google-chrome-stable >/dev/null 2>&1 && ok "google-chrome-stable" || { warn "Chrome ausente (necessário p/ browser/chrome-real.sh)"; HAVE_ALL=0; }
 echo
