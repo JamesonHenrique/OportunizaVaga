@@ -607,8 +607,17 @@ while ($true) {
             if ($parts.Count -ge 2) { $cooldown[$parts[0]] = [int64]$parts[1] }
         }
     }
-    $cascata = @($MODELOS | Where-Object { -not ($cooldown.ContainsKey($_) -and $cooldown[$_] -gt $agoraS) })
-    if ($cascata.Count -eq 0) { $cascata = $MODELOS }
+    # Ordem adaptativa (bot/modelos-saude.py): melhor taxa de sucesso primeiro, modelo inutil de quarentena;
+    # fail-open para $MODELOS (saida vazia ou erro). Desligue com OV_MODELOS_SAUDE=0.
+    $modelosOrd = @($MODELOS)
+    if ($Py -and (EnvStr 'OV_MODELOS_SAUDE' '1') -eq '1') {
+        try {
+            $ord = @(& $Py (Join-Path $BOT_ROOT 'bot\modelos-saude.py') ordenar @($MODELOS) 2>$null | Where-Object { $_ -and $_.Trim() })
+            if ($LASTEXITCODE -eq 0 -and $ord.Count -gt 0) { $modelosOrd = $ord }
+        } catch { }
+    }
+    $cascata = @($modelosOrd | Where-Object { -not ($cooldown.ContainsKey($_) -and $cooldown[$_] -gt $agoraS) })
+    if ($cascata.Count -eq 0) { $cascata = $modelosOrd }
     # Modelo pago (opt-in) na frente da cascata so com algo pronto para enviar, ate OV_PAGO_MAX_DIA/dia.
     if ($OV_USAR_PAGO_ENVIO -eq '1' -and $OV_MODELO_PAGO -and (Test-EnvioPronto)) {
         $pagoFile = Join-Path $StateDir 'pago_dia'
@@ -624,8 +633,8 @@ while ($true) {
             Write-LoopLog ("rodada com envio pronto: {0} na frente da cascata ({1}/{2} hoje)" -f $OV_MODELO_PAGO, ($pagoHoje + 1), $OV_PAGO_MAX_DIA)
         }
     }
-    if ($cascata.Count -lt $MODELOS.Count) {
-        Write-LoopLog ("cascata sem {0} modelo(s) em resfriamento" -f ($MODELOS.Count - $cascata.Count))
+    if ($cascata.Count -lt $modelosOrd.Count) {
+        Write-LoopLog ("cascata sem {0} modelo(s) em resfriamento" -f ($modelosOrd.Count - $cascata.Count))
     }
 
     foreach ($MODELO in $cascata) {

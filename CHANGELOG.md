@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Cascata de modelos adaptativa (`bot/modelos-saude.py`)**: ordena a cascata pela taxa de sucesso real dos últimos 7 dias de
+  `loop.log*`, põe em quarentena (7 dias) modelo com 0 sucessos em ≥ 10 tentativas (nunca abaixo de 2 ativos), recalcula a
+  cada 6 h e é fail-open. Ligado em `loop.sh` e `loop.ps1` (`OV_MODELOS_SAUDE=0` desliga; `MODELOS_SAUDE_FILE` sobrescreve o
+  estado). Teste: `tests/test_modelos_saude.sh`.
 - **Triagem pela descrição (`bot/vaga_check.py`)**: decide nível, anos exigidos (pt/en, hifenizado, idade da empresa ≥ 10
   ignorada), modelo e stack a partir do texto e do "Nível de experiência" oficial do LinkedIn, dirigida pelo perfil e por
   `descoberta.json` (`stack_evitar`/`stack_preferida`, nada de stack fixa no código). `bot/descobrir.py` a usa em cada vaga da
