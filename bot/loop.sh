@@ -471,7 +471,7 @@ while true; do
   OC_ENV=()
   [ -n "$OV_OPENCODE_CONFIG_CONTENT" ] && OC_ENV=(OPENCODE_CONFIG_CONTENT="$OV_OPENCODE_CONFIG_CONTENT")
   setsid env "${OC_ENV[@]}" timeout --kill-after=30s "$RUN_TIMEOUT" \
-    flock -w 900 -E 75 "$BROWSER_LOCK" \
+    env CHROME_LOCK_YIELD_RC=75 CHROME_LOCK_FILE="$BROWSER_LOCK" "$BOT_ROOT/bot/chrome-lock.sh" loop normal 900 -- \
     "$OPENCODE_BIN" run -m "$MODELO" --title "candidaturas-$(date '+%F-%H%M')" "$(cat "$RUNTIME_PROMPT")" \
     </dev/null 9>&- >"$ROUND_LOG" 2>&1 &
   ROUND_PID=$!
@@ -584,7 +584,7 @@ while true; do
     log "rodada estourou ${RUN_TIMEOUT} (ou foi morta), nova tentativa em ${W}s"
     sleep "$W"
   elif [ "$STATUS" -eq 75 ]; then
-    log "outro agente segurou o Chrome por 15min (lock), tentando de novo em ${RETRY_BASE}s"
+    log "Chrome ocupado (lock de 15min ou cedeu a job prioritario), tentando de novo em ${RETRY_BASE}s"
     sleep "$RETRY_BASE"
   elif [ "$STATUS" -ne 0 ]; then
     FAILS=$((FAILS + 1))

@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **`bot/chrome-lock.sh` / `bot/chrome-lock.ps1`**: protocolo único do Chrome compartilhado (`NOME alta|normal ESPERA -- CMD`):
+  jobs curtos (follow-up, Gmail) marcam prioridade por flag e o loop cede a rodada (`CHROME_LOCK_YIELD_RC`); flag do job pai
+  não é removida; log em `bot/logs/chrome-lock.log`. Usado por `loop.sh/.ps1`, `followup.sh/.ps1` e `gmail-status.py`.
+  Teste: `tests/test_chrome_lock.sh` (rodar/ceder/timeout).
 - **Prompt modular e defesa contra injeção indireta** (`bot/prompt_cond.py`, usado por `loop.sh` e `loop.ps1`):
   blocos `<!--se:site=X-->…<!--/se-->` (só a URL do site da rodada) e `<!--se:telegram-->` (só com colheita fresca),
   fail-open para condição/site desconhecido; linha `SITE DESTA RODADA`; fila da descoberta e posts do Telegram entram
