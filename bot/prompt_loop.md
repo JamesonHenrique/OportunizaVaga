@@ -162,14 +162,56 @@ c) CANAL (prioridade — evita candidatura abandonada e esforço perdido):
        registre em bloqueados e siga — nunca deixe candidatura pela metade por causa de cadastro.
    Formulários: use respostas_padrao_gupy.
 
-c1) CV POR VAGA (regra de esforço): só gere o PDF ajustado com reportlab (1 coluna, filename
-   $BOT_ROOT/bot/CV_SEU_NOME_<Empresa>.pdf, SEM "ATS" no nome) quando o canal REALMENTE anexa
-   um arquivo SEU: e-mail (Gmail), upload do LinkedIn, Indeed. Use no topo do CV a frase_transferencia de
-   dados_candidato.json + palavras_chave_ats no RESUMO/HABILIDADES (todas verdadeiras, só reordenar por vaga:
-   ex.: vaga React → subir Angular/TS + frase transferência; vaga de contencioso → subir PJe/audiências).
-   NO GUPY NÃO GERE PDF por vaga — o Gupy envia o CV do PERFIL. No Gupy confie no CV do perfil; se ele
-   estiver ruim/desatualizado, anote em manutencao_gupy p/ fora desta rodada (checklist: resumo com ATS,
-   experiências com período ago/2026-atual sem afirmar anos, idiomas PT/B1/A2 sem alemão, links https).
+c1) CV POR VAGA (regra de esforço): só gere o PDF quando o canal REALMENTE anexa um arquivo SEU:
+   e-mail (Gmail), upload do LinkedIn, Indeed. NO GUPY NÃO GERE PDF por vaga — o Gupy envia o CV do
+   PERFIL (se o perfil estiver ruim/desatualizado, anote em manutencao_gupy p/ fora desta rodada:
+   resumo com ATS, experiências com período MM/AAAA-atual sem afirmar anos, idiomas só o real,
+   links https).
+
+   FONTES IMUTÁVEIS: todo conteúdo vem de bot/cv_base.md (currículo mestre — se não existir, crie
+   UMA vez a partir de examples/cv_base.example.md preenchendo só com dados_candidato.json) +
+   dados_candidato.json. NUNCA escreva HTML/tex/reportlab na mão, NUNCA invente empresa, período,
+   ano, idioma, skill ou número. O gerador é sempre o mesmo script — não crie outro.
+
+   FLUXO (5 passos):
+   1) Leia a descrição da vaga/anúncio e extraia SÓ o que é verdadeiro no perfil dele. Copie a
+      formulação EXATA do anúncio para as top-3 keywords verdadeiras (mesma grafia: "Spring Boot"
+      não vira "springboot"). Na 1ª menção de siglas no resumo, escreva o extenso entre parênteses
+      (ex.: "integração contínua/entrega contínua (CI/CD)", "automação robótica de processos (RPA)")
+      — ATS e recrutadores entendem melhor.
+   2) Monte o spec em /tmp/cv_spec.json:
+        { "empresa": "...", "vaga": "...",
+          "frase_key": "default",
+          "resumo_custom": "...",              // <=800 chars, 3-4 frases, verdadeiro, com keywords da vaga
+          "categorias_ordem": ["...", "..."],   // subseções de "Habilidades técnicas" p/ o topo
+          "so_categorias": ["...", "..."],      // 3-7 subseções p/ MOSTRAR; as demais ficam ocultas
+          "palavras_chave_vaga": ["..."] }      // só skills reais da vaga que existem no meu perfil
+      Os nomes válidos são os "###" da seção "## Habilidades técnicas" do SEU bot/cv_base.md (se
+      o spec estiver errado, o script falha e lista os válidos). so_categorias é OBRIGATÓRIO (3-7
+      subseções relevantes à vaga): sem o campo o script FALHA (exit 2) — é ele que mantém o corpo
+      em 10pt legível e o CV longe de um muro de skills irrelevantes. Mapeie pela área da vaga
+      (ex.: vaga de dev → "Backend"/"Frontend"/"Banco de dados"; vaga de automação → a categoria
+      de automação/integração do SEU cv_base).
+   3) Gere o PDF (o script SÓ retorna exit 0 se o arquivo tiver 1 página e o texto passar na
+      auto-checagem de nome + seções; qualquer ERRO = corrija o spec e rode de novo):
+        python3 "$BOT_ROOT/bot/gerar_cv.py" /tmp/cv_spec.json \
+          "$BOT_ROOT/bot/CV_SEU_NOME_<Empresa>.pdf"
+      filename SEM a palavra "ATS" e com o nome real do candidato (de dados_candidato.json ->
+      nome) no lugar de SEU_NOME. O script imprime "kw no CV: ..." e "kw DESCARTADAS (fora do
+      perfil): ..." — se algo que você pediu caiu, é porque NÃO existe no perfil: NÃO tente
+      contornar nem recrie o PDF com conteúdo inventado; siga com o que passou.
+   4) Salve o texto do anúncio em /tmp/anuncio.txt e meça a cobertura ANTES de anexar:
+        python3 "$BOT_ROOT/bot/check_ats.py" /tmp/anuncio.txt \
+          "$BOT_ROOT/bot/CV_SEU_NOME_<Empresa>.pdf"
+      Meta: cobertura dos termos DO PERFIL >= 75% (exit 0 = "OK"). Se reprovou, ajuste o spec
+      (resumo_custom com os termos FALTANTES na formulação do anúncio, palavras_chave_vaga,
+      so_categorias) e gere o PDF de novo — NUNCA tente cobrir termo "fora do perfil" (o próprio
+      script lista esses termos como desalinhamento da vaga).
+   5) Anexe o PDF gerado (1 página) ao envio.
+
+   FRASE DE TRANSFERÊNCIA: use respostas_padrao_gupy -> frase_transferencia sem editar o texto (se
+   estiver vazia, monte uma frase verdadeira no mesmo padrão usando só REAL + SIMILAR da regra 4);
+   registre no log da rodada o caminho do PDF junto de "(frase:custom)".
 
 c-LinkedIn) LINKEDIN NO TODO (não só "Candidatura Simplificada"):
    - Candidatura Simplificada disponível: aplique direto (anexe o CV ajustado por vaga).

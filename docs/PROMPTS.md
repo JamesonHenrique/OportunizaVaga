@@ -41,6 +41,31 @@ Troque o bloco `EXEMPLO` pelo seu stack real:
 - Perfil Gupy: faça **1 item por execução**; se um item travar (captcha, autocomplete
   quebrado), documente em `NOTA TÉCNICA` e siga — não repita estratégia falha.
 
+## 5. CV por vaga (regra `c1`) — currículo mestre + gerador
+
+O CV de cada vaga **não é escrito na hora**: deriva sempre de duas fontes imutáveis.
+
+- `bot/cv_base.md` — seu currículo **mestre** (copie `examples/cv_base.example.md` e preencha;
+  fica no `.gitignore`, nunca vai ao git). Estrutura que o gerador espera: `# nome`, linhas de
+  cabeçalho (tagline, contato, local) antes do primeiro `##`, `##` para seção e `###` para
+  subseção; skills das `## Habilidades técnicas` separadas por ` | `.
+- `bot/dados_candidato.json` — seus dados de formulário.
+
+Fluxo do agente (detalhado em `bot/prompt_loop.md` -> `c1`):
+
+1. monta `/tmp/cv_spec.json` com `resumo_custom` (verdadeiro, com as keywords exatas do anúncio),
+   `categorias_ordem`/`so_categorias` (3-7 subseções das Habilidades técnicas relevantes à vaga)
+   e `palavras_chave_vaga` (só skills reais);
+2. `python3 bot/gerar_cv.py /tmp/cv_spec.json <saida.pdf>` — reordena seções, negrita keywords,
+   filtra qualquer keyword fora do perfil e **só retorna exit 0 com 1 página**;
+3. `python3 bot/check_ats.py /tmp/anuncio.txt <saida.pdf>` — cobertura dos termos do perfil >= 75%
+   antes de anexar;
+4. anexa. Nome do arquivo sem a palavra "ATS". No Gupy **não** se gera PDF (o Gupy usa o CV do perfil).
+
+Anti-pattern proibido: HTML/tex/reportlab escritos à mão, keyword stuffing e texto invisível/branco
+(ATS como Workday/Greenhouse sinalizam fraude). Dependências: `pip install reportlab` + `poppler-utils`
+(`pdftotext`).
+
 ## Regras de edição
 
 - Mantenha o sentinel `QUOTA_EXAUSTA` (última linha): é ele que diz ao `loop.sh`
