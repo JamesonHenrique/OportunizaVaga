@@ -6,6 +6,11 @@ new application, so rounds are not wasted re-scanning dry sites. Deterministic, 
                                      rodizio.proximo (and, with --perfil, sites outside the profile's area)
   rodizio-saude.py pos  [APLICADAS]   after a successful round: update the site's streak
 
+Once a day (first `pre`; recorded in rodizio.ordem_calculada_em) the order is recomputed by each
+site's yield: same number of slots, >=1 per site, the rest proportional to a smoothed score
+(applications per round + positive replies), interleaved so a site does not repeat back to back.
+Disable with OV_RODIZIO_REORDENAR=0.
+
 State: rodizio_saude.json next to APLICADAS (same state dir as the profile, so each
 profile's site-health tracking stays isolated); also read by the monitor.
 Optional notifications: scripts/notificar.sh (Telegram), only if the script exists.
@@ -18,10 +23,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+from jsonlock import gravar, travado  # noqa: E402
 DEFAULT_APLICADAS = SCRIPT_DIR / "aplicadas.json"
 NOTIFICAR_SH = SCRIPT_DIR.parent / "scripts" / "notificar.sh"
 PAUSE_AFTER = 4
 PAUSE_HOURS = 48
+REORDENAR = os.environ.get("OV_RODIZIO_REORDENAR", "1") != "0"   # daily yield-based reorder (0 = keep the order as is)
 
 
 def load(p, default):
@@ -32,11 +40,8 @@ def load(p, default):
 
 
 def save(p, d):
-    p = Path(p)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_suffix(p.suffix + ".tmp")
-    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
-    os.replace(tmp, p)
+    Path(p).parent.mkdir(parents=True, exist_ok=True)
+    gravar(str(p), d, indent=1)   # jsonlock.py: unique tmp + atomic replace
 
 
 def notify(msg):
@@ -51,6 +56,44 @@ def notify(msg):
 def paused(site_info, now):
     until = site_info.get("pausado_ate")
     return bool(until) and datetime.fromisoformat(until) > now
+
+
+POSITIVOS = {"etapa_teste", "proxima_etapa", "entrevista"}
+
+
+def nota_site(site, info, aplicadas):
+    """Yield score: smoothed applications per round + 2 per positive reply whose `como` names the
+    site. Smoothing keeps new/rare sites alive instead of zeroing them."""
+    resp = sum(1 for a in aplicadas if (a.get("status") or "") in POSITIVOS
+               and site.split(".")[0] in str(a.get("como", "")).lower())
+    return (info.get("aplicadas", 0) + 2 * resp + 1) / (info.get("rodadas", 0) + 3)
+
+
+def reordenar(ordem, sites, aplicadas):
+    """Same slot count as the current order, >=1 slot per site, the rest by yield (largest
+    remainder), interleaved with smooth weighted round-robin so a site never runs twice in a row
+    if avoidable. Deterministic. Returns (new_order, scores)."""
+    nomes = list(dict.fromkeys(ordem))
+    if len(nomes) < 2:
+        return ordem, {}
+    total = max(len(ordem), len(nomes))
+    notas = {s: nota_site(s, sites.get(s, {}), aplicadas) for s in nomes}
+    livres = total - len(nomes)
+    soma = sum(notas.values()) or 1
+    cotas = {s: livres * notas[s] / soma for s in nomes}
+    slots = {s: 1 + int(cotas[s]) for s in nomes}
+    for s in sorted(nomes, key=lambda x: cotas[x] - int(cotas[x]), reverse=True)[:total - sum(slots.values())]:
+        slots[s] += 1
+    atual = {s: 0 for s in nomes}
+    nova = []
+    for _ in range(total):
+        for s in nomes:
+            atual[s] += slots[s]
+        cands = sorted(nomes, key=lambda x: -atual[x])
+        esc = next((c for c in cands if not nova or c != nova[-1]), cands[0])
+        atual[esc] -= total
+        nova.append(esc)
+    return nova, notas
 
 
 def sites_fora_do_perfil(perfil_path):
@@ -75,6 +118,20 @@ def main(cmd, aplicadas_path, perfil_path=None):
         return 0
     rod = d.get("rodizio", {})
     ordem = rod.get("ordem") or []
+
+    if cmd == "pre" and ordem and REORDENAR and rod.get("ordem_calculada_em") != now.strftime("%Y-%m-%d"):
+        # Once a day, before the first round: the order follows each site's yield.
+        nova, notas = reordenar(ordem, sites, d.get("aplicadas", []))
+        if nova != ordem:
+            prox = rod.get("proximo")
+            rod["ordem"] = nova
+            rod["pos"] = nova.index(prox) if prox in nova else 0
+            print("rodizio-saude: ordem por rendimento -> " + ",".join(nova) + " | notas "
+                  + ", ".join(f"{k}={v:.2f}" for k, v in sorted(notas.items(), key=lambda x: -x[1])))
+        rod["ordem_calculada_em"] = now.strftime("%Y-%m-%d")
+        d["rodizio"] = rod
+        save(aplicadas_path, d)
+        ordem = rod["ordem"]
 
     if cmd == "pre":
         atual = rod.get("proximo")
@@ -144,4 +201,6 @@ if __name__ == "__main__":
         i = args.index("--perfil")
         perfil = args[i + 1] if i + 1 < len(args) else None
         del args[i:i + 2]
-    sys.exit(main(sys.argv[1], args[0] if args else str(DEFAULT_APLICADAS), perfil))
+    _ap = args[0] if args else str(DEFAULT_APLICADAS)
+    with travado(_ap):   # same exclusive lock as estado.py
+        sys.exit(main(sys.argv[1], _ap, perfil))

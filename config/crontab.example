@@ -34,4 +34,14 @@ BOT_DIR=$HOME/opensource/oportunizavaga
 # Validacao semantica do estado (o loop ja roda apos cada rodada; isto e redundancia barata)
 */30 * * * *                  $BOT_DIR/scripts/validate-rodada.sh >> $BOT_DIR/bot/validate-rodada.log 2>&1
 
+# Mascara segredos nos logs (senhas do credenciais.tsv, tokens, CPF, codigos de 6 digitos). O loop ja limpa o log de
+# cada rodada ao fim dela (--forcar); esta varredura pega o resto (loop.log, followup.log...) e ignora arquivo
+# escrito ha menos de 30 min. Config: OV_CREDENTIALS_FILE, OV_REDACT_GLOBS (ver cabecalho de bot/redact-logs.py)
+*/10 * * * *                  python3 $BOT_DIR/bot/redact-logs.py >> $BOT_DIR/bot/logs/redact.log 2>&1
+
+# (Opcional, opt-in) Poda as sessoes antigas DO ROBO no opencode (o banco guarda os argumentos de toda tool-call,
+# senhas digitadas em formularios incluidas). So apaga titulo candidaturas-/followup- E pasta do robo, com mais de N dias
+# (created); nunca sessoes interativas suas. Teste antes com --dry. Config: OV_PODAR_PREFIXOS, OV_PODAR_PASTAS.
+#30 4 * * *                   python3 $BOT_DIR/bot/podar-sessoes.py 3 >> $BOT_DIR/bot/logs/podar-sessoes.log 2>&1
+
 # Relatorio de tokens por job (manual): python3 $BOT_DIR/scripts/tokens-relatorio.py 1

@@ -46,12 +46,17 @@
 | `bot/guardiao.sh` | Supervisor via cron (sem systemd): loop + Chrome; limpa lock órfão |
 | `bot/followup.sh` | Rotina semanal (só leitura de status, nunca se candidata) |
 | `bot/prompt_*.md` | O "cérebro": regras, rodízio, pré-filtros, canais, formato de registro |
-| `bot/estado.py` | CLI compacta e atômica p/ ler/escrever `aplicadas.json` sem o agente ler o arquivo inteiro |
+| `bot/estado.py` | CLI compacta e atômica p/ ler/escrever `aplicadas.json` sem o agente ler o arquivo inteiro; `resumo` enxuto + `ja-visto EMPRESA [TITULO]` sob demanda |
+| `bot/jsonlock.py` | Trava exclusiva (fcntl/msvcrt) + gravação atômica (tmp único, fsync, `os.replace`) dos JSONs de estado |
+| `bot/prompt_cond.py` | Blocos condicionais do prompt (`<!--se:site=X-->…<!--/se-->`, `<!--se:telegram-->`; fail-open) e cerca `<<<DADOS_EXTERNOS>>>` para texto de terceiros; usado por `loop.sh`/`loop.ps1` |
+| `bot/redact-logs.py` | Varredor que mascara segredos nos logs (chamado com `--forcar` ao fim de cada rodada + cron/Task Scheduler) |
+| `bot/podar-sessoes.py` | (opt-in) Poda sessões antigas do robô no opencode, com filtro título+pasta; DB em 600 |
 | `bot/gerar_cv.py` | Gera o PDF por vaga (regra `c1`) só a partir de `bot/cv_base.md` + `dados_candidato.json`; 1 página ou exit 2 |
 | `bot/check_ats.py` | Mede a cobertura dos termos do anúncio no CV (meta >= 75%) antes de anexar |
-| `bot/rodizio-saude.py` | Pausa (48h) site com 4 rodadas seguidas sem candidatura nova; hooks `pre`/`pos` no `loop.sh` |
+| `bot/rodizio-saude.py` | Pausa (48h) site com 4 rodadas seguidas sem candidatura nova; reordena o rodízio 1x/dia pelo rendimento; hooks `pre`/`pos` no `loop.sh` |
 | `bot/sites/lib.sh` | Descoberta automática de adaptadores e contrato comum (`site_adapter_*`) |
 | `bot/sites/*.sh` | Adaptadores de portal: URL de busca, dica de remoto e termos por site |
+| `bot/chrome-lock.sh` (+ `.ps1`) | Protocolo único do Chrome compartilhado: lock + flags de prioridade (`alta` marca a vez, `normal` cede) |
 | `browser/chrome-real.sh` | Chrome persistente com CDP :9222 (login 1x vale p/ tudo) |
 | `config/sites_permitidos.json` | Blocklist de agregadores gringos/spam em 2 camadas: `--blocked-origins` + regra 7 do prompt |
 | `monitor/*.mjs` | `snapshot` (agregado + perfis) → `publish-status` / `publish-once` → Vercel |
@@ -60,6 +65,7 @@
 | `scripts/pull-monitor.sh` | Fast-forward do painel + restart do publisher se o código mudou |
 | `scripts/digest.sh` | Resumo diário (aplicadas/bloqueadas + alertas de anomalia no `loop.log`) |
 | `scripts/notificar.sh` | Push genérico ao Telegram (dedupe de 6h); usado por `digest`/`followup`/`rodizio-saude` |
+| `scripts/ctl.sh` (+ `.ps1`) | Inspeção só-leitura: `status` / `rodada` / `chrome` em respostas curtas (comece por `status` antes de abrir qualquer log) |
 | `scripts/backup-jsons.sh` | Cópia rotativa (14x) de `aplicadas.json`/`dados_candidato.json`, raiz + cada perfil |
 
 ## Decisões-chave

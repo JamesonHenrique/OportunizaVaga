@@ -24,7 +24,8 @@ from datetime import datetime
 BOT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOT_DIR = os.path.join(BOT_ROOT, "bot")
 NODE = os.environ.get("NODE_BIN") or shutil.which("node") or "node"
-LOCK = os.path.join(tempfile.gettempdir(), "agent-chrome-9222.lock")   # same file loop.sh/loop.ps1 lock
+LOCK = os.environ.get("CHROME_LOCK_FILE") or os.path.join(tempfile.gettempdir(), "agent-chrome-9222.lock")   # same file loop.sh/loop.ps1 lock
+FLAG_DIR = os.environ.get("CHROME_LOCK_DIR") or tempfile.gettempdir()   # priority flags (bot/chrome-lock.sh protocol)
 DADOS = os.environ.get("DADOS_FILE", os.path.join(BOT_DIR, "dados_candidato.json"))
 APLICADAS = os.environ.get("APLICADAS_FILE", os.path.join(BOT_DIR, "aplicadas.json"))
 SAIDA = os.path.join(BOT_DIR, "state", "gmail_status.json")
@@ -95,10 +96,15 @@ def contas():
 
 class browser_lock:
     """Portable exclusive lock on the shared Chrome lock file (flock on POSIX, msvcrt on Windows).
-    Waits up to `wait` seconds; `acquired` tells whether it got the lock."""
+    Waits up to `wait` seconds; `acquired` tells whether it got the lock.
 
-    def __init__(self, wait=900):
+    Same protocol as bot/chrome-lock.sh with PRIO=alta: while waiting/holding, the flag file
+    agent-chrome-9222.prio.NAME makes the application loop yield its next round instead of
+    making this short job wait behind it. A flag that already existed is the parent's: kept."""
+
+    def __init__(self, wait=900, name="gmail"):
         self.wait, self.fh, self.acquired = wait, None, False
+        self.flag, self.flag_criada = os.path.join(FLAG_DIR, f"agent-chrome-9222.prio.{name}"), False
 
     def _try(self):
         if os.name == "nt":
@@ -110,6 +116,12 @@ class browser_lock:
             fcntl.flock(self.fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
     def __enter__(self):
+        try:
+            self.flag_criada = not os.path.exists(self.flag)
+            with open(self.flag, "a"):
+                os.utime(self.flag, None)
+        except OSError:
+            self.flag_criada = False
         deadline = time.time() + self.wait
         while True:
             try:
@@ -124,6 +136,11 @@ class browser_lock:
                 time.sleep(2)
 
     def __exit__(self, *exc):
+        if self.flag_criada:
+            try:
+                os.unlink(self.flag)
+            except OSError:
+                pass
         if self.fh:
             try:
                 if self.acquired and os.name == "nt":

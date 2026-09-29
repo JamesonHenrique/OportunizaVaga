@@ -46,7 +46,8 @@
       "properties": {
         "ordem": { "type": "array", "items": { "type": "string" } },
         "proximo": { "type": "string", "minLength": 1 },
-        "ultima_rodada": { "type": "string" }
+        "ultima_rodada": { "type": "string" },
+        "ordem_calculada_em": { "type": "string", "description": "YYYY-MM-DD da ultima reordenacao diaria por rendimento (bot/rodizio-saude.py)" }
       },
       "additionalProperties": true
     },

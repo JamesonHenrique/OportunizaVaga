@@ -6,6 +6,7 @@ short line.
   estado.py [--file F] resumo                     compact state (injected into the prompt)
   estado.py [--file F] get CHAVE                  full record of one aplicada/bloqueado/quase_la
   estado.py [--file F] tem CHAVE                  "sim <secao>" / "nao"
+  estado.py [--file F] ja-visto EMPRESA [TITULO]  applied/blocked records of a company ("MESMA VAGA provavel" first)
   estado.py [--file F] add-aplicada JSON          append to aplicadas (needs "chave")
   estado.py [--file F] add-bloqueado CHAVE JSON   set bloqueados[CHAVE] (JSON object or plain motivo)
   estado.py [--file F] set-quase-la CHAVE JSON    set quase_la[CHAVE]; JSON=null removes it
@@ -19,9 +20,14 @@ APLICADAS_FILE environment variable (bot/loop.sh exports it per active profile).
 """
 import json
 import os
+import re
 import sys
+import unicodedata
 from datetime import date, datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from jsonlock import gravar, travado  # noqa: E402
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT = str(SCRIPT_DIR / "aplicadas.json")
@@ -33,10 +39,7 @@ def load(path):
 
 
 def save(path, d):
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(d, fh, ensure_ascii=False, indent=2)
-    os.replace(tmp, path)
+    gravar(path, d)   # unique tmp + fsync + atomic replace (jsonlock.py)
 
 
 def parse(s):
@@ -64,20 +67,58 @@ def resumo(d):
     out.append(f"quase_la ({len(q)}):")
     for k, v in (q.items() if isinstance(q, dict) else enumerate(q)):
         out.append(f"  {k} | {json.dumps(v, ensure_ascii=False)[:200]}")
+    # Token diet: the full blocked list with reasons was ~18 KB of EVERY prompt. The model only
+    # needs "did I see this company already?" -> company names + counts here, and
+    # `ja-visto EMPRESA [TITULO]` for the detail of one job.
     ap = d.get("aplicadas", [])
-    out.append(f"aplicadas ({len(ap)}) — chave | empresa | vaga | data:")
+    out.append(f"aplicadas ({len(ap)}) — empresa | vaga (NAO reenvie):")
     for a in ap:
-        out.append(f"  {a.get('chave')} | {a.get('empresa')} | {str(a.get('vaga'))[:60]} | {a.get('data')}")
-    b = d.get("bloqueados", {})
-    out.append(f"bloqueados ({len(b)}) — chave | data | motivo (curto; detalhe: estado.py get CHAVE):")
-    for k, v in (b.items() if isinstance(b, dict) else enumerate(b)):
-        dt = v.get("data", "") if isinstance(v, dict) else ""
-        out.append(f"  {k} | {dt} | {short(v)}")
-    arq = d.get("bloqueados_arquivados")
-    if arq:
-        keys = list(arq) if isinstance(arq, dict) else [str(x.get("chave", x))[:40] if isinstance(x, dict) else str(x)[:40] for x in arq]
-        out.append(f"bloqueados_arquivados (só chaves, {len(keys)}): {', '.join(map(str, keys))}")
+        out.append(f"  {a.get('empresa')} | {str(a.get('vaga'))[:50]}")
+    vistos = {}
+    for sec in ("bloqueados", "bloqueados_arquivados"):
+        v = d.get(sec) or {}
+        for k, rec in (v.items() if isinstance(v, dict) else enumerate(v)):
+            emp = (rec.get("empresa") if isinstance(rec, dict) else None) or str(k).split("_")[0]
+            vistos[emp] = vistos.get(emp, 0) + 1
+    out.append(f"bloqueados+arquivados ({sum(vistos.values())}) por empresa — ANTES de abrir vaga de empresa listada, rode "
+               f"`estado.py ja-visto \"<empresa>\" \"<titulo>\"`:")
+    out.append("  " + ", ".join(f"{e}({n})" if n > 1 else str(e) for e, n in sorted(vistos.items(), key=lambda x: str(x[0]).lower())))
     return "\n".join(out)
+
+
+def _norm(t):
+    t = unicodedata.normalize("NFKD", str(t or "").lower())
+    return re.sub(r"[^a-z0-9]+", " ", "".join(c for c in t if not unicodedata.combining(c))).strip()
+
+
+_STOP = {"de", "da", "do", "e", "em", "para", "com", "a", "o", "the", "and", "remoto", "remote", "home", "office",
+         "vaga", "100", "br", "brasil", "pessoa", "desenvolvedora"}
+
+
+def ja_visto(d, empresa, titulo=""):
+    """Lines describing applied/blocked/archived records of this company (best match first)."""
+    e = _norm(empresa)
+    tt = {w for w in _norm(titulo).split() if len(w) >= 3 and w not in _STOP}
+    achados = []
+    for sec in ("aplicadas", "quase_la", "bloqueados", "bloqueados_arquivados"):
+        v = d.get(sec) or {}
+        for k, rec in (v.items() if isinstance(v, dict) else ((x.get("chave") if isinstance(x, dict) else x, x) for x in v)):
+            rec = rec if isinstance(rec, dict) else {"motivo": str(rec)}
+            re_ = _norm(rec.get("empresa") or "")
+            ch = _norm(k)
+            # also compare without spaces: "Zeta Soft" x "ZetaSoft" is the same company
+            e2, re2, ch2 = e.replace(" ", ""), re_.replace(" ", ""), ch.replace(" ", "")
+            if not e2 or not (e2 in re2 or (re2 and re2 in e2) or e2 in ch2):
+                continue
+            rt = {w for w in _norm(rec.get("vaga") or k).split() if len(w) >= 3 and w not in _STOP}
+            score = len(tt & rt) / len(tt) if tt else 0
+            achados.append((score, sec, k, rec))
+    achados.sort(key=lambda x: -x[0])
+    linhas = []
+    for score, sec, k, rec in achados[:6]:
+        tag = "MESMA VAGA provavel" if tt and score >= 0.5 else "mesma empresa"
+        linhas.append(f"{tag} | {sec} | {k} | {str(rec.get('vaga') or '')[:50]} | {short(rec)[:90]}")
+    return linhas
 
 
 def main(argv):
@@ -91,6 +132,10 @@ def main(argv):
     d = load(path)
     if cmd == "resumo":
         print(resumo(d))
+        return 0
+    if cmd == "ja-visto":
+        linhas = ja_visto(d, args[0] if args else "", args[1] if len(args) > 1 else "")
+        print("\n".join(linhas) if linhas else "nao visto: pode avaliar")
         return 0
     if cmd in ("get", "tem"):
         k = args[0]
@@ -197,5 +242,19 @@ def main(argv):
     return 0
 
 
+LEITURA = {"resumo", "get", "tem", "ja-visto"}
+
+
+def main_travado(argv):
+    """Writes hold the exclusive state lock for the whole load -> modify -> save; reads take none."""
+    com_file = argv[:1] == ["--file"] and len(argv) > 1
+    path = argv[1] if com_file else os.environ.get("APLICADAS_FILE", DEFAULT)
+    resto = argv[2:] if com_file else argv
+    if not resto or resto[0] in LEITURA:
+        return main(argv)
+    with travado(path):
+        return main(argv)
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main_travado(sys.argv[1:]))
