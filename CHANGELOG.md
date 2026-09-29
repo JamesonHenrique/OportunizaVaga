@@ -6,6 +6,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Bloco do Telegram só enquanto há vaga colhida ainda não oferecida** (`bot/prompt_cond.py`): `<!--se:telegram-->` exige
+  colheita fresca **e** ao menos uma vaga oferecida < 2 vezes (`<estado>/telegram_oferecidas.json`, contado uma vez por prompt
+  renderizado em `loop.sh`/`loop.ps1`). Testes em `tests/test_prompt_cond.sh`.
 - **Config enxuta do opencode (`bot/opencode-enxuto.py`)**: monta o `OPENCODE_CONFIG_CONTENT` a partir da sua própria config
   (desliga os outros MCPs, tira `--caps vision` do MCP de browser, nega `edit/glob/grep/websearch/task/todowrite`, mantém
   `write`/`webfetch`), usada por `loop` e `followup` (`.sh` e `.ps1`); fail-open, `OV_OPENCODE_ENXUTO=0` desliga e

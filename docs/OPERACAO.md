@@ -72,3 +72,13 @@ usa a mesma ordem (o `.sh` cai na config fixa antiga se o script não gerar nada
 MCP de browser ausente ou JSONC inválido = saída vazia e o robô segue com a config do opencode intacta.
 `OV_OPENCODE_ENXUTO=0` desliga. Arquivo lido: `OV_OPENCODE_USER_CONFIG`, `OPENCODE_CONFIG` ou
 `~/.config/opencode/opencode.jsonc|json`. Teste: `tests/test_opencode_enxuto.sh`.
+
+## Bloco do Telegram só enquanto há vaga nova
+
+A colheita do Telegram roda algumas vezes por dia, mas quase nenhuma vaga colhida vira candidatura; um bloco fixo no
+prompt custa tokens em toda rodada. `<!--se:telegram-->` (em `bot/prompt_cond.py`, usado por `loop.sh` e `loop.ps1`)
+agora só é mantido enquanto a colheita está fresca (< 6 h) **e** alguma vaga colhida foi oferecida menos de 2 vezes.
+O contador vive em `<estado>/telegram_oferecidas.json` (chave `id` ou `post`, últimas 500), incrementa uma vez por prompt
+renderizado com o bloco e `telegram_fresco()` não tem efeito colateral. Erro de leitura = sem bloco. O texto das vagas
+que `tg-garimpo.py prompt` acrescenta continua com o próprio limite por vaga (`max_ofertas`). Teste:
+`tests/test_prompt_cond.sh`.
