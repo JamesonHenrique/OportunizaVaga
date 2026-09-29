@@ -6,6 +6,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **`estado.py ja-visto EMPRESA [TITULO]`** e **`resumo` compacto**: aplicadas como `empresa | vaga`; bloqueadas e
+  arquivadas só como nomes de empresa com contagem (o detalhe vem sob demanda). Corta milhares de tokens por prompt;
+  regra 2 e recheagem de bloqueados dos prompts (pt/en) usam o `ja-visto`.
 - **`bot/jsonlock.py`** (trava exclusiva + tmp único + fsync + `os.replace`, portável fcntl/msvcrt) usada por
   `estado.py` (escritas travadas, leituras não), `rodizio-saude.py` e `arquivar-logs-rodada.py`: gravações
   concorrentes não se perdem mais. Teste de corrida em `tests/test_jsonlock.sh` (30 escritas paralelas = 30).

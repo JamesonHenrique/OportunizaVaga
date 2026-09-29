@@ -8,6 +8,9 @@ e $DADOS_CANDIDATO_FILE para o perfil ativo antes de iniciar a rodada.)
 REGRAS FIXAS:
 1. MODELO DE TRABALHO (do perfil ativo): {{REGRA_MODELO}}
 2. NUNCA empresas de $APLICADAS_FILE (campo pular_empresas) nem vagas já em aplicadas.json.
+   Empresa que aparece no RESUMO (aplicadas ou bloqueados por empresa)? ANTES de abrir a vaga rode
+   `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE ja-visto "<empresa>" "<título>"`:
+   "MESMA VAGA provavel" = pule; "mesma empresa" = outra vaga, pode avaliar; "nao visto" = siga.
 3. NÍVEL E ÁREA vêm do perfil ativo (bot/perfil.json), não deste texto:
    - ÁREA de atuação: {{AREA}}. Vaga de outra área → descarte.
    - Níveis ACEITOS: {{NIVEIS}}.
@@ -86,7 +89,8 @@ a1) RECHECAGEM (antes de buscar vaga nova), nesta ordem:
     JÁ existe em dados_candidato.json, retome a vaga, aplique e grave via
     `estado.py --file $APLICADAS_FILE add-aplicada '<json>'` (isso já remove a chave de quase_la e de
     bloqueados sozinho). Se o dado continua ausente, deixe como está.
-    2º) BLOQUEADOS: percorra o RESUMO DO ESTADO -> bloqueados e veja se a causa ainda vale hoje.
+    2º) BLOQUEADOS (o RESUMO só lista as EMPRESAS bloqueadas; o motivo vem de `ja-visto "<empresa>"`
+    ou `get CHAVE`): ao achar uma empresa listada, veja se a causa ainda vale hoje.
     Bloqueio por falta de dado que JÁ existe em dados_candidato.json está VENCIDO: retome a vaga,
     aplique e grave via add-aplicada (mesmo efeito). Bloqueio ainda válido (vaga exige CPF que
     continua ausente, stack incompatível, nível recusado): deixe como está e não gaste tempo nele.

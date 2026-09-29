@@ -8,6 +8,9 @@ $DADOS_CANDIDATO_FILE for the active profile before the round starts.)
 FIXED RULES:
 1. WORK MODEL (from the active profile): {{REGRA_MODELO}}
 2. NEVER companies from $APLICADAS_FILE (pular_empresas field) nor jobs already in aplicadas.json.
+   Company listed in the SUMMARY (applied or blocked, by company)? BEFORE opening the job run
+   `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE ja-visto "<company>" "<title>"`:
+   "MESMA VAGA provavel" = skip; "mesma empresa" = another job, you may evaluate; "nao visto" = go on.
 3. LEVEL AND AREA come from the active profile (bot/perfil.json), not from this text:
    - Field/AREA: {{AREA}}. A job from another field → discard.
    - ACCEPTED levels: {{NIVEIS}}.
@@ -86,7 +89,8 @@ a1) RECHECK (before looking for new jobs), in this order:
     was missing NOW exists in dados_candidato.json, resume the job, apply and log it via
     `estado.py --file $APLICADAS_FILE add-aplicada '<json>'` (this already removes the key from quase_la
     and from bloqueados). If the datum is still missing, leave it as is.
-    2nd) BLOQUEADOS: walk the STATE SUMMARY -> bloqueados and check whether the cause still holds today.
+    2nd) BLOQUEADOS (the SUMMARY lists only blocked COMPANIES; the reason comes from `ja-visto "<company>"`
+    or `get CHAVE`): when you meet a listed company, check whether the cause still holds today.
     A block for missing data that ALREADY exists in dados_candidato.json is EXPIRED: resume the job,
     apply and log via add-aplicada (same effect). A still-valid block (job requires a CPF that
     is still missing, incompatible stack, refused level): leave as is and don't spend time on it.
