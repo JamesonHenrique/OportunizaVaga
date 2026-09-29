@@ -6,6 +6,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **`scripts/ctl.sh` / `scripts/ctl.ps1`**: `status` (motor, prompt, estado, Chrome, logs em ~20 linhas), `rodada` (final da
+  última rodada) e `chrome` (quem usou o Chrome), só leitura e baratos em tokens. Teste: `tests/test_ctl.sh`.
 - **Rodízio reordenado 1x/dia pelo rendimento** (`bot/rodizio-saude.py`): mesma quantidade de vagas de rodada, ≥ 1 por site,
   o resto proporcional a uma nota suavizada (candidaturas por rodada + respostas positivas), intercalado por round-robin
   ponderado suave (sem repetir site em sequência quando dá); guarda `rodizio.ordem_calculada_em`. Desliga com
