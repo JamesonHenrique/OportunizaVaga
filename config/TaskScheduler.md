@@ -91,6 +91,41 @@ schtasks /Create /TN 'OportunizaVaga\Digest' `
 
 Equivale a `5 21 * * * $BOT_DIR/scripts/digest.sh --send`.
 
+## 8. Respostas do Gmail (08:40 e 18:40)
+
+Lê as caixas de `email` e `email_contas` (as duas precisam estar logadas no Chrome do robô;
+a que faltar vira só um aviso no log).
+
+```powershell
+$BOT_DIR = 'C:\Users\VOCE\opensource\oportunizavaga'
+foreach ($h in '08:40','18:40') {
+  schtasks /Create /TN "OportunizaVaga\GmailStatus-$($h -replace ':','')" `
+    /TR "py `"$BOT_DIR\bot\gmail-status.py`"" /SC DAILY /ST $h /F
+}
+```
+
+Equivale a `40 8,18 * * * python3 $BOT_DIR/bot/gmail-status.py`.
+
+## 9. Garimpo do Telegram (opcional; 08:00, 13:00 e 18:00)
+
+Rode uma vez à mão com `-Login` para criar a sessão; depois agende:
+
+```powershell
+foreach ($h in '08:00','13:00','18:00') {
+  schtasks /Create /TN "OportunizaVaga\TgGarimpo-$($h -replace ':','')" `
+    /TR "powershell -ExecutionPolicy Bypass -File `"$BOT_DIR\bot\tg-garimpo.ps1`"" /SC DAILY /ST $h /F
+}
+```
+
+## 10. Validação do estado (opcional; a cada 30 min)
+
+```powershell
+schtasks /Create /TN 'OportunizaVaga\ValidateRodada' `
+  /TR "powershell -ExecutionPolicy Bypass -File `"$BOT_DIR\scripts\validate-rodada.ps1`"" /SC MINUTE /MO 30 /F
+```
+
+Relatório de tokens (manual): `py "$BOT_DIR\scripts\tokens-relatorio.py" 1`.
+
 ## Conferir / remover
 
 ```powershell

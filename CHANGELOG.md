@@ -6,6 +6,36 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Leitor de respostas no Gmail** (`bot/gmail-status.py` + `bot/gmail-extrair.mjs`): CDP puro, sem dependências,
+  aba própria; lê as caixas de `email` e `email_contas` (escolhidas por endereço, `authuser`) e só falha se
+  nenhuma abrir. Classifica em encerrada → **etapa de testes / fit cultural** → entrevista → **próxima etapa** →
+  em análise, só avança o status, grava a **data do e-mail** (`historico_status[].email_data`) e avisa no Telegram.
+  Lock do Chrome portável (Linux/Windows).
+- **E-mail de contato × e-mail de contas** (`email_contas`, `regra_emails` em `dados_candidato`): cadastros, OAuth,
+  códigos e links de verificação usam a caixa de `email_contas`; o CV e os campos de contato usam `email`.
+- **`bot/nova-senha.mjs`**: gera a senha de cadastro, grava em `credenciais.tsv` (`OV_CREDENTIALS_FILE`) e preenche os
+  campos via CDP — a senha nunca passa pelo modelo nem pelo log (regra 3 do prompt).
+- **Descoberta determinística** (`bot/descobrir.py`, opt-in `OV_DESCOBRIR=1`): fila LinkedIn/Gupy sem LLM,
+  filtrada pelo perfil e injetada no prompt; config em `config/descoberta.example.json`.
+- **Garimpo do Telegram** (`bot/tg-garimpo.py` + `.sh`/`.ps1`, opcional): canais em `bot/telegram_canais.json`.
+- **`scripts/validate-rodada`** (+ `.sh`/`.ps1`) após cada rodada, notificando falha; `scripts/tokens-relatorio.py`.
+- **Monitor**: fila "Esperando login" por canal; bloqueios triados por causa (você / robô retenta / descartada)
+  com CSV; nome da vaga vira link; painel "Busca por script" e resumo do Gmail (arquivos de estado opcionais);
+  rótulos "TESTE / FIT CULTURAL" e "PRÓXIMA ETAPA" separados de "ENTREVISTA", com a data do e-mail; e-mail, CPF e
+  telefone mascarados antes de publicar; redesenho de todas as abas; demo com os novos status.
+- Testes: `test_gmail_status.sh`, `test_descobrir.sh`, `test_tg_garimpo.sh`, casos novos em `test_estado.sh` e
+  `monitor/snapshot.test.mjs`.
+
+### Changed
+- **Loop** (`loop.sh`/`loop.ps1`): teto do backoff de rodada vazia (`OV_VAZIA_MAX`), impressão digital do estado por
+  chaves, descarte de modelos que o opencode não lista mais, cascata quando a sessão morre após erro de ferramenta,
+  rotação persistente de termos, modelo pago opt-in para rodadas com envio pronto, quota do log do opencode
+  filtrada por diretório (Linux).
+
+### Security
+- Senhas de cadastro não aparecem mais em comandos de shell nem em `fill_form` (ambos vão para o log da rodada).
+- `credenciais.tsv`, `gmail_status.json`, sessões e config do Telegram no `.gitignore`.
+
 - **CV por vaga com gerador e checagem ATS (regra `c1`)**: currículo mestre `bot/cv_base.md`
   (exemplo em `examples/cv_base.example.md`, gitignored) alimenta `bot/gerar_cv.py`, que gera o PDF
   de 1 página com as subseções de `Habilidades técnicas` reordenadas por vaga (`so_categorias` é
