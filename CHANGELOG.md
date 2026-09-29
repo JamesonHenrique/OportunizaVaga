@@ -6,6 +6,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **CV por vaga com gerador e checagem ATS (regra `c1`)**: currículo mestre `bot/cv_base.md`
+  (exemplo em `examples/cv_base.example.md`, gitignored) alimenta `bot/gerar_cv.py`, que gera o PDF
+  de 1 página com as subseções de `Habilidades técnicas` reordenadas por vaga (`so_categorias` é
+  obrigatório), keywords reais em negrito e filtro de keyword fora do perfil (avisa em `kw
+  DESCARTADAS`). `bot/check_ats.py` mede a cobertura dos termos do anúncio no CV (meta >= 75%)
+  antes do anexo. Auto-checagem no gerador: exit 0 só com 1 página e nome/seções extraíveis.
+  Prompts `c1` PT/EN agora exigem o fluxo spec → gerador → checagem; nunca mais HTML/reportlab à mão.
+- `scripts/setup.sh`/`setup.ps1` copiam o exemplo do `cv_base` e checam `reportlab`/`pdftotext`.
 - **Modelo de trabalho configurável**: `modelos` (`remoto`, `hibrido`, `presencial`) e `cidades` no perfil.
   Placeholders `{{REGRA_MODELO}}`, `{{FILTRO_MODELO}}`, `{{LOCAL_BUSCA}}` e `{{LINKEDIN_WT}}` na regra 1 e nas
   URLs de busca. Padrão continua só remoto. Sites só-remoto (`restrito_a_modelo`) saem do rodízio de quem não aceita remoto.

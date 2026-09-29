@@ -26,6 +26,7 @@ function Copy-Example([string]$src, [string]$dst) {
 
 Write-Host '-- 1) Arquivos de dados (gitignored) --'
 Copy-Example 'examples\dados_candidato.example.json' 'bot\dados_candidato.json'
+Copy-Example 'examples\cv_base.example.md' 'bot\cv_base.md'
 Copy-Example 'examples\aplicadas.example.json' 'bot\aplicadas.json'
 $CronEnv = Join-Path $env:USERPROFILE '.config\opencode\cron.env'
 if (Test-Path $CronEnv) {
@@ -43,6 +44,8 @@ foreach ($bin in @('node', 'python', 'git')) {
     if (Get-Command $bin -ErrorAction SilentlyContinue) { Write-Ok $bin }
     else { Write-Bad ("{0} NAO encontrado" -f $bin); $HAVE_ALL = $false }
 }
+if (python -c 'import reportlab' 2>$null) { Write-Ok 'reportlab (gera o PDF por vaga)' }
+else { Write-Bad 'reportlab ausente — pip install reportlab (sem ele o c1 nao gera CV)' }
 if (Get-Command opencode -ErrorAction SilentlyContinue) { Write-Ok 'opencode' }
 else {
     Write-Bad 'opencode ausente — instale via winget (se publicado) ou https://opencode.ai:'

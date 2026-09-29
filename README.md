@@ -78,6 +78,8 @@ oportunizavaga/
 │   ├── prompt_loop.md           # regras e passo a passo de cada rodada (o "cérebro")
 │   ├── prompt_followup.md       # prompt da rotina semanal
 │   ├── prompt_perfil_gupy.md    # manutenção avulsa do perfil Gupy
+│   ├── gerar_cv.py              # CV por vaga a partir de bot/cv_base.md (1 página, auto-checado)
+│   ├── check_ats.py             # mede a cobertura do anúncio no CV (meta >= 75%)
 │   └── sites/                   # adaptadores descobertos automaticamente
 │       ├── lib.sh               # contrato comum (site_adapter_*)
 │       └── *.sh                 # indeed, gupy, linkedin, programathor, geekhunter, vagas
@@ -106,6 +108,7 @@ oportunizavaga/
 │   └── backup-jsons.sh / .ps1       # cópia rotativa (14x) dos JSONs de estado
 ├── examples/
 │   ├── dados_candidato.example.json  # COPIE p/ bot/dados_candidato.json e preencha
+│   ├── cv_base.example.md            # COPIE p/ bot/cv_base.md (currículo mestre do CV por vaga)
 │   └── aplicadas.example.json        # COPIE p/ bot/aplicadas.json (estado inicial)
 ├── docs/                        # QUICKSTART, ARQUITETURA, CUSTO, SEGURANCA, FAQ, PROMPTS
 ├── CONTRIBUTING.md / LICENSE (MIT)
@@ -144,7 +147,7 @@ Guia completo: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
 
 ## Segurança — LEIA ANTES DE COMMITAR
 
-**Nunca** commite: `bot/dados_candidato.json`, `bot/aplicadas.json`, `bot/state/`,
+**Nunca** commite: `bot/dados_candidato.json`, `bot/cv_base.md`, `bot/aplicadas.json`, `bot/state/`,
 `bot/prompt_loop.runtime.md`, CVs em PDF, `cron.env`/`auth.json`, `*.log`, `logs/`,
 perfil do Chrome, backups `*.bak-*`. O `.gitignore` já bloqueia tudo isso — confira
 com `git status` antes de cada push e rode `./scripts/sanitize.sh`. Vazou secret?
