@@ -138,6 +138,17 @@ schtasks /Create /TN 'OportunizaVaga\RedactLogs' `
 
 Equivale a `*/10 * * * * python3 $BOT_DIR/bot/redact-logs.py`.
 
+## 12. Poda das sessões do robô no opencode (opcional, opt-in; diária 04:30)
+
+O banco do opencode guarda os argumentos de toda tool-call (senhas digitadas em formulários incluídas) e o
+`redact-logs.py` não o alcança. A poda apaga só sessões cujo título começa com `candidaturas-`/`followup-` **e**
+cuja pasta é a do robô, com mais de N dias (usa `created`). Teste antes: `py bot\podar-sessoes.py --dry 3`.
+
+```powershell
+schtasks /Create /TN 'OportunizaVaga\PodarSessoes' `
+  /TR "py `"$BOT_DIR\bot\podar-sessoes.py`" 3" /SC DAILY /ST 04:30 /F
+```
+
 Relatório de tokens (manual): `py "$BOT_DIR\scripts\tokens-relatorio.py" 1`.
 
 ## Conferir / remover

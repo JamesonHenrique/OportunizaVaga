@@ -51,6 +51,12 @@ ln -s ../../scripts/sanitize.sh .git/hooks/pre-commit
   `--forcar` (reescrever um log aberto congelaria a rodada). Complementa — não substitui — a regra 3 do prompt
   (a senha nunca passa pelo modelo: `bot/nova-senha.mjs`).
 
+- **Banco do opencode (opt-in)**: ele guarda os argumentos de toda tool-call de toda rodada. `bot/podar-sessoes.py [--dry] [DIAS]`
+  apaga, via CLI oficial (`opencode session list --format json` / `session delete`), só as sessões **do robô**
+  (título `candidaturas-`/`followup-` **e** pasta do repositório; idade por `created`) com mais de N dias (padrão 3), e
+  deixa o banco em `chmod 600` (POSIX). Sessões interativas suas nunca são tocadas. Agende só se quiser
+  (`config/crontab.example`, `config/TaskScheduler.md`); rode `--dry` antes.
+
 ## Se vazar
 
 1. Rotacione a chave/senha **no provedor** (novo token, revogue o antigo).

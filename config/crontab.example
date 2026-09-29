@@ -39,4 +39,9 @@ BOT_DIR=$HOME/opensource/oportunizavaga
 # escrito ha menos de 30 min. Config: OV_CREDENTIALS_FILE, OV_REDACT_GLOBS (ver cabecalho de bot/redact-logs.py)
 */10 * * * *                  python3 $BOT_DIR/bot/redact-logs.py >> $BOT_DIR/bot/logs/redact.log 2>&1
 
+# (Opcional, opt-in) Poda as sessoes antigas DO ROBO no opencode (o banco guarda os argumentos de toda tool-call,
+# senhas digitadas em formularios incluidas). So apaga titulo candidaturas-/followup- E pasta do robo, com mais de N dias
+# (created); nunca sessoes interativas suas. Teste antes com --dry. Config: OV_PODAR_PREFIXOS, OV_PODAR_PASTAS.
+#30 4 * * *                   python3 $BOT_DIR/bot/podar-sessoes.py 3 >> $BOT_DIR/bot/logs/podar-sessoes.log 2>&1
+
 # Relatorio de tokens por job (manual): python3 $BOT_DIR/scripts/tokens-relatorio.py 1
