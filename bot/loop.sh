@@ -47,7 +47,8 @@ OV_PAGO_MAX_DIA="${OV_PAGO_MAX_DIA:-2}"
 # Rodada enxuta (opcional): JSON de config do opencode desligando MCPs que o loop nao usa (cada MCP
 # custa dezenas de milhares de tokens de schema em TODA chamada). Ex.:
 #   OV_OPENCODE_CONFIG_CONTENT='{"mcp":{"github":{"enabled":false},"context7":{"enabled":false}}}'
-# So desligue MCPs que voce realmente tem configurados. Vazio = nao mexe na config.
+# So desligue MCPs que voce realmente tem configurados. Vazio = bot/opencode-enxuto.py monta a config enxuta a
+# partir da sua propria config do opencode (OV_OPENCODE_ENXUTO=0 para nao mexer em nada).
 OV_OPENCODE_CONFIG_CONTENT="${OV_OPENCODE_CONFIG_CONTENT:-}"
 # Cadeia de modelos GRATUITOS, em ordem de preferencia. Toda rodada comeca pelo
 # primeiro: por isso a volta ao preferido e automatica quando o limite dele passa,
@@ -473,9 +474,13 @@ while true; do
   # </dev/null: opencode le stdin; sem TTY isso gerava "EBADF: bad file descriptor".
   # 9>&-: nao vaza o fd do flock para o filho.
   # Sessao nova a cada rodada: o historico nao carrega nada que aplicadas.json nao tenha.
-  # Rodada enxuta: OPENCODE_CONFIG_CONTENT (opcional) desliga MCPs que o loop nao usa.
+  # Rodada enxuta: OPENCODE_CONFIG_CONTENT desliga MCPs/ferramentas que o loop nao usa. Precedencia:
+  # OV_OPENCODE_CONFIG_CONTENT (explicito) > bot/opencode-enxuto.py (le a SUA config; OV_OPENCODE_ENXUTO=0 desliga)
+  # > nada. Fail-open: script sem saida = config do opencode intacta.
+  OC_CFG="$OV_OPENCODE_CONFIG_CONTENT"
+  [ -n "$OC_CFG" ] || OC_CFG="$(python3 "$BOT_ROOT/bot/opencode-enxuto.py" 2>>loop.log)"
   OC_ENV=()
-  [ -n "$OV_OPENCODE_CONFIG_CONTENT" ] && OC_ENV=(OPENCODE_CONFIG_CONTENT="$OV_OPENCODE_CONFIG_CONTENT")
+  [ -n "$OC_CFG" ] && OC_ENV=(OPENCODE_CONFIG_CONTENT="$OC_CFG")
   setsid env "${OC_ENV[@]}" timeout --kill-after=30s "$RUN_TIMEOUT" \
     env CHROME_LOCK_YIELD_RC=75 CHROME_LOCK_FILE="$BROWSER_LOCK" "$BOT_ROOT/bot/chrome-lock.sh" loop normal 900 -- \
     "$OPENCODE_BIN" run -m "$MODELO" --title "candidaturas-$(date '+%F-%H%M')" "$(cat "$RUNTIME_PROMPT")" \

@@ -70,6 +70,17 @@ $MODELOS = @(
     'opencode/nemotron-3.5-lightning-free',
     'opencode/mimo-v2.5-free'
 )
+# Config enxuta do opencode (bot/opencode-enxuto.py, fail-open): OV_OPENCODE_CONFIG_CONTENT explicito tem precedencia.
+$OcCfg = $env:OV_OPENCODE_CONFIG_CONTENT
+if ([string]::IsNullOrWhiteSpace($OcCfg)) {
+    foreach ($c in @('python3', 'python', 'py')) {
+        $g = Get-Command $c -ErrorAction SilentlyContinue
+        if ($g) {
+            try { $OcCfg = (& $g.Source (Join-Path $BOT_ROOT 'bot\opencode-enxuto.py') 2>$null) -join '' } catch { $OcCfg = '' }
+            break
+        }
+    }
+}
 $FLOG = 'logs/followup-{0}.log' -f (Get-Date).ToString('yyyyMMdd-HHmmss')
 if (-not (Test-Path 'logs')) { New-Item -ItemType Directory -Path 'logs' | Out-Null }
 
@@ -112,9 +123,10 @@ if (Test-Cdp) {
             $STATUS = 1
             foreach ($MODELO in $MODELOS) {
                 $job = Start-Job -ScriptBlock {
-                    param($bin, $mod, $ttl, $pr)
+                    param($bin, $mod, $ttl, $pr, $cfg)
+                    if ($cfg) { $env:OPENCODE_CONFIG_CONTENT = $cfg }
                     & $bin run -m $mod --title $ttl $pr 2>&1
-                } -ArgumentList $OpencodeBin, $MODELO, $title, $prompt
+                } -ArgumentList $OpencodeBin, $MODELO, $title, $prompt, $OcCfg
                 # Sessao unica semanal: timeout de 55min por modelo, igual ao .sh.
                 $done = Wait-Job -Job $job -Timeout 3300
                 if ($done) {

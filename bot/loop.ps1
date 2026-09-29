@@ -506,12 +506,18 @@ function Invoke-ModelRound([string]$modelo, [string]$prompt, [string]$roundLog) 
     $env:CHROME_LOCK_FILE = $BROWSER_LOCK
     $chromeLock = Enter-ChromeLock -Name 'loop' -Prio 'normal' -WaitSeconds 900
     if ($chromeLock.Status -ne 0) { return @{ Status = 75; TimedOut = $false } }
+    # Config enxuta: OV_OPENCODE_CONFIG_CONTENT (explicito) > bot/opencode-enxuto.py (le a SUA config do opencode;
+    # OV_OPENCODE_ENXUTO=0 desliga) > nada. Fail-open: sem saida = config do opencode intacta.
+    $ocCfg = $OV_OPENCODE_CONFIG_CONTENT
+    if ([string]::IsNullOrWhiteSpace($ocCfg) -and $Py) {
+        try { $ocCfg = (& $Py (Join-Path $BOT_ROOT 'bot\opencode-enxuto.py') 2>$null) -join '' } catch { $ocCfg = '' }
+    }
     try {
         $job = Start-Job -ScriptBlock {
             param($bin, $mod, $ttl, $pr, $cfg)
             if ($cfg) { $env:OPENCODE_CONFIG_CONTENT = $cfg }
             & $bin run -m $mod --title $ttl $pr 2>&1
-        } -ArgumentList $OpencodeBin, $modelo, $title, $prompt, $OV_OPENCODE_CONFIG_CONTENT
+        } -ArgumentList $OpencodeBin, $modelo, $title, $prompt, $ocCfg
         $done = Wait-Job -Job $job -Timeout $RUN_TIMEOUT_SEC
         if ($done) {
             $out = Receive-Job -Job $job

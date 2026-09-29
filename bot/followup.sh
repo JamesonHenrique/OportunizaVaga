@@ -14,8 +14,11 @@ OPENCODE_BIN="$HOME/.opencode/bin/opencode"
 exec 9>/tmp/oportunizavaga-followup.lock
 flock -n 9 || exit 0
 
-# Lean run: MCPs o follow-up nunca usa custam tokens de schema em toda chamada.
-export OPENCODE_CONFIG_CONTENT='{"mcp":{"github":{"enabled":false},"context7":{"enabled":false},"ai-memory":{"enabled":false},"playwright-firefox":{"enabled":false}},"permission":{"*":"allow","skill":"deny"}}'
+# Lean run: MCPs/ferramentas que o follow-up nunca usa custam tokens de schema em toda chamada.
+# Precedencia: OV_OPENCODE_CONFIG_CONTENT > bot/opencode-enxuto.py (fail-open) > config fixa abaixo.
+OPENCODE_CONFIG_CONTENT="${OV_OPENCODE_CONFIG_CONTENT:-$(python3 "$BOT_ROOT/bot/opencode-enxuto.py" 2>/dev/null)}"
+[ -n "$OPENCODE_CONFIG_CONTENT" ] || OPENCODE_CONFIG_CONTENT='{"mcp":{"github":{"enabled":false},"context7":{"enabled":false},"ai-memory":{"enabled":false},"playwright-firefox":{"enabled":false}},"permission":{"*":"allow","skill":"deny"}}'
+export OPENCODE_CONFIG_CONTENT
 export AI_MEMORY_DISABLE=1
 
 # Semanal com retentativa diaria: o cron pode rodar todo dia; pula se o ultimo

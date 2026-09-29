@@ -49,3 +49,26 @@ python3 bot/modelos-saude.py ordenar M1 M2 M3      # cascata resultante, um mode
 Estado em `<STATE_DIR>/modelos_saude.json` (`MODELOS_SAUDE_FILE` sobrescreve; `MODELOS_SAUDE_LOGS` troca o glob dos logs,
 útil em testes). Desligue com `OV_MODELOS_SAUDE=0`. O modelo pago opcional (`OV_MODELO_PAGO`) continua na frente e fora
 da ordenação. Teste: `tests/test_modelos_saude.sh`.
+
+## Config enxuta do opencode (`bot/opencode-enxuto.py`)
+
+Cada chamada do opencode envia o schema de **todas** as ferramentas de MCP e as nativas. O robô usa um MCP de browser e
+poucas nativas; o resto é custo puro em toda chamada (~9 por sessão). O script monta um `OPENCODE_CONFIG_CONTENT` que o
+opencode mescla sobre a sua config:
+
+- os **outros** MCPs da sua config são desligados (`{"enabled": false}`; nenhuma URL/header é copiado);
+- o MCP de browser (`OV_BROWSER_MCP`, padrão `playwright-chrome-real`) fica com o `command` **lido da sua config**, sem a
+  capacidade `vision` (`--caps vision`: as ferramentas por coordenada nunca foram chamadas nas rodadas do mantenedor);
+- ferramentas nativas que o robô não usa ficam negadas: `edit`, `glob`, `grep`, `websearch`, `task`, `todowrite` e o
+  `browser_close` do MCP (`OV_ENXUTO_NEGAR="a,b"` troca a lista). `write` e `webfetch` continuam. O agente ainda pode
+  usar grep/edição via bash; sai só o schema das ferramentas dedicadas.
+
+**Medição privada:** no ambiente do mantenedor (conjunto de MCPs dele, mesmo modelo, prompt de uma linha) o contexto da
+primeira chamada caiu de 15.346 para 11.051 tokens (**-28% por chamada**). É uma medição privada, não uma garantia:
+o ganho no seu ambiente depende de quais MCPs você tem configurados.
+
+Precedência em `loop.sh`/`loop.ps1`: `OV_OPENCODE_CONFIG_CONTENT` explícito > este script > nada. O `followup.sh`/`.ps1`
+usa a mesma ordem (o `.sh` cai na config fixa antiga se o script não gerar nada). **Fail-open**: config não encontrada,
+MCP de browser ausente ou JSONC inválido = saída vazia e o robô segue com a config do opencode intacta.
+`OV_OPENCODE_ENXUTO=0` desliga. Arquivo lido: `OV_OPENCODE_USER_CONFIG`, `OPENCODE_CONFIG` ou
+`~/.config/opencode/opencode.jsonc|json`. Teste: `tests/test_opencode_enxuto.sh`.
