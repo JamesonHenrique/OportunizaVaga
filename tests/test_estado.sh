@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 ESTADO="bot/estado.py"
 
-TOTAL=7
+TOTAL=9
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -88,6 +88,22 @@ if python3 "$ESTADO" --file "$TMP_STATE" resumo | grep -q '"total": 6'; then
   relata 0 "descartes soma nivel+modelo+stack no total"
 else
   relata 1 "descartes soma nivel+modelo+stack no total"
+fi
+
+# 8 — status com EMAIL_DATA grava email_data + fonte gmail no historico.
+python3 "$ESTADO" --file "$TMP_STATE" status "teste-1" etapa_teste "" 2026-09-17 >/dev/null
+if python3 "$ESTADO" --file "$TMP_STATE" get "teste-1" | tr -d ' \n' | grep -q '"email_data":"2026-09-17","fonte":"gmail"'; then
+  relata 0 "status com EMAIL_DATA grava email_data + fonte gmail"
+else
+  relata 1 "status com EMAIL_DATA grava email_data + fonte gmail"
+fi
+
+# 9 — status sem EMAIL_DATA (follow-up manual) nao grava fonte.
+python3 "$ESTADO" --file "$TMP_STATE" status "teste-1" entrevista >/dev/null
+if python3 "$ESTADO" --file "$TMP_STATE" get "teste-1" | tr -d ' \n' | grep -q '"para":"entrevista","em":"[^"]*"}'; then
+  relata 0 "status sem EMAIL_DATA nao grava fonte"
+else
+  relata 1 "status sem EMAIL_DATA nao grava fonte"
 fi
 
 if [ "$FAIL" -eq 0 ]; then
