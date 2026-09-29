@@ -1,0 +1,11 @@
+{
+  "_COMO_USAR": "Copie para bot/telegram_canais.json (gitignored) e liste SO canais/grupos PUBLICOS de vagas que voce mesmo acompanha (handle sem @). Requer TG_API_ID/TG_API_HASH proprios; veja o cabecalho de bot/tg-garimpo.py.",
+  "canais": [
+    "canal_publico_de_vagas_1",
+    "grupo_publico_de_vagas_2"
+  ],
+  "janela_horas": 48,
+  "max_por_canal": 300,
+  "max_saida": 40,
+  "max_ofertas": 2
+}

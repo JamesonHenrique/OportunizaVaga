@@ -1,0 +1,11 @@
+[
+ {"id": 1, "text": "Vaga Desenvolvedor Backend Junior 100% remoto. Candidate-se: https://empresa-a.example/vagas/1 boa sorte", "buttons": []},
+ {"id": 2, "text": "Vaga Dev Senior remoto - https://empresa-b.example/vagas/2 experiencia de 8 anos necessaria", "buttons": []},
+ {"id": 3, "text": "Vaga Junior presencial em Sao Paulo, mande curriculo para rh@empresa-c.example agora mesmo", "buttons": []},
+ {"id": 4, "text": "Dev Junior remoto, chama no privado @recrutador para detalhes da oportunidade incrivel", "buttons": []},
+ {"id": 5, "text": "Vaga Analista de BI Junior remoto - https://empresa-d.example/vagas/5 candidate-se ja", "buttons": []},
+ {"id": 6, "text": "Desenvolvedor Junior remoto. Detalhes no botao abaixo, vaga aberta para todo o Brasil hoje.", "buttons": ["https://empresa-e.example/apply/6?utm=x", "https://t.me/canal_qualquer/9"]},
+ {"id": 7, "text": "Vaga Junior remoto https://empresa-a.example/vagas/1 repostada, mesma vaga do primeiro post", "buttons": []},
+ {"id": 8, "text": "curto junior remoto", "buttons": []},
+ {"id": 9, "text": "Desenvolvedor Backend remoto\nRequisitos: 2 anos, mid-level. Nivel: Junior aceito tambem. https://empresa-f.example/vagas/9 vagas limitadas", "buttons": []}
+]
