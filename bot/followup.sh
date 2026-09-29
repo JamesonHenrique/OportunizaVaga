@@ -57,10 +57,13 @@ for a in ap:
 PY
 )"
 
+  # Priority flag for the WHOLE run (all model attempts), so the application loop does not grab the
+  # Chrome between attempts; chrome-lock.sh does not remove a flag it did not create.
+  touch /tmp/agent-chrome-9222.prio.followup; trap 'rm -f /tmp/agent-chrome-9222.prio.followup' EXIT
   STATUS=1
   for MODELO in "${MODELOS[@]}"; do
     setsid timeout --kill-after=30s 55m \
-      flock -w 1800 -E 75 /tmp/agent-chrome-9222.lock \
+      "$BOT_ROOT/bot/chrome-lock.sh" followup alta 1800 -- \
       "$OPENCODE_BIN" run -m "$MODELO" --title "followup-$(date '+%F')" "$PROMPT" \
       </dev/null 9>&- >"$FLOG" 2>&1 &
     RPID=$!

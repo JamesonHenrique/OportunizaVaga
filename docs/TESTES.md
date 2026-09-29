@@ -70,6 +70,24 @@ com taxas, `descartes_listagem` sem `total` (soma campos), regra de resposta.
 
 Dependabot (`.github/dependabot.yml`): npm em `monitor/` + github-actions, mensal.
 
+## Suítes de robustez (bash, sem framework)
+
+Todas em `tests/`, saída TAP, offline e sem tocar em estado/Chrome/opencode reais (diretório temporário e "opencode" falso):
+
+| Arquivo | Cobre |
+|---|---|
+| `test_estado.sh` | CLI do estado, `resumo` compacto e `ja-visto` |
+| `test_jsonlock.sh` | corrida: 30 `estado.py descartes 1 0 0` em paralelo somam exatamente 30 |
+| `test_prompt_cond.sh` | `render_prompt` real do `loop.sh`: sem `<!--` sobrando, só a URL do site da rodada, cerca `<<<DADOS_EXTERNOS`, regra 9 |
+| `test_chrome_lock.sh` | `chrome-lock.sh`: executar, propagar rc, ceder (76/`CHROME_LOCK_YIELD_RC`), timeout (75), flag do job pai |
+| `test_redact_logs.sh` | vazamentos sintéticos mascarados; IDs de vaga e linhas `Error:`/`browser_navigate` preservados; < 30 min; `.gz` |
+| `test_podar_sessoes.sh` | só sessões do robô (título + pasta), idade por `created`, `--dry`, DB 600 |
+| `test_rodizio_saude.sh` | pausa de site e reordenação diária por rendimento (fixture determinística) |
+| `test_ctl.sh` | `scripts/ctl.sh` status/rodada/chrome |
+
+Os espelhos PowerShell (`chrome-lock.ps1`, `ctl.ps1`, ajustes de `loop.ps1`/`followup.ps1`) não têm teste automatizado:
+o CI Windows só roda o PSScriptAnalyzer; valide numa máquina Windows antes de confiar.
+
 ## Pré-tag v0.1.0
 
 `CHANGELOG.md` tem `[0.1.0] - 2026-09-18` (partes A–E) e `[Unreleased]`

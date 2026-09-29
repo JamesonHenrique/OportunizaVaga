@@ -322,6 +322,10 @@ import sys
 
 source, target, aplicadas, dados, perfil, perfil_nome, reconhecimento, modo, limite, limite_reconhecimento, bot_root = sys.argv[1:]
 text = Path(source).read_text(encoding='utf-8')
+sys.path.insert(0, str(Path(bot_root) / 'bot'))
+import prompt_cond
+# Conditional blocks (<!--se:site=X-->...<!--/se-->, <!--se:telegram-->): keep only what this round can use.
+text = prompt_cond.aplicar(text, prompt_cond.site_da_rodada(aplicadas), prompt_cond.telegram_fresco(Path(aplicadas).parent))
 text = text.replace('$APLICADAS_FILE', aplicadas)
 text = text.replace('$DADOS_CANDIDATO_FILE', dados)
 text = text.replace('$BOT_ROOT', bot_root)
@@ -329,7 +333,6 @@ text = text.replace('bot/perfil.json', perfil)
 text = text.replace('SEU_NOME', perfil_nome)
 text = text.replace('YOUR_NAME', perfil_nome)
 # Nivel/area/termos do perfil ativo -> placeholders {{...}} (bot/perfil_render.py).
-sys.path.insert(0, str(Path(bot_root) / 'bot'))
 import perfil_render
 text = perfil_render.render(text, perfil_render.carregar(perfil))
 if modo in {'1', 'true', 'True', 'sim', 'Sim'}:
@@ -375,7 +378,8 @@ if modo not in {'1', 'true', 'True', 'sim', 'Sim'}:
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if r.returncode == 0 and r.stdout.strip():
-                text += "\n\n" + r.stdout
+                # Titles/companies/posts come from third parties: fenced as DATA (rule 9 of the prompt).
+                text += prompt_cond.cercar('fila' if 'descobrir' in cmd[1] else 'telegram', r.stdout)
         except Exception:
             pass
 Path(target).write_text(text, encoding='utf-8')
@@ -467,7 +471,7 @@ while true; do
   OC_ENV=()
   [ -n "$OV_OPENCODE_CONFIG_CONTENT" ] && OC_ENV=(OPENCODE_CONFIG_CONTENT="$OV_OPENCODE_CONFIG_CONTENT")
   setsid env "${OC_ENV[@]}" timeout --kill-after=30s "$RUN_TIMEOUT" \
-    flock -w 900 -E 75 "$BROWSER_LOCK" \
+    env CHROME_LOCK_YIELD_RC=75 CHROME_LOCK_FILE="$BROWSER_LOCK" "$BOT_ROOT/bot/chrome-lock.sh" loop normal 900 -- \
     "$OPENCODE_BIN" run -m "$MODELO" --title "candidaturas-$(date '+%F-%H%M')" "$(cat "$RUNTIME_PROMPT")" \
     </dev/null 9>&- >"$ROUND_LOG" 2>&1 &
   ROUND_PID=$!
@@ -537,6 +541,10 @@ while true; do
 
   [ -n "$MODELO_OK" ] && log "rodada usou o modelo ${MODELO_OK}"
 
+  # A rodada acabou e o opencode fechou o log: mascara segredos AGORA (antes do tail ir para o loop.log),
+  # sem esperar a varredura do cron. Falha aqui nunca derruba o loop.
+  python3 "$BOT_ROOT/bot/redact-logs.py" --forcar "$ROUND_LOG" >> loop.log 2>&1 || true
+
   # loop.log fica legivel: so o fim da rodada. Dump completo vive em logs/.
   { echo "--- saida da rodada (completa em ${ROUND_LOG}) ---"; tail -n 40 "$ROUND_LOG"; } >> loop.log
 
@@ -580,7 +588,7 @@ while true; do
     log "rodada estourou ${RUN_TIMEOUT} (ou foi morta), nova tentativa em ${W}s"
     sleep "$W"
   elif [ "$STATUS" -eq 75 ]; then
-    log "outro agente segurou o Chrome por 15min (lock), tentando de novo em ${RETRY_BASE}s"
+    log "Chrome ocupado (lock de 15min ou cedeu a job prioritario), tentando de novo em ${RETRY_BASE}s"
     sleep "$RETRY_BASE"
   elif [ "$STATUS" -ne 0 ]; then
     FAILS=$((FAILS + 1))

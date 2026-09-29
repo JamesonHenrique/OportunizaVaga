@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 ESTADO="bot/estado.py"
 
-TOTAL=9
+TOTAL=12
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -37,9 +37,9 @@ else
   relata 1 "resumo mostra rodizio.proximo"
 fi
 
-# 2 — add-aplicada grava e resumo passa a listar a chave.
+# 2 — add-aplicada grava e resumo passa a listar empresa | vaga.
 python3 "$ESTADO" --file "$TMP_STATE" add-aplicada '{"chave":"teste-1","empresa":"AcmeCorp","vaga":"Dev Jr"}' >/dev/null
-if python3 "$ESTADO" --file "$TMP_STATE" resumo | grep -q "teste-1"; then
+if python3 "$ESTADO" --file "$TMP_STATE" resumo | grep -q "AcmeCorp | Dev Jr"; then
   relata 0 "add-aplicada grava a chave nova"
 else
   relata 1 "add-aplicada grava a chave nova"
@@ -104,6 +104,33 @@ if python3 "$ESTADO" --file "$TMP_STATE" get "teste-1" | tr -d ' \n' | grep -q '
   relata 0 "status sem EMAIL_DATA nao grava fonte"
 else
   relata 1 "status sem EMAIL_DATA nao grava fonte"
+fi
+
+# 10 — resumo compacto: bloqueado aparece so como empresa (sem o motivo); ja-visto traz o detalhe.
+python3 "$ESTADO" --file "$TMP_STATE" add-bloqueado "zeta_backend_jr" '{"empresa":"ZetaSoft","vaga":"Desenvolvedor Backend Java","motivo":"exige CPF ausente"}' >/dev/null
+OUT10="$(python3 "$ESTADO" --file "$TMP_STATE" resumo)"
+if echo "$OUT10" | grep -q "ZetaSoft" && ! echo "$OUT10" | grep -q "exige CPF ausente"; then
+  relata 0 "resumo lista bloqueado so por empresa, sem motivo"
+else
+  relata 1 "resumo lista bloqueado so por empresa, sem motivo"
+fi
+
+# 11 — ja-visto: mesma vaga (titulo parecido) x mesma empresa (outro titulo).
+OUT11A="$(python3 "$ESTADO" --file "$TMP_STATE" ja-visto "Zeta Soft" "Backend Java Junior")"
+OUT11B="$(python3 "$ESTADO" --file "$TMP_STATE" ja-visto "ZetaSoft" "Analista de Marketing")"
+if echo "$OUT11A" | grep -q "^MESMA VAGA provavel | bloqueados" && echo "$OUT11B" | grep -q "^mesma empresa"; then
+  relata 0 "ja-visto separa MESMA VAGA provavel de mesma empresa"
+else
+  echo "A=$OUT11A B=$OUT11B"
+  relata 1 "ja-visto separa MESMA VAGA provavel de mesma empresa"
+fi
+
+# 12 — ja-visto de empresa desconhecida.
+OUT12="$(python3 "$ESTADO" --file "$TMP_STATE" ja-visto "EmpresaInexistenteXyz" "Dev")"
+if [ "$OUT12" = "nao visto: pode avaliar" ]; then
+  relata 0 "ja-visto empresa desconhecida -> nao visto"
+else
+  relata 1 "ja-visto empresa desconhecida -> nao visto"
 fi
 
 if [ "$FAIL" -eq 0 ]; then

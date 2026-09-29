@@ -56,7 +56,8 @@ $EDITOR bot/sites/meuportal.sh          # ajuste SITE_ID, SEARCH_URL_TEMPLATE, d
    portal usa hífen no path (como Vagas.com.br), troque por `-` — veja
    [`bot/sites/vagas.sh`](../bot/sites/vagas.sh).
 4. **Termos**: por padrão o portal usa os `termos[]` do perfil. Só se o site precisar de termos
-   próprios, adicione um bloco `- meuportal:` com termos entre aspas no `bot/prompt_loop.md`.
+   próprios, adicione um bloco `- meuportal:` com termos entre aspas no `bot/prompt_loop.md`, dentro de
+   `<!--se:site=meuportal-->…<!--/se-->` (o `render_prompt` só mantém o bloco do site da rodada; ver `docs/PROMPTS.md`).
    Portal só de uma área (ex.: só tech)? Registre em `config/sites_permitidos.json` ->
    `restrito_a_area` para ele sair do rodízio de perfis de outras áreas.
 5. **Rodízio**: inclua o `SITE_ID` na lista de rodízio (campo `rodizio` do

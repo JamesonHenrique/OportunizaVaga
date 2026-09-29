@@ -52,11 +52,16 @@ jobs:
           python3 -m py_compile bot/arquivar-logs-rodada.py
           python3 -m py_compile bot/rodizio-saude.py
           python3 -m py_compile bot/perfil_render.py
+          python3 -m py_compile bot/jsonlock.py
+          python3 -m py_compile bot/prompt_cond.py
+          python3 -m py_compile bot/redact-logs.py
+          python3 -m py_compile bot/podar-sessoes.py
       - name: validate (schemas + novos .sh)
         run: |
           bash -n bot/dry-run.sh
           bash -n bot/doctor.sh
           bash -n scripts/validate.sh
+          bash -n bot/chrome-lock.sh
           bash scripts/validate.sh
       - name: suite bash (TAP)
         run: |
@@ -65,6 +70,12 @@ jobs:
           bash tests/test_estado.sh
           bash tests/test_rodizio_saude.sh
           bash tests/test_perfil_render.sh
+          bash tests/test_jsonlock.sh
+          bash tests/test_prompt_cond.sh
+          bash tests/test_chrome_lock.sh
+          bash tests/test_redact_logs.sh
+          bash tests/test_podar_sessoes.sh
+          bash tests/test_ctl.sh
       - name: node --test monitor/
         run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)

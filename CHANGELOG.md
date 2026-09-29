@@ -6,6 +6,34 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **`scripts/ctl.sh` / `scripts/ctl.ps1`**: `status` (motor, prompt, estado, Chrome, logs em ~20 linhas), `rodada` (final da
+  última rodada) e `chrome` (quem usou o Chrome), só leitura e baratos em tokens. Teste: `tests/test_ctl.sh`.
+- **Rodízio reordenado 1x/dia pelo rendimento** (`bot/rodizio-saude.py`): mesma quantidade de vagas de rodada, ≥ 1 por site,
+  o resto proporcional a uma nota suavizada (candidaturas por rodada + respostas positivas), intercalado por round-robin
+  ponderado suave (sem repetir site em sequência quando dá); guarda `rodizio.ordem_calculada_em`. Desliga com
+  `OV_RODIZIO_REORDENAR=0`. Testes determinísticos em `tests/test_rodizio_saude.sh`.
+- **`bot/podar-sessoes.py`** (opt-in): apaga as sessões antigas do robô no opencode (banco com argumentos de tool-calls) via
+  `opencode session list --format json` / `session delete`; filtra por prefixo de título **e** pasta, idade por `created`,
+  `--dry`, banco em `chmod 600`. Documentado em `docs/SEGURANCA.md`, cron e Task Scheduler. Teste: `tests/test_podar_sessoes.sh`.
+- **`bot/redact-logs.py`**: mascara segredos nos logs (senhas do `credenciais.tsv`, campos de senha de tool-calls,
+  `printf … >> credenciais`, tokens de API/bot, CPF, códigos de 6 dígitos; `.gz`), portável, globs e arquivo de
+  credenciais configuráveis (`OV_REDACT_GLOBS`, `OV_CREDENTIALS_FILE`). Pula arquivo escrito há < 30 min salvo `--forcar`;
+  `loop.sh`/`loop.ps1` limpam o log de cada rodada ao fim dela. Exemplos de cron/Task Scheduler. Teste: `tests/test_redact_logs.sh`.
+- **`bot/chrome-lock.sh` / `bot/chrome-lock.ps1`**: protocolo único do Chrome compartilhado (`NOME alta|normal ESPERA -- CMD`):
+  jobs curtos (follow-up, Gmail) marcam prioridade por flag e o loop cede a rodada (`CHROME_LOCK_YIELD_RC`); flag do job pai
+  não é removida; log em `bot/logs/chrome-lock.log`. Usado por `loop.sh/.ps1`, `followup.sh/.ps1` e `gmail-status.py`.
+  Teste: `tests/test_chrome_lock.sh` (rodar/ceder/timeout).
+- **Prompt modular e defesa contra injeção indireta** (`bot/prompt_cond.py`, usado por `loop.sh` e `loop.ps1`):
+  blocos `<!--se:site=X-->…<!--/se-->` (só a URL do site da rodada) e `<!--se:telegram-->` (só com colheita fresca),
+  fail-open para condição/site desconhecido; linha `SITE DESTA RODADA`; fila da descoberta e posts do Telegram entram
+  cercados por `<<<DADOS_EXTERNOS …>>>` (delimitadores removidos do conteúdo) e a regra 9 dos prompts (pt/en) manda
+  tratar texto de terceiros como dado, nunca instrução. Teste: `tests/test_prompt_cond.sh`.
+- **`estado.py ja-visto EMPRESA [TITULO]`** e **`resumo` compacto**: aplicadas como `empresa | vaga`; bloqueadas e
+  arquivadas só como nomes de empresa com contagem (o detalhe vem sob demanda). Corta milhares de tokens por prompt;
+  regra 2 e recheagem de bloqueados dos prompts (pt/en) usam o `ja-visto`.
+- **`bot/jsonlock.py`** (trava exclusiva + tmp único + fsync + `os.replace`, portável fcntl/msvcrt) usada por
+  `estado.py` (escritas travadas, leituras não), `rodizio-saude.py` e `arquivar-logs-rodada.py`: gravações
+  concorrentes não se perdem mais. Teste de corrida em `tests/test_jsonlock.sh` (30 escritas paralelas = 30).
 - **Leitor de respostas no Gmail** (`bot/gmail-status.py` + `bot/gmail-extrair.mjs`): CDP puro, sem dependências,
   aba própria; lê as caixas de `email` e `email_contas` (escolhidas por endereço, `authuser`) e só falha se
   nenhuma abrir. Classifica em encerrada → **etapa de testes / fit cultural** → entrevista → **próxima etapa** →

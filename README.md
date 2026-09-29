@@ -80,6 +80,11 @@ oportunizavaga/
 │   ├── prompt_perfil_gupy.md    # manutenção avulsa do perfil Gupy
 │   ├── gerar_cv.py              # CV por vaga a partir de bot/cv_base.md (1 página, auto-checado)
 │   ├── check_ats.py             # mede a cobertura do anúncio no CV (meta >= 75%)
+│   ├── estado.py / jsonlock.py  # CLI compacta do estado (resumo, ja-visto) + trava exclusiva e gravação atômica
+│   ├── prompt_cond.py           # blocos condicionais do prompt e cerca de dados externos (anti-injeção)
+│   ├── chrome-lock.sh / .ps1    # protocolo único do Chrome compartilhado (lock + prioridade)
+│   ├── redact-logs.py           # mascara segredos nos logs (chamado ao fim de cada rodada + cron)
+│   ├── podar-sessoes.py         # (opt-in) poda sessões antigas do robô no opencode
 │   └── sites/                   # adaptadores descobertos automaticamente
 │       ├── lib.sh               # contrato comum (site_adapter_*)
 │       └── *.sh                 # indeed, gupy, linkedin, programathor, geekhunter, vagas
@@ -105,6 +110,7 @@ oportunizavaga/
 │   ├── pull-monitor.sh / .ps1       # atualiza o painel via git pull
 │   ├── digest.sh / .ps1             # resumo diário + alertas de anomalia no loop.log
 │   ├── notificar.sh / .ps1          # push genérico ao Telegram (dedupe 6h)
+│   ├── ctl.sh / .ps1                # status/rodada/chrome em poucas linhas (só leitura)
 │   └── backup-jsons.sh / .ps1       # cópia rotativa (14x) dos JSONs de estado
 ├── examples/
 │   ├── dados_candidato.example.json  # COPIE p/ bot/dados_candidato.json e preencha
