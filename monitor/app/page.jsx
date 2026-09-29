@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CACHE_KEY, FIRST_SEEN_KEY, TZ, desde, fmtDur, horaSeg, causaRaiz, refBloq, statusLoop, serieDias } from '@/lib/dashboard';
+import { CACHE_KEY, FIRST_SEEN_KEY, TZ, desde, fmtDur, horaSeg, causaRaiz, classificar, refBloq, statusLoop, serieDias } from '@/lib/dashboard';
 import StatusStrip from '@/components/dashboard/StatusStrip';
 import ActionCenter from '@/components/dashboard/ActionCenter';
 import TodayHero from '@/components/dashboard/TodayHero';
@@ -15,6 +15,8 @@ import ModelsPanel from '@/components/dashboard/ModelsPanel';
 import CadencePanel from '@/components/dashboard/CadencePanel';
 import InvitesPanel from '@/components/dashboard/InvitesPanel';
 import BlocksPanel from '@/components/dashboard/BlocksPanel';
+import LoginQueuePanel from '@/components/dashboard/LoginQueuePanel';
+import DiscoveryPanel from '@/components/dashboard/DiscoveryPanel';
 import TelegramPanel from '@/components/dashboard/TelegramPanel';
 import YieldPanel from '@/components/dashboard/YieldPanel';
 import RotationHealthPanel from '@/components/dashboard/RotationHealthPanel';
@@ -235,7 +237,9 @@ export default function Dashboard() {
     ? (d.events || []).filter(e => e.kind === 'rodada' && (e.at || '') > ultimaAplicada).length
     : (d.events || []).filter(e => e.kind === 'rodada').length;
 
-  const precisaAcao = bloqueios.filter(b => causaRaiz(b) === 'cadastro quebrado' && !b.retentar);
+  // Candidate-side blocks (login, missing data, broken signup), excluding what the robot retries.
+  const precisaAcao = bloqueios.filter(b => classificar(b).grupo === 'voce' && !b.retentar);
+  const aguardandoLogin = d.aguardandoLogin || [];
   const dadosFaltantes = d.dadosFaltantes || [];
   const proximaTentativaEm = 8 - (Math.floor(agora / 1000) % 8);
 
@@ -268,7 +272,26 @@ export default function Dashboard() {
   }
   if (horasSemEnviar != null && horasSemEnviar > 24) acoes.push({ id: 'seco', tom: 'warn',
     titulo: `Sem envio há ${Math.round(horasSemEnviar)}h`, sub: `${rodadasDesdeEnvio} rodadas desde o último envio`, acao: { rotulo: 'Diagnóstico', aba: 'robo' } });
-  if (precisaAcao.length) acoes.push({ id: 'cad', tom: 'warn', titulo: `${precisaAcao.length} cadastro(s) quebrado(s)`,
+  const stDe = (a) => (a.status || '').toLowerCase();
+  const entrevistas = aplicadas.filter(a => stDe(a) === 'entrevista');
+  if (entrevistas.length) acoes.push({ id: 'entrevista', tom: 'bad', titulo: `${entrevistas.length} e-mail(s) falando em entrevista`,
+    sub: `${nomes(entrevistas)} · confira o Gmail e responda`, acao: { rotulo: 'Ver', aba: 'candidaturas' } });
+  const testes = aplicadas.filter(a => stDe(a) === 'etapa_teste');
+  if (testes.length) acoes.push({ id: 'teste', tom: 'warn', titulo: `${testes.length} etapa(s) de teste / fit cultural`,
+    sub: `${nomes(testes)} · faça o teste na plataforma da vaga`, acao: { rotulo: 'Ver', aba: 'candidaturas' } });
+  const etapas = aplicadas.filter(a => stDe(a) === 'proxima_etapa');
+  if (etapas.length) acoes.push({ id: 'etapa', tom: 'warn', titulo: `${etapas.length} e-mail(s) de próxima etapa`,
+    sub: `${nomes(etapas)} · confira o Gmail`, acao: { rotulo: 'Ver', aba: 'candidaturas' } });
+  const sitesRod = Object.values(d.rodizioSaude?.sites || {});
+  const pausados = sitesRod.filter(s => s?.pausado_ate && new Date(s.pausado_ate).getTime() > agora).length;
+  if (sitesRod.length && pausados === sitesRod.length) acoes.push({ id: 'pausados', tom: 'warn', titulo: 'Todos os sites do rodízio pausados',
+    sub: 'o robô segue só com a busca por script e a fila de login', acao: { rotulo: 'Ver', aba: 'robo' } });
+  if (aguardandoLogin.length) {
+    const canais = [...new Set(aguardandoLogin.map(v => v.canal))];
+    acoes.push({ id: 'login', tom: 'bad', titulo: `${aguardandoLogin.length} vaga(s) compatível(is) esperando login`,
+      sub: `logue no navegador do robô: ${canais.join(', ')}`, acao: { rotulo: 'Ver vagas', aba: 'bloqueios' } });
+  }
+  if (precisaAcao.length) acoes.push({ id: 'cad', tom: 'warn', titulo: `${precisaAcao.length} bloqueio(s) dependem de você`,
     sub: nomes(precisaAcao), acao: { rotulo: 'Abrir', aba: 'bloqueios' } });
   if (retentar.length) acoes.push({ id: 'ret', tom: 'warn', titulo: `${retentar.length} vaga(s) para retentar`,
     sub: `${nomes(retentar)} · o robô retoma sozinho`, acao: { rotulo: 'Abrir', aba: 'bloqueios' } });
@@ -282,6 +305,8 @@ export default function Dashboard() {
     { rotulo: 'Total enviadas', valor: d.totals?.candidaturas ?? aplicadas.length, sub: `${porFonte[0]?.[0] || '—'} lidera (${porFonte[0]?.[1] ?? 0})` },
     { rotulo: 'Rodadas por envio', valor: d.rendimento?.rodadasPorCandidatura != null ? String(d.rendimento.rodadasPorCandidatura).replace('.', ',') : '—',
       sub: `${d.rendimento?.rodadas7d ?? '—'} rodadas em 7 dias`, dica: 'Quanto menor, mais eficiente' },
+    { rotulo: 'Respostas', valor: aplicadas.filter(a => ['etapa_teste', 'proxima_etapa', 'entrevista', 'encerrada', 'respondida'].includes(stDe(a))).length,
+      sub: `${entrevistas.length} entrevista · ${testes.length + etapas.length} teste/etapa · ${aplicadas.filter(a => stDe(a) === 'em_analise').length} em análise` },
     d.linkedin
       ? { rotulo: 'Convites LinkedIn', valor: d.totals?.convites ?? convites.length, sub: `${loops.linkedin?.convitesHoje ?? 0}/${d.linkedin?.limiteDiario ?? 10} hoje` }
       : { rotulo: 'Vagas descartadas', valor: d.descartes?.total ?? d.telemetry?.totals?.descartes ?? '—', sub: 'filtradas antes de abrir', dica: 'Nível, stack ou modelo incompatível' },
@@ -289,7 +314,7 @@ export default function Dashboard() {
 
   const abas = [
     { id: 'candidaturas', rotulo: 'Candidaturas', conta: aplicadas.length },
-    { id: 'bloqueios', rotulo: 'Bloqueios', conta: bloqueios.length, alerta: precisaAcao.length > 0 || retentar.length > 0 },
+    { id: 'bloqueios', rotulo: 'Bloqueios', conta: bloqueios.length, alerta: aguardandoLogin.length > 0 || precisaAcao.length > 0 || retentar.length > 0 },
     { id: 'robo', rotulo: 'Robô', alerta: pills.some(p => p.tom === 'bad') },
     ...(d.linkedin ? [{ id: 'linkedin', rotulo: 'LinkedIn', conta: convites.length }] : []),
     ...(d.telegram ? [{ id: 'telegram', rotulo: 'Telegram' }] : []),
@@ -325,7 +350,12 @@ export default function Dashboard() {
                 <CadencePanel porDia={porDia} porFonte={porFonte} porStatus={porStatus} total={aplicadas.length} />
               </div>
             )}
-            {abaAtiva === 'bloqueios' && <BlocksPanel bloqueios={bloqueios} vistos={vistos} />}
+            {abaAtiva === 'bloqueios' && (
+              <div className="blocks-tab">
+                <LoginQueuePanel itens={aguardandoLogin} agora={agora} />
+                <BlocksPanel bloqueios={bloqueios} />
+              </div>
+            )}
             {abaAtiva === 'robo' && (
               <>
                 {(loops.candidaturas?.duracao || loops.linkedin?.duracao) && (
@@ -336,8 +366,6 @@ export default function Dashboard() {
                   </p>
                 )}
                 <div className="layout">
-                  <TerminalPanel logTail={d.logTail} />
-                  <TimelinePanel eventos={d.events || []} />
                   <DiagnosisPanel
                     d={d} loops={loops} agora={agora}
                     ultimaAplicada={ultimaAplicada}
@@ -346,14 +374,17 @@ export default function Dashboard() {
                     gruposBloq={gruposBloq}
                     totalBloqueios={bloqueios.length}
                   />
-                  <ModelsPanel modelos={d.modelos} />
+                  <RotationHealthPanel rodizioSaude={d.rodizioSaude} proximo={d.rodizio?.proximo} />
+                  <TerminalPanel logTail={d.logTail} />
+                  <TimelinePanel eventos={d.events || []} />
+                  <DiscoveryPanel descoberta={d.descoberta} gmail={d.gmailStatus} />
                   <YieldPanel rendimento={d.rendimento} />
-                  <RotationHealthPanel rodizioSaude={d.rodizioSaude} />
+                  <ModelsPanel modelos={d.modelos} />
                 </div>
               </>
             )}
-            {abaAtiva === 'linkedin' && <InvitesPanel convites={convites} />}
-            {abaAtiva === 'telegram' && <TelegramPanel telegram={d.telegram} />}
+            {abaAtiva === 'linkedin' && <InvitesPanel convites={convites} bloqueios={d.linkedin?.bloqueios || []} convitesHoje={loops.linkedin?.convitesHoje ?? 0} limiteDiario={d.linkedin?.limiteDiario} hoje={hojeYmd} loop={loops.linkedin} />}
+            {abaAtiva === 'telegram' && <TelegramPanel telegram={d.telegram} agora={agora} />}
           </div>
         </section>
 
