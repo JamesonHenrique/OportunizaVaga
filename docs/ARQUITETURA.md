@@ -50,6 +50,7 @@
 | `bot/jsonlock.py` | Trava exclusiva (fcntl/msvcrt) + gravação atômica (tmp único, fsync, `os.replace`) dos JSONs de estado |
 | `bot/prompt_cond.py` | Blocos condicionais do prompt (`<!--se:site=X-->…<!--/se-->`, `<!--se:telegram-->`; fail-open) e cerca `<<<DADOS_EXTERNOS>>>` para texto de terceiros; usado por `loop.sh`/`loop.ps1` |
 | `bot/redact-logs.py` | Varredor que mascara segredos nos logs (chamado com `--forcar` ao fim de cada rodada + cron/Task Scheduler) |
+| `bot/podar-sessoes.py` | (opt-in) Poda sessões antigas do robô no opencode, com filtro título+pasta; DB em 600 |
 | `bot/gerar_cv.py` | Gera o PDF por vaga (regra `c1`) só a partir de `bot/cv_base.md` + `dados_candidato.json`; 1 página ou exit 2 |
 | `bot/check_ats.py` | Mede a cobertura dos termos do anúncio no CV (meta >= 75%) antes de anexar |
 | `bot/rodizio-saude.py` | Pausa (48h) site com 4 rodadas seguidas sem candidatura nova; hooks `pre`/`pos` no `loop.sh` |

@@ -55,6 +55,7 @@ jobs:
           python3 -m py_compile bot/jsonlock.py
           python3 -m py_compile bot/prompt_cond.py
           python3 -m py_compile bot/redact-logs.py
+          python3 -m py_compile bot/podar-sessoes.py
       - name: validate (schemas + novos .sh)
         run: |
           bash -n bot/dry-run.sh
@@ -73,6 +74,7 @@ jobs:
           bash tests/test_prompt_cond.sh
           bash tests/test_chrome_lock.sh
           bash tests/test_redact_logs.sh
+          bash tests/test_podar_sessoes.sh
       - name: node --test monitor/
         run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)

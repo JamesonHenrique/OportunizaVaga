@@ -6,6 +6,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **`bot/podar-sessoes.py`** (opt-in): apaga as sessões antigas do robô no opencode (banco com argumentos de tool-calls) via
+  `opencode session list --format json` / `session delete`; filtra por prefixo de título **e** pasta, idade por `created`,
+  `--dry`, banco em `chmod 600`. Documentado em `docs/SEGURANCA.md`, cron e Task Scheduler. Teste: `tests/test_podar_sessoes.sh`.
 - **`bot/redact-logs.py`**: mascara segredos nos logs (senhas do `credenciais.tsv`, campos de senha de tool-calls,
   `printf … >> credenciais`, tokens de API/bot, CPF, códigos de 6 dígitos; `.gz`), portável, globs e arquivo de
   credenciais configuráveis (`OV_REDACT_GLOBS`, `OV_CREDENTIALS_FILE`). Pula arquivo escrito há < 30 min salvo `--forcar`;
