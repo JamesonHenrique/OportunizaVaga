@@ -55,3 +55,6 @@ __pycache__/
 *.session
 .venv-tg/
 **/*.json.lock
+
+# Estado do bot fora de um perfil (execucao avulsa)
+**/state/*.json

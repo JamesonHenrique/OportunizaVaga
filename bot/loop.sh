@@ -445,12 +445,18 @@ while true; do
   COOLDOWN_FILE="$STATE_DIR/model_cooldown"
   AGORA_S=$(date +%s)
   CASCATA=()
-  for M in "${MODELOS[@]}"; do
+  # Adaptive order: best success rate first, useless models benched (bot/modelos-saude.py); fail-open to MODELOS.
+  MODELOS_ORD=()
+  if [ "${OV_MODELOS_SAUDE:-1}" = "1" ]; then
+    mapfile -t MODELOS_ORD < <(python3 "$BOT_ROOT/bot/modelos-saude.py" ordenar "${MODELOS[@]}" 2>>loop.log)
+  fi
+  [ "${#MODELOS_ORD[@]}" -gt 0 ] || MODELOS_ORD=("${MODELOS[@]}")
+  for M in "${MODELOS_ORD[@]}"; do
     ATE=$(awk -v m="$M" '$1==m {print $2}' "$COOLDOWN_FILE" 2>/dev/null | tail -1)
     [ -n "$ATE" ] && [ "$ATE" -gt "$AGORA_S" ] && continue
     CASCATA+=("$M")
   done
-  [ "${#CASCATA[@]}" -eq 0 ] && CASCATA=("${MODELOS[@]}")   # todos em resfriamento: tenta assim mesmo
+  [ "${#CASCATA[@]}" -eq 0 ] && CASCATA=("${MODELOS_ORD[@]}")   # todos em resfriamento: tenta assim mesmo
   # Modelo pago (opt-in) na frente da cascata so quando ha algo pronto para enviar, ate OV_PAGO_MAX_DIA/dia.
   if [ "$OV_USAR_PAGO_ENVIO" = "1" ] && [ -n "$OV_MODELO_PAGO" ] && tem_envio_pronto; then
     PAGO_HOJE=$(awk -v d="$(date +%F)" '$1==d {print $2}' "$STATE_DIR/pago_dia" 2>/dev/null | tail -1)
@@ -460,7 +466,7 @@ while true; do
       log "rodada com envio pronto: ${OV_MODELO_PAGO} na frente da cascata ($(( ${PAGO_HOJE:-0} + 1 ))/${OV_PAGO_MAX_DIA} hoje)"
     fi
   fi
-  [ "${#CASCATA[@]}" -lt "${#MODELOS[@]}" ] && log "cascata sem $(( ${#MODELOS[@]} - ${#CASCATA[@]} )) modelo(s) em resfriamento"
+  [ "${#CASCATA[@]}" -lt "${#MODELOS_ORD[@]}" ] && log "cascata sem $(( ${#MODELOS_ORD[@]} - ${#CASCATA[@]} )) modelo(s) em resfriamento"
 
   for MODELO in "${CASCATA[@]}"; do
   ROUND_START=$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')

@@ -57,6 +57,7 @@ jobs:
           python3 -m py_compile bot/redact-logs.py
           python3 -m py_compile bot/podar-sessoes.py
           python3 -m py_compile bot/vaga_check.py
+          python3 -m py_compile bot/modelos-saude.py
           python3 -m py_compile bot/descobrir.py
       - name: validate (schemas + novos .sh)
         run: |
@@ -80,6 +81,7 @@ jobs:
           bash tests/test_ctl.sh
           bash tests/test_descobrir.sh
           bash tests/test_vaga_check.sh
+          bash tests/test_modelos_saude.sh
       - name: node --test monitor/
         run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)
