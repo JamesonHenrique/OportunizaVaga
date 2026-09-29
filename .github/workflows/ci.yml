@@ -59,6 +59,7 @@ jobs:
           bash -n bot/dry-run.sh
           bash -n bot/doctor.sh
           bash -n scripts/validate.sh
+          bash -n bot/chrome-lock.sh
           bash scripts/validate.sh
       - name: suite bash (TAP)
         run: |
@@ -69,6 +70,7 @@ jobs:
           bash tests/test_perfil_render.sh
           bash tests/test_jsonlock.sh
           bash tests/test_prompt_cond.sh
+          bash tests/test_chrome_lock.sh
       - name: node --test monitor/
         run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)

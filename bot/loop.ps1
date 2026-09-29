@@ -120,6 +120,7 @@ $ROUNDS_KEPT = 20
 $TEMP_DIR = $env:TEMP
 if ([string]::IsNullOrWhiteSpace($TEMP_DIR)) { $TEMP_DIR = [System.IO.Path]::GetTempPath() }
 $BROWSER_LOCK = Join-Path $TEMP_DIR 'agent-chrome-9222.lock'
+. (Join-Path $PSScriptRoot 'chrome-lock.ps1')   # Enter-ChromeLock / Exit-ChromeLock
 $LOOP_LOCK = Join-Path $TEMP_DIR 'oportunizavaga-loop.lock'
 
 # Localiza um python (qualquer um serve p/ estado.py / arquivar-logs-rodada.py).
@@ -500,16 +501,11 @@ function Render-Prompt {
 # Retorna hashtable @{ Status = <int>; TimedOut = <bool> }.
 function Invoke-ModelRound([string]$modelo, [string]$prompt, [string]$roundLog) {
     $title = 'candidaturas-{0}' -f (Get-Date).ToString('yyyy-MM-dd-HHmm')
-    # Disputa exclusiva pelo Chrome (ate 900s), espelhando `flock -w 900 -E 75`.
-    $chromeLock = $null
-    $deadline = (Get-Date).AddSeconds(900)
-    while ((Get-Date) -lt $deadline) {
-        try {
-            $chromeLock = [System.IO.File]::Open($BROWSER_LOCK, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
-            break
-        } catch { Start-Sleep -Seconds 5 }
-    }
-    if ($null -eq $chromeLock) { return @{ Status = 75; TimedOut = $false } }
+    # Protocolo unico do Chrome compartilhado (bot/chrome-lock.ps1, espelho de chrome-lock.sh):
+    # espera ate 900s; cede a vez a job prioritario (flag). Ambos viram 75 = "Chrome ocupado".
+    $env:CHROME_LOCK_FILE = $BROWSER_LOCK
+    $chromeLock = Enter-ChromeLock -Name 'loop' -Prio 'normal' -WaitSeconds 900
+    if ($chromeLock.Status -ne 0) { return @{ Status = 75; TimedOut = $false } }
     try {
         $job = Start-Job -ScriptBlock {
             param($bin, $mod, $ttl, $pr, $cfg)
@@ -530,7 +526,7 @@ function Invoke-ModelRound([string]$modelo, [string]$prompt, [string]$roundLog) 
             return @{ Status = 124; TimedOut = $true }
         }
     } finally {
-        try { $chromeLock.Close(); $chromeLock.Dispose() } catch { }
+        Exit-ChromeLock $chromeLock
     }
 }
 

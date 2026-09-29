@@ -45,6 +45,7 @@ $TEMP_DIR = $env:TEMP
 if ([string]::IsNullOrWhiteSpace($TEMP_DIR)) { $TEMP_DIR = [System.IO.Path]::GetTempPath() }
 $FOLLOWUP_LOCK = Join-Path $TEMP_DIR 'oportunizavaga-followup.lock'
 $BROWSER_LOCK = Join-Path $TEMP_DIR 'agent-chrome-9222.lock'
+. (Join-Path $PSScriptRoot 'chrome-lock.ps1')   # Enter-ChromeLock / Exit-ChromeLock
 
 # Instancia unica: lock exclusivo; se ja houver dono, sai calado.
 try {
@@ -85,16 +86,11 @@ function Test-Cdp {
 }
 
 if (Test-Cdp) {
-    # Disputa exclusiva pelo Chrome (ate 900s). Timeout = pula a semana.
-    $chromeLock = $null
-    $deadline = (Get-Date).AddSeconds(900)
-    while ((Get-Date) -lt $deadline) {
-        try {
-            $chromeLock = [System.IO.File]::Open($BROWSER_LOCK, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
-            break
-        } catch { Start-Sleep -Seconds 5 }
-    }
-    if ($null -eq $chromeLock) {
+    # Protocolo unico do Chrome (bot/chrome-lock.ps1): job prioritario ("alta"), espera ate 900s.
+    # A flag de prioridade fica durante TODAS as tentativas de modelo. Timeout = pula a semana.
+    $env:CHROME_LOCK_FILE = $BROWSER_LOCK
+    $chromeLock = Enter-ChromeLock -Name 'followup' -Prio 'alta' -WaitSeconds 900
+    if ($chromeLock.Status -ne 0) {
         Add-Content -Path 'followup.log' -Value ("[{0}] follow-up pulado: Chrome ocupado (lock)" -f (Write-Stamp))
     } else {
         try {
@@ -152,7 +148,7 @@ if (Test-Cdp) {
                 Add-Content -Path 'followup.log' -Value ("[{0}] follow-up FALHOU (status {1}); tenta de novo amanha" -f (Write-Stamp), $STATUS)
             }
         } finally {
-            try { $chromeLock.Close(); $chromeLock.Dispose() } catch { }
+            Exit-ChromeLock $chromeLock
         }
     }
 } else {
