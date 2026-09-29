@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 PY="${PYTHON:-python3}"
 
-TOTAL=6
+TOTAL=7
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -18,6 +18,11 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 export ROOT OV_OPENCODE_USER_CONFIG="$ROOT/config/opencode.jsonc.example"
 unset OPENCODE_CONFIG OV_BROWSER_MCP OV_ENXUTO_NEGAR OV_OPENCODE_ENXUTO
+# 0 — opt-in in the public repo: without OV_OPENCODE_ENXUTO=1 nothing changes (empty output, exit 0).
+S0="$("$PY" bot/opencode-enxuto.py 2>/dev/null)"; R0=$?
+[ -z "$S0" ] && [ "$R0" = 0 ]
+relata $? "padrao desligado: sem OV_OPENCODE_ENXUTO=1 a saida e vazia"
+export OV_OPENCODE_ENXUTO=1
 
 # 1 — JSONC do exemplo (com // dentro de URLs e comentarios) vira JSON valido; browser MCP sem 'vision', com CDP e blocklist.
 "$PY" bot/opencode-enxuto.py > "$TMP/cfg.json" 2>"$TMP/err"

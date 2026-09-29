@@ -18,7 +18,7 @@ What it does (merged by opencode over your own config, so nothing else changes):
 
 Usage: python3 bot/opencode-enxuto.py   -> JSON on stdout, or NOTHING when off/unavailable (fail-open:
 the caller then keeps its own config, e.g. $OV_OPENCODE_CONFIG_CONTENT).
-Off switch: OV_OPENCODE_ENXUTO=0. Config file: $OV_OPENCODE_USER_CONFIG, $OPENCODE_CONFIG, or
+Opt-in: OV_OPENCODE_ENXUTO=1 (off by default in the public repo: it denies built-in tools). Config file: $OV_OPENCODE_USER_CONFIG, $OPENCODE_CONFIG, or
 ~/.config/opencode/opencode.jsonc|json.
 """
 import json
@@ -85,7 +85,7 @@ def enxuto(user_cfg, navegador):
 
 
 def main():
-    if os.environ.get("OV_OPENCODE_ENXUTO", "1") == "0":
+    if os.environ.get("OV_OPENCODE_ENXUTO", "0") != "1":   # opt-in in the public repo (denies tools)
         return 0
     try:
         with open(caminho_config(), encoding="utf-8") as fh:

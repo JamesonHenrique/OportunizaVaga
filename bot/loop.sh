@@ -48,7 +48,7 @@ OV_PAGO_MAX_DIA="${OV_PAGO_MAX_DIA:-2}"
 # custa dezenas de milhares de tokens de schema em TODA chamada). Ex.:
 #   OV_OPENCODE_CONFIG_CONTENT='{"mcp":{"github":{"enabled":false},"context7":{"enabled":false}}}'
 # So desligue MCPs que voce realmente tem configurados. Vazio = bot/opencode-enxuto.py monta a config enxuta a
-# partir da sua propria config do opencode (OV_OPENCODE_ENXUTO=0 para nao mexer em nada).
+# partir da sua propria config do opencode (OV_OPENCODE_ENXUTO=1 para ligar; desligado por padrao).
 OV_OPENCODE_CONFIG_CONTENT="${OV_OPENCODE_CONFIG_CONTENT:-}"
 # Cadeia de modelos GRATUITOS, em ordem de preferencia. Toda rodada comeca pelo
 # primeiro: por isso a volta ao preferido e automatica quando o limite dele passa,
@@ -475,7 +475,7 @@ while true; do
   # 9>&-: nao vaza o fd do flock para o filho.
   # Sessao nova a cada rodada: o historico nao carrega nada que aplicadas.json nao tenha.
   # Rodada enxuta: OPENCODE_CONFIG_CONTENT desliga MCPs/ferramentas que o loop nao usa. Precedencia:
-  # OV_OPENCODE_CONFIG_CONTENT (explicito) > bot/opencode-enxuto.py (le a SUA config; OV_OPENCODE_ENXUTO=0 desliga)
+  # OV_OPENCODE_CONFIG_CONTENT (explicito) > bot/opencode-enxuto.py (le a SUA config; OV_OPENCODE_ENXUTO=1 liga (desligado por padrão))
   # > nada. Fail-open: script sem saida = config do opencode intacta.
   OC_CFG="$OV_OPENCODE_CONFIG_CONTENT"
   [ -n "$OC_CFG" ] || OC_CFG="$(python3 "$BOT_ROOT/bot/opencode-enxuto.py" 2>>loop.log)"

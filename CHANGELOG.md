@@ -22,7 +22,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   renderizado em `loop.sh`/`loop.ps1`). Testes em `tests/test_prompt_cond.sh`.
 - **Config enxuta do opencode (`bot/opencode-enxuto.py`)**: monta o `OPENCODE_CONFIG_CONTENT` a partir da sua própria config
   (desliga os outros MCPs, tira `--caps vision` do MCP de browser, nega `edit/glob/grep/websearch/task/todowrite`, mantém
-  `write`/`webfetch`), usada por `loop` e `followup` (`.sh` e `.ps1`); fail-open, `OV_OPENCODE_ENXUTO=0` desliga e
+  `write`/`webfetch`), usada por `loop` e `followup` (`.sh` e `.ps1`); fail-open, `OV_OPENCODE_ENXUTO=1` liga (desligado por padrão: nega ferramentas embutidas) e
   `OV_OPENCODE_CONFIG_CONTENT` continua mandando. Medição privada do mantenedor: -28% de contexto por chamada
   (15.346 -> 11.051 tokens). Teste: `tests/test_opencode_enxuto.sh`.
 - **Cascata de modelos adaptativa (`bot/modelos-saude.py`)**: ordena a cascata pela taxa de sucesso real dos últimos 7 dias de

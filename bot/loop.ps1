@@ -507,7 +507,7 @@ function Invoke-ModelRound([string]$modelo, [string]$prompt, [string]$roundLog) 
     $chromeLock = Enter-ChromeLock -Name 'loop' -Prio 'normal' -WaitSeconds 900
     if ($chromeLock.Status -ne 0) { return @{ Status = 75; TimedOut = $false } }
     # Config enxuta: OV_OPENCODE_CONFIG_CONTENT (explicito) > bot/opencode-enxuto.py (le a SUA config do opencode;
-    # OV_OPENCODE_ENXUTO=0 desliga) > nada. Fail-open: sem saida = config do opencode intacta.
+    # OV_OPENCODE_ENXUTO=1 liga (desligado por padrão)) > nada. Fail-open: sem saida = config do opencode intacta.
     $ocCfg = $OV_OPENCODE_CONFIG_CONTENT
     if ([string]::IsNullOrWhiteSpace($ocCfg) -and $Py) {
         try { $ocCfg = (& $Py (Join-Path $BOT_ROOT 'bot\opencode-enxuto.py') 2>$null) -join '' } catch { $ocCfg = '' }
