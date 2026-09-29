@@ -53,7 +53,7 @@
 | `bot/podar-sessoes.py` | (opt-in) Poda sessões antigas do robô no opencode, com filtro título+pasta; DB em 600 |
 | `bot/gerar_cv.py` | Gera o PDF por vaga (regra `c1`) só a partir de `bot/cv_base.md` + `dados_candidato.json`; 1 página ou exit 2 |
 | `bot/check_ats.py` | Mede a cobertura dos termos do anúncio no CV (meta >= 75%) antes de anexar |
-| `bot/rodizio-saude.py` | Pausa (48h) site com 4 rodadas seguidas sem candidatura nova; hooks `pre`/`pos` no `loop.sh` |
+| `bot/rodizio-saude.py` | Pausa (48h) site com 4 rodadas seguidas sem candidatura nova; reordena o rodízio 1x/dia pelo rendimento; hooks `pre`/`pos` no `loop.sh` |
 | `bot/sites/lib.sh` | Descoberta automática de adaptadores e contrato comum (`site_adapter_*`) |
 | `bot/sites/*.sh` | Adaptadores de portal: URL de busca, dica de remoto e termos por site |
 | `bot/chrome-lock.sh` (+ `.ps1`) | Protocolo único do Chrome compartilhado: lock + flags de prioridade (`alta` marca a vez, `normal` cede) |

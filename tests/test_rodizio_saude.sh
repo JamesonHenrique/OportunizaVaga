@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 SAUDE="bot/rodizio-saude.py"
 
-TOTAL=4
+TOTAL=8
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -88,6 +88,79 @@ else
   echo "vazias_seguidas=$VAZIAS_SEGUIDAS"
   relata 1 "candidatura nova zera vazias_seguidas do site"
 fi
+
+# 5-6 — reordenar (rendimento): saida deterministica numa fixture; >=1 vaga por site; sem repeticao seguida.
+OUT5="$(python3 - <<'PYEOF'
+import importlib.util, os
+spec = importlib.util.spec_from_file_location("rs", os.path.join("bot", "rodizio-saude.py"))
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+ordem = ["gupy", "linkedin", "indeed", "gupy", "linkedin", "indeed", "remotar", "programathor", "infojobs", "geekhunter"]
+sites = {"gupy": {"rodadas": 10, "aplicadas": 6}, "linkedin": {"rodadas": 10, "aplicadas": 3}, "indeed": {"rodadas": 10, "aplicadas": 0},
+         "remotar": {"rodadas": 2, "aplicadas": 0}, "programathor": {"rodadas": 8, "aplicadas": 1}}
+ap = [{"status": "entrevista", "como": "Gupy"}, {"status": "etapa_teste", "como": "linkedin easy apply"}, {"status": "em_analise", "como": "indeed"}]
+nova, notas = m.reordenar(ordem, sites, ap)
+nova2, _ = m.reordenar(ordem, sites, ap)
+print(",".join(nova))
+print("deterministico" if nova == nova2 else "instavel")
+print("tamanho-ok" if len(nova) == len(ordem) else "tamanho-errado")
+print("um-por-site" if set(nova) == set(ordem) else "site-sumiu")
+print("sem-repeticao" if all(a != b for a, b in zip(nova, nova[1:])) else "repetiu")
+print("nota-gupy=%.3f" % notas["gupy"])
+PYEOF
+)"
+EXPECTED5="gupy,linkedin,infojobs,indeed,remotar,programathor,geekhunter,gupy,linkedin,infojobs"
+if [ "$(echo "$OUT5" | sed -n 1p)" = "$EXPECTED5" ] && [ "$(echo "$OUT5" | sed -n 6p)" = "nota-gupy=0.692" ]; then
+  relata 0 "reordenar: ordem e notas esperadas na fixture (gupy=0.692)"
+else
+  echo "$OUT5"
+  relata 1 "reordenar: ordem e notas esperadas na fixture"
+fi
+if [ "$(echo "$OUT5" | sed -n '2,5p' | tr '\n' ' ')" = "deterministico tamanho-ok um-por-site sem-repeticao " ]; then
+  relata 0 "reordenar: deterministico, mesmo tamanho, >=1 vaga por site, sem repeticao seguida"
+else
+  echo "$OUT5"
+  relata 1 "reordenar: deterministico, mesmo tamanho, >=1 vaga por site, sem repeticao seguida"
+fi
+
+# 7 — pre recalcula 1x por dia (ordem_calculada_em) e mantem o proximo; segunda chamada no mesmo dia nao mexe.
+DIR7="$(mktemp -d)"
+python3 - "$DIR7" <<'PYEOF'
+import json, os, sys
+d = sys.argv[1]
+json.dump({"rodizio": {"ordem": ["gupy", "indeed", "gupy", "indeed", "remotar", "linkedin"], "proximo": "indeed", "pos": 1}, "aplicadas": []},
+          open(os.path.join(d, "aplicadas.json"), "w", encoding="utf-8"))
+json.dump({"sites": {"gupy": {"rodadas": 10, "aplicadas": 8}, "indeed": {"rodadas": 10, "aplicadas": 0},
+                      "remotar": {"rodadas": 5, "aplicadas": 0}, "linkedin": {"rodadas": 5, "aplicadas": 1}}},
+          open(os.path.join(d, "rodizio_saude.json"), "w", encoding="utf-8"))
+PYEOF
+python3 "$SAUDE" pre "$DIR7/aplicadas.json" >/dev/null 2>&1
+ORD_A="$(python3 -c "import json; r=json.load(open('$DIR7/aplicadas.json'))['rodizio']; print(','.join(r['ordem']), r['ordem_calculada_em'], r['proximo'], r['ordem'][r['pos']])")"
+python3 "$SAUDE" pre "$DIR7/aplicadas.json" >/dev/null 2>&1
+ORD_B="$(python3 -c "import json; r=json.load(open('$DIR7/aplicadas.json'))['rodizio']; print(','.join(r['ordem']), r['ordem_calculada_em'], r['proximo'], r['ordem'][r['pos']])")"
+HOJE="$(date +%Y-%m-%d)"
+if [ "$ORD_A" = "$ORD_B" ] && echo "$ORD_A" | grep -q " $HOJE indeed indeed$" && [ "$(echo "$ORD_A" | cut -d' ' -f1 | tr ',' '\n' | grep -c '^gupy$')" -ge 2 ]; then
+  relata 0 "pre reordena 1x/dia (ordem_calculada_em), mantem o proximo e favorece o site que rende"
+else
+  echo "A=$ORD_A B=$ORD_B"
+  relata 1 "pre reordena 1x/dia (ordem_calculada_em), mantem o proximo e favorece o site que rende"
+fi
+
+# 8 — OV_RODIZIO_REORDENAR=0 desliga a reordenacao.
+python3 - "$DIR7" <<'PYEOF'
+import json, os, sys
+p = os.path.join(sys.argv[1], "aplicadas.json")
+d = json.load(open(p, encoding="utf-8"))
+d["rodizio"]["ordem"] = ["gupy", "indeed", "gupy", "indeed", "remotar", "linkedin"]
+d["rodizio"].pop("ordem_calculada_em", None)
+json.dump(d, open(p, "w", encoding="utf-8"))
+PYEOF
+OV_RODIZIO_REORDENAR=0 python3 "$SAUDE" pre "$DIR7/aplicadas.json" >/dev/null 2>&1
+if [ "$(python3 -c "import json; print(','.join(json.load(open('$DIR7/aplicadas.json'))['rodizio']['ordem']))")" = "gupy,indeed,gupy,indeed,remotar,linkedin" ]; then
+  relata 0 "OV_RODIZIO_REORDENAR=0 mantem a ordem"
+else
+  relata 1 "OV_RODIZIO_REORDENAR=0 mantem a ordem"
+fi
+rm -rf "$DIR7"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "# verde: $N/$TOTAL"
