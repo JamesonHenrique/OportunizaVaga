@@ -23,6 +23,9 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from jsonlock import gravar, travado  # noqa: E402
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT = str(SCRIPT_DIR / "aplicadas.json")
 
@@ -33,10 +36,7 @@ def load(path):
 
 
 def save(path, d):
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(d, fh, ensure_ascii=False, indent=2)
-    os.replace(tmp, path)
+    gravar(path, d)   # unique tmp + fsync + atomic replace (jsonlock.py)
 
 
 def parse(s):
@@ -197,5 +197,19 @@ def main(argv):
     return 0
 
 
+LEITURA = {"resumo", "get", "tem", "ja-visto"}
+
+
+def main_travado(argv):
+    """Writes hold the exclusive state lock for the whole load -> modify -> save; reads take none."""
+    com_file = argv[:1] == ["--file"] and len(argv) > 1
+    path = argv[1] if com_file else os.environ.get("APLICADAS_FILE", DEFAULT)
+    resto = argv[2:] if com_file else argv
+    if not resto or resto[0] in LEITURA:
+        return main(argv)
+    with travado(path):
+        return main(argv)
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main_travado(sys.argv[1:]))

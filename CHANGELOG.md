@@ -6,6 +6,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **`bot/jsonlock.py`** (trava exclusiva + tmp único + fsync + `os.replace`, portável fcntl/msvcrt) usada por
+  `estado.py` (escritas travadas, leituras não), `rodizio-saude.py` e `arquivar-logs-rodada.py`: gravações
+  concorrentes não se perdem mais. Teste de corrida em `tests/test_jsonlock.sh` (30 escritas paralelas = 30).
 - **Leitor de respostas no Gmail** (`bot/gmail-status.py` + `bot/gmail-extrair.mjs`): CDP puro, sem dependências,
   aba própria; lê as caixas de `email` e `email_contas` (escolhidas por endereço, `authuser`) e só falha se
   nenhuma abrir. Classifica em encerrada → **etapa de testes / fit cultural** → entrevista → **próxima etapa** →

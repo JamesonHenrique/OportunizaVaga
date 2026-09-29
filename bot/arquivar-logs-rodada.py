@@ -14,36 +14,43 @@ from datetime import datetime
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+from jsonlock import gravar, travado  # noqa: E402
 
 src = Path(sys.argv[1]) if len(sys.argv) > 1 else SCRIPT_DIR / "aplicadas.json"
 out = Path(sys.argv[2]) if len(sys.argv) > 2 else SCRIPT_DIR / "logs" / "rodadas.jsonl"
 
-try:
-    d = json.loads(src.read_text(encoding="utf-8"))
-except Exception as e:
-    print(f"arquivar-logs: json invalido, nada feito ({e})")
-    sys.exit(0)
 
-keys = [k for k in d if k.startswith("log_rodada")]
-# Weak models often miscount descartes_listagem.total by 1; recompute it deterministically.
-dl = d.get("descartes_listagem")
-fixed_total = False
-if isinstance(dl, dict) and all(isinstance(dl.get(k), int) for k in ("nivel", "modelo", "stack")):
-    soma = dl["nivel"] + dl["modelo"] + dl["stack"]
-    if dl.get("total") != soma:
-        dl["total"] = soma
-        fixed_total = True
+def main():
+    try:
+        d = json.loads(src.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"arquivar-logs: json invalido, nada feito ({e})")
+        return
 
-if not keys and not fixed_total:
-    sys.exit(0)
+    keys = [k for k in d if k.startswith("log_rodada")]
+    # Weak models often miscount descartes_listagem.total by 1; recompute it deterministically.
+    dl = d.get("descartes_listagem")
+    fixed_total = False
+    if isinstance(dl, dict) and all(isinstance(dl.get(k), int) for k in ("nivel", "modelo", "stack")):
+        soma = dl["nivel"] + dl["modelo"] + dl["stack"]
+        if dl.get("total") != soma:
+            dl["total"] = soma
+            fixed_total = True
 
-out.parent.mkdir(parents=True, exist_ok=True)
-with out.open("a", encoding="utf-8") as fh:
-    for k in keys:
-        fh.write(json.dumps({"arquivado_em": datetime.now().isoformat(timespec="seconds"),
-                             "chave": k, "valor": d.pop(k)}, ensure_ascii=False) + "\n")
+    if not keys and not fixed_total:
+        return
 
-tmp = src.with_suffix(".json.tmp")
-tmp.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
-os.replace(tmp, src)
-print(f"arquivar-logs: {len(keys)} chaves movidas para {out.name}" + (", total de descartes recalculado" if fixed_total else ""))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("a", encoding="utf-8") as fh:
+        for k in keys:
+            fh.write(json.dumps({"arquivado_em": datetime.now().isoformat(timespec="seconds"),
+                                 "chave": k, "valor": d.pop(k)}, ensure_ascii=False) + "\n")
+
+    gravar(str(src), d)
+    print(f"arquivar-logs: {len(keys)} chaves movidas para {out.name}" + (", total de descartes recalculado" if fixed_total else ""))
+
+
+if __name__ == "__main__":
+    with travado(str(src)):   # same exclusive lock as estado.py
+        main()
