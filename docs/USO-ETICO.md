@@ -43,6 +43,12 @@ Por design o bot já processa **1 site por rodada** em rodízio e faz backoff cr
 quando não há vaga nova — ou seja, quanto menos há para fazer, mais devagar ele vai.
 Isso é intencional: reduz pegada e cara de automação.
 
+### Requisições da descoberta (opt-in, `OV_DESCOBRIR=1`)
+
+Além das buscas (poucas a cada ~90 min), a triagem pela descrição baixa **a página pública** de até `max_descricoes`
+vagas do LinkedIn por coleta (padrão 12, com pausa aleatória de 1,5-3 s entre elas; `0` desliga) e o canário diário faz 2-3
+requisições. Tudo é público, sem login. Reduza `max_descricoes`/`termos_por_coleta` para um ritmo ainda mais baixo.
+
 ## Privacidade
 
 Rodar o modelo **100% local com Ollama** faz seus dados e CV nunca saírem da máquina.

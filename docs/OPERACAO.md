@@ -107,3 +107,15 @@ alarme falso o tempo todo; o vigia olha o **processo**. Limite: roda na própria
 (para isso é preciso um pinger externo no `/api/status`). Variáveis: `HB_MAX_MIN`, `VIGIA_INTERVALO_MIN` (só a mensagem),
 `NOTIFY`/`VIGIA_NOTIFY` (notificador), `VIGIA_STATE`, `VIGIA_LOOP_PATTERN` (testes). Sai com 2 quando alertou.
 Teste: `tests/test_vigia_vida.sh`. O `.ps1` não tem teste automatizado (ver `docs/TESTES.md`).
+
+## Canário dos parsers de portal (`bot/canario-fontes.py`)
+
+`descobrir.py` lê páginas públicas cujo markup os portais mudam sem aviso; sem alarme, um parser quebrado vira "0 vagas
+novas" para sempre. O canário roda 1x/dia, **ao vivo**, o primeiro termo do perfil em cada fonte habilitada em
+`descoberta.json` (`fontes`) e checa o contrato: busca do LinkedIn com `id`/`titulo`/`url`; página da vaga com descrição
+**e** nível de experiência oficial; API da Gupy com vagas e descrição. Falhou = mensagem `[CANARIO] ...` no Telegram
+(`scripts/notificar.sh`; no Windows `notificar.ps1`) e exit 2.
+
+As fixtures de `tests/fixtures/` (`linkedin_search.html`, `linkedin_vaga.html`, `gupy_busca_desc.json`) são **sintéticas**:
+fixam o markup que o projeto *assume*, então testes verdes offline não provam que o portal ainda o serve; só o canário
+detecta a mudança. Ao atualizar um parser, atualize a fixture junto. Teste: `tests/test_canario_fontes.sh`.

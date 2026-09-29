@@ -48,4 +48,8 @@ BOT_DIR=$HOME/opensource/oportunizavaga
 # (so com MONITOR_URL no ambiente do cron; sem ele essa checagem e pulada) ou o aplicadas.json quebrar
 */15 * * * *                  $BOT_DIR/bot/vigia-vida.sh >> $BOT_DIR/bot/logs/vigia-vida.log 2>&1
 
+# Canario dos parsers de portal (opcional, com OV_DESCOBRIR=1): 1x/dia roda a busca do LinkedIn/Gupy AO VIVO e avisa no
+# Telegram se o markup mudou (sem isso um parser quebrado so vira "0 vagas novas" para sempre). 2-3 requisicoes/dia.
+30 7 * * *                    python3 $BOT_DIR/bot/canario-fontes.py >> $BOT_DIR/bot/logs/canario-fontes.log 2>&1
+
 # Relatorio de tokens por job (manual): python3 $BOT_DIR/scripts/tokens-relatorio.py 1

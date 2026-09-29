@@ -6,6 +6,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Canário dos parsers de portal (`bot/canario-fontes.py`)**: 1x/dia roda a busca do LinkedIn/Gupy ao vivo (só as `fontes`
+  habilitadas) e avisa no Telegram, com exit 2, se algum parser não devolver dados usáveis (busca vazia, página de vaga sem
+  descrição ou sem nível oficial, Gupy sem descrição). Contrato offline com fixtures **sintéticas** em
+  `tests/test_canario_fontes.sh` (`tests/fixtures/linkedin_vaga.html`, `gupy_busca_desc.json`). Exemplos em
+  `config/crontab.example` e `config/TaskScheduler.md`.
 - **Dead man's switch (`bot/vigia-vida.sh` / `bot/vigia-vida.ps1`)**: a cada 15 min avisa no Telegram se o loop não estiver
   rodando em 2 checagens seguidas, se o heartbeat do monitor (`MONITOR_URL/api/status?ping=1`) tiver mais de `HB_MAX_MIN`
   minutos (`MONITOR_URL` opcional e sem padrão: sem ele a checagem é pulada) ou se o `aplicadas.json` estiver ausente/ilegível.

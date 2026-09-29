@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""Daily canary of the portal parsers. bot/descobrir.py reads public pages whose markup the portals change
+without notice; without this, a broken parser just means "0 new jobs" forever. This runs each parser LIVE once
+and alerts (scripts/notificar.sh|ps1, Telegram) when one returns nothing usable.
+
+  canario-fontes.py          live check (cron / Task Scheduler, once a day); exit 0 ok, 2 = some parser broke
+
+Contract checked, per source enabled in descoberta.json "fontes" (the same contract tests/test_canario_fontes.sh
+checks OFFLINE against the fixtures in tests/fixtures/):
+  - linkedin search   -> >= 1 job with id, titulo and url
+  - linkedin job page -> non-empty description AND the official experience level
+  - gupy search API   -> >= 1 job with id, titulo and url, and a description
+The fixtures are SYNTHETIC: they pin the markup this project assumes, so a green offline test does not prove the
+portal still serves it. Only this live canary detects drift. It costs 2-3 requests a day (see docs/USO-ETICO.md).
+The search term is the first of the active profile; env NOTIFY overrides the notifier (tests).
+"""
+import os
+import subprocess
+import sys
+
+BOT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BOT_DIR)
+import descobrir as d  # noqa: E402
+
+
+def _notificar(msg):
+    alvo = os.environ.get("NOTIFY")
+    scripts = os.path.join(os.path.dirname(BOT_DIR), "scripts")
+    if alvo:
+        cmd = [alvo, msg]
+    elif os.name == "nt":
+        cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(scripts, "notificar.ps1"), msg]
+    else:
+        cmd = [os.path.join(scripts, "notificar.sh"), msg]
+    try:
+        subprocess.run(cmd, check=False, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+def checar(ctx=None, termo=None):
+    """List of failure descriptions ([] = every enabled parser produced usable data)."""
+    ctx = ctx or d.Ctx()
+    termo = termo or ctx.termos[0]
+    falhas = []
+    if "linkedin" in ctx.cfg["fontes"]:
+        try:
+            li = [v for v in d.linkedin(ctx, termo) if v.get("titulo") and v.get("url")]
+            if not li:
+                falhas.append("LinkedIn busca: 0 vagas")
+        except Exception as e:
+            li = []
+            falhas.append(f"LinkedIn busca: {type(e).__name__}")
+        if li:
+            try:
+                texto, nivel = d.linkedin_detalhe(li[0]["id"].split(":", 1)[1])
+                if not texto.strip():
+                    falhas.append("LinkedIn vaga: descricao vazia")
+                if not nivel:
+                    falhas.append("LinkedIn vaga: sem nivel de experiencia oficial")
+            except Exception as e:
+                falhas.append(f"LinkedIn vaga: {type(e).__name__}")
+    if "gupy" in ctx.cfg["fontes"]:
+        try:
+            gp = [v for v in d.gupy(ctx, termo) if v.get("titulo") and v.get("url")]
+            if not gp:
+                falhas.append("Gupy busca: 0 vagas")
+            elif not any((v.get("_descricao") or "").strip() for v in gp):
+                falhas.append("Gupy busca: sem descricao")
+        except Exception as e:
+            falhas.append(f"Gupy busca: {type(e).__name__}")
+    return falhas
+
+
+def main():
+    falhas = checar()
+    if falhas:
+        msg = ("[CANARIO] Parser de portal quebrado: " + "; ".join(falhas)
+               + " (o portal mudou? ver bot/descobrir.py e bot/vaga_check.py)")
+        print(msg)
+        _notificar(msg)
+        return 2
+    print("canario-fontes: ok")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

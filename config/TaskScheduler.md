@@ -165,6 +165,18 @@ schtasks /Create /TN 'OportunizaVaga\VigiaVida' `
 
 Equivale a `*/15 * * * * $BOT_DIR/bot/vigia-vida.sh`. Limite: roda na própria máquina; PC desligado não avisa.
 
+## 14. Canário dos parsers de portal (opcional; diário 07:30)
+
+Roda a busca do LinkedIn/Gupy **ao vivo** (2-3 requisições) e avisa no Telegram (`scripts\notificar.ps1`) se algum parser
+parou de devolver dados (o portal mudou o HTML/API). Só faz sentido com a descoberta ligada (`OV_DESCOBRIR=1`).
+
+```powershell
+schtasks /Create /TN 'OportunizaVaga\CanarioFontes' `
+  /TR "py `"$BOT_DIR\bot\canario-fontes.py`"" /SC DAILY /ST 07:30 /F
+```
+
+Equivale a `30 7 * * * python3 $BOT_DIR/bot/canario-fontes.py`.
+
 ## Conferir / remover
 
 ```powershell
