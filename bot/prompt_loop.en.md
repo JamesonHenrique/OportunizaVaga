@@ -52,7 +52,7 @@ FIXED RULES:
      guess. Log it via `estado.py --file $APLICADAS_FILE set-quase-la KEY '<json>'` (NOT in bloqueados
      — fields chave, empresa, vaga, falta, bloqueado_em) and move to the next job. See a1 to resume it
      once the datum exists.
-   - New sign-ups (GeekHunter, Remotar/Inhire, Talentbrand): create with the candidate's e-mail + CV data;
+   - New sign-ups (GeekHunter, Remotar/Inhire, Talentbrand): create with the "email_contas" from dados_candidato.json (falls back to "email"; NEVER the contact "email" when email_contas exists) + CV data;
      note where you created them and which data in aplicadas.json ("contas_criadas" field).
 5. At most 3 new applications per round. If there is no compatible new job, finish doing nothing.
 6. RAM ECONOMY: at the start list the tabs (agent-browser tabs) and CLOSE all unnecessary ones, keeping at
@@ -228,17 +228,19 @@ c-Externo) NON-STANDARD ATS / SITE (rippling, greenhouse, lever, inhire.app, fac
       ats.rippling.com/...)? That's NORMAL — keep going through the flow to the final submit button.
       Do not log a block for a redirect.
    2. Order of preference: form WITHOUT an account (greenhouse/lever/rippling often are) → "Continue
-      with Google"/"Sign in with LinkedIn" (candidate's e-mail, already logged into Chrome) → sign up
+      with Google"/"Sign in with LinkedIn" ("email_contas" account, already logged into Chrome) → sign up
       with e-mail+password.
-   3. Sign-up with a password: generate a NEW strong password per site
-      (python3 -c "import secrets;print(secrets.token_urlsafe(18))") and save it IMMEDIATELY, before
-      submitting the form, to a file OUTSIDE the repo and the published state (e.g.
-      ~/.config/oportunizavaga/credenciais.tsv, chmod 600):
-      printf '%s\t%s\t%s\n' "<domain>" "<email>" "<password>" >> ~/.config/oportunizavaga/credenciais.tsv
-      NEVER write a password into aplicadas.json, a log, the final reply or the CV — aplicadas.json can
-      be published to the monitor. In contas_criadas note only the site, e-mail, date and "password in
-      credenciais.tsv". E-mail confirmation: open logged-in Gmail, click the verification link and go
-      back to the form.
+   3. Sign-up with a password: NEW strong password per site, always through the script:
+      NEVER generate, type or read the password yourself (shell commands and fill_form go to the log). With
+      the form open and the password fields visible, run:
+      node $BOT_ROOT/bot/nova-senha.mjs <domain> <email_contas>
+      It generates the password, saves it to ~/.config/oportunizavaga/credenciais.tsv (chmod 600, OUTSIDE
+      the repo; path overridable via OV_CREDENTIALS_FILE) and fills password + confirmation straight into
+      the tab. Fill the other fields with fill_form, without touching the password fields. NEVER write a
+      password into aplicadas.json, a log, the final reply or the CV — aplicadas.json can be published to
+      the monitor. In contas_criadas note only the site, e-mail, date and "password in credenciais.tsv".
+      E-mail confirmation: open the Gmail of the "email_contas" account
+      (mail.google.com/mail/?authuser=<email_contas>), click the verification link and go back to the form.
    4. Aggregator with no application link (e.g. a post with no external button): look for the SAME job
       (company + title) on LinkedIn, Gupy, Inhire or the company's careers site
       ("<company> careers" / "<company> we're hiring") and apply there. Only log a block if you can't

@@ -52,7 +52,7 @@ REGRAS FIXAS:
      não chute. Registre via `estado.py --file $APLICADAS_FILE set-quase-la CHAVE '<json>'` (NÃO em
      bloqueados — campos chave, empresa, vaga, falta, bloqueado_em) e siga para a próxima vaga. Ver a1
      para retomar quando o dado passar a existir.
-   - Cadastros novos (GeekHunter, Remotar/Inhire, Talentbrand): crie com o e-mail do candidato + dados do CV;
+   - Cadastros novos (GeekHunter, Remotar/Inhire, Talentbrand): crie com o "email_contas" de dados_candidato.json (sem ele, "email"; NUNCA o "email" de contato se email_contas existir) + dados do CV;
      anote onde criou e quais dados em aplicadas.json (campo "contas_criadas").
 5. Máximo 3 candidaturas novas por rodada. Se não houver vaga nova compatível, encerre sem fazer nada.
 6. ECONOMIA DE RAM: no início liste as abas (agent-browser tabs) e FECHE todas desnecessárias, mantendo no
@@ -226,16 +226,19 @@ c-Externo) ATS / SITE SEM PADRÃO (rippling, greenhouse, lever, inhire.app, fact
       ats.rippling.com/...)? É NORMAL — continue o fluxo até o botão final de envio. Não registre
       bloqueio por redirecionamento.
    2. Ordem de preferência: formulário SEM conta (greenhouse/lever/rippling costumam ser) → "Continuar
-      com Google"/"Entrar com LinkedIn" (e-mail do candidato, já logado no Chrome) → cadastro com
+      com Google"/"Entrar com LinkedIn" (conta "email_contas", já logada no Chrome) → cadastro com
       e-mail+senha.
-   3. Cadastro com senha: gere uma senha forte NOVA por site
-      (python3 -c "import secrets;print(secrets.token_urlsafe(18))") e grave IMEDIATAMENTE, antes de
-      enviar o form, num arquivo FORA do repositório e do estado publicado (ex.:
-      ~/.config/oportunizavaga/credenciais.tsv, chmod 600):
-      printf '%s\t%s\t%s\n' "<dominio>" "<email>" "<senha>" >> ~/.config/oportunizavaga/credenciais.tsv
-      NUNCA escreva senha em aplicadas.json, log, resposta final ou CV — aplicadas.json pode ser
-      publicado no monitor. Em contas_criadas anote só site, e-mail, data e "senha em credenciais.tsv".
-      Confirmação por e-mail: abra o Gmail logado, clique no link de verificação e volte ao form.
+   3. Cadastro com senha: senha forte NOVA por site, sempre via script:
+      NUNCA gere, digite ou leia a senha você mesmo (comando de shell e fill_form vão para o log). Com o form
+      aberto e os campos de senha visíveis, rode:
+      node $BOT_ROOT/bot/nova-senha.mjs <dominio> <email_contas>
+      Ele gera a senha, grava em ~/.config/oportunizavaga/credenciais.tsv (chmod 600, FORA do repositório;
+      caminho configurável em OV_CREDENTIALS_FILE) e preenche senha + confirmação direto na aba. Preencha os
+      demais campos com fill_form, sem tocar nos campos de senha. NUNCA escreva senha em aplicadas.json, log,
+      resposta final ou CV — aplicadas.json pode ser publicado no monitor. Em contas_criadas anote só site,
+      e-mail, data e "senha em credenciais.tsv".
+      Confirmação por e-mail: abra o Gmail da conta "email_contas" (mail.google.com/mail/?authuser=<email_contas>),
+      clique no link de verificação e volte ao form.
    4. Agregador sem link de candidatura (ex.: vaga só com texto, sem botão externo): procure a MESMA
       vaga (empresa + título) no LinkedIn, Gupy, Inhire ou no site de carreiras da empresa
       ("<empresa> carreiras" / "<empresa> trabalhe conosco") e aplique por lá. Só registre bloqueio se

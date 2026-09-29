@@ -2,6 +2,8 @@
   "_COMO_USAR": "Copie para dados_candidato.json e preencha com SEUS dados reais. Este arquivo NUNCA vai ao git (.gitignore). O robô NUNCA inventa: campo vazio = ele registra 'bloqueado' em vez de chutar.",
   "nome": "SEU NOME COMPLETO",
   "email": "seu-email@example.com",
+  "email_contas": "seu-email-de-login@example.com",
+  "regra_emails": "email = CONTATO (CV, campo de e-mail de contato dos formularios, envio de CV por e-mail). email_contas = LOGIN (cadastro novo, Continuar com Google, reset de senha, codigo de verificacao); opcional, sem ele usa-se email. Plataformas que preenchem o e-mail da conta (LinkedIn/Indeed/Gupy): aceite, nao troque. Enquanto o e-mail de contato nao estiver logado no Chrome, nunca abra a caixa dele: todo Gmail do robo usa a caixa de email_contas.",
   "telefone": "+55 (00) 90000-0000",
   "linkedin": "https://www.linkedin.com/in/seu-perfil",
   "github": "https://github.com/seu-usuario",
