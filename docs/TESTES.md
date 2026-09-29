@@ -84,6 +84,8 @@ Todas em `tests/`, saída TAP, offline e sem tocar em estado/Chrome/opencode rea
 | `test_podar_sessoes.sh` | só sessões do robô (título + pasta), idade por `created`, `--dry`, DB 600 |
 | `test_rodizio_saude.sh` | pausa de site e reordenação diária por rendimento (fixture determinística) |
 | `test_ctl.sh` | `scripts/ctl.sh` status/rodada/chrome |
+| `test_descobrir.sh` | parsers LinkedIn/Gupy, filtros de título, fila (fixtures offline) |
+| `test_vaga_check.sh` | triagem pela descrição: 10 casos de referência, regras por perfil, CLI, descoberta offline |
 
 Os espelhos PowerShell (`chrome-lock.ps1`, `ctl.ps1`, ajustes de `loop.ps1`/`followup.ps1`) não têm teste automatizado:
 o CI Windows só roda o PSScriptAnalyzer; valide numa máquina Windows antes de confiar.

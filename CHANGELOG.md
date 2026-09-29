@@ -6,6 +6,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Triagem pela descrição (`bot/vaga_check.py`)**: decide nível, anos exigidos (pt/en, hifenizado, idade da empresa ≥ 10
+  ignorada), modelo e stack a partir do texto e do "Nível de experiência" oficial do LinkedIn, dirigida pelo perfil e por
+  `descoberta.json` (`stack_evitar`/`stack_preferida`, nada de stack fixa no código). `bot/descobrir.py` a usa em cada vaga da
+  fila (`linkedin_detalhe`, descrição da lista da Gupy, `max_descricoes` por coleta, fail-open, marca `[descrição ok]`) e os
+  prompts (pt/en) ganham o passo **c0**. Teste: `tests/test_vaga_check.sh`. Ver `docs/OPERACAO.md`.
 - **`scripts/ctl.sh` / `scripts/ctl.ps1`**: `status` (motor, prompt, estado, Chrome, logs em ~20 linhas), `rodada` (final da
   última rodada) e `chrome` (quem usou o Chrome), só leitura e baratos em tokens. Teste: `tests/test_ctl.sh`.
 - **Rodízio reordenado 1x/dia pelo rendimento** (`bot/rodizio-saude.py`): mesma quantidade de vagas de rodada, ≥ 1 por site,

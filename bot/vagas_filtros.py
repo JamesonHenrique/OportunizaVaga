@@ -77,6 +77,16 @@ def resolve_paths():
     return {"perfil_file": perfil_file, "state_dir": state_dir, "aplicadas": aplicadas}
 
 
+def descoberta_config(paths):
+    """Raw optional tuning (descoberta.json): $OV_DESCOBERTA_CONFIG, state dir, then bot/. {} when absent."""
+    for cand in (os.environ.get("OV_DESCOBERTA_CONFIG"),
+                 os.path.join(paths["state_dir"], "descoberta.json"),
+                 str(BOT_DIR / "descoberta.json")):
+        if cand and os.path.exists(cand):
+            return load_json(cand, {})
+    return {}
+
+
 def perfil_resolvido(perfil_file):
     """perfil_render.resolver() of the active profile (defaults when there is none)."""
     doc = load_json(perfil_file, {}) if perfil_file else {}

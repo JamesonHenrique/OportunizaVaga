@@ -183,6 +183,12 @@ b) SITE ROTATION: check rodizio.proximo in the STATE SUMMARY. Use EXACTLY 1 site
    (incompatible, missing datum, closed job). Re-finding the same list with no news
    does not create a new key with a suffix (_15b, _15d, _15e...).
 
+c0) SCRIPT TRIAGE (every opened job, BEFORE CV/form): save the posting text to /tmp/anuncio.txt and run
+    `python3 "$BOT_ROOT/bot/vaga_check.py" checar /tmp/anuncio.txt "<title>" "<LinkedIn experience level, if the
+    page shows it>"`. INCOMPATIVEL -> add-bloqueado with that reason and go to the next job (no CV). COMPATIVEL ->
+    apply rules 1-4 as usual (the script only cuts the obvious, according to the profile). A queue job tagged
+    [descrição ok] already went through this triage: skip c0.
+
 c) CHANNEL (priority — avoids abandoned applications and wasted effort):
    1st) channels with READY accounts and fast apply: Gupy (Google account), LinkedIn (see c-LinkedIn),
        e-mail via logged-in Gmail, Indeed Easy Apply, Remotar/Inhire (account already created).
