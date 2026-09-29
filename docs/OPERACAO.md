@@ -82,3 +82,12 @@ O contador vive em `<estado>/telegram_oferecidas.json` (chave `id` ou `post`, ú
 renderizado com o bloco e `telegram_fresco()` não tem efeito colateral. Erro de leitura = sem bloco. O texto das vagas
 que `tg-garimpo.py prompt` acrescenta continua com o próprio limite por vaga (`max_ofertas`). Teste:
 `tests/test_prompt_cond.sh`.
+
+## Cobertura ATS gravada automaticamente
+
+Antes, o campo `ats` de uma candidatura só existia se o modelo lembrasse de anotá-lo (na operação privada, 1 de 42),
+então ninguém sabia se o CV por vaga compensa. Agora `estado.py add-aplicada` mede sozinho: se o registro traz `cv` com um
+`CV_*.pdf` existente e o anúncio salvo no passo c1 (`ANUNCIO_FILE`, padrão `<tmp>/anuncio.txt`) foi escrito há menos de
+20 minutos (para nunca usar o texto de outra vaga), roda `bot/check_ats.py` e grava
+`"ats": {"geral": <%>, "perfil": <%|null>}`. Best effort: qualquer falha deixa o registro como veio. `OV_CHECK_ATS`
+troca o script (testes). Teste: `tests/test_estado.sh`.

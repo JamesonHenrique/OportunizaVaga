@@ -19,6 +19,11 @@
           "remota": { "type": "boolean" },
           "como": { "type": "string" },
           "cv": { "type": "string" },
+          "ats": {
+            "type": "object",
+            "description": "Cobertura ATS do CV desta vaga, gravada por estado.py add-aplicada (bot/check_ats.py): geral e dos termos do perfil, em %",
+            "properties": { "geral": { "type": "integer" }, "perfil": { "type": ["integer", "null"] } }
+          },
           "data": { "type": "string" },
           "enviada_em": { "type": "string" }
         },

@@ -7,7 +7,8 @@ short line.
   estado.py [--file F] get CHAVE                  full record of one aplicada/bloqueado/quase_la
   estado.py [--file F] tem CHAVE                  "sim <secao>" / "nao"
   estado.py [--file F] ja-visto EMPRESA [TITULO]  applied/blocked records of a company ("MESMA VAGA provavel" first)
-  estado.py [--file F] add-aplicada JSON          append to aplicadas (needs "chave")
+  estado.py [--file F] add-aplicada JSON          append to aplicadas (needs "chave"); also records "ats" coverage
+                                                  when "cv" names a CV_*.pdf and the posting saved in step c1 is fresh
   estado.py [--file F] add-bloqueado CHAVE JSON   set bloqueados[CHAVE] (JSON object or plain motivo)
   estado.py [--file F] set-quase-la CHAVE JSON    set quase_la[CHAVE]; JSON=null removes it
   estado.py [--file F] descartes NIVEL MODELO STACK   increments descartes_listagem counters
@@ -21,7 +22,10 @@ APLICADAS_FILE environment variable (bot/loop.sh exports it per active profile).
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
+import time
 import unicodedata
 from datetime import date, datetime
 from pathlib import Path
@@ -31,6 +35,39 @@ from jsonlock import gravar, travado  # noqa: E402
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT = str(SCRIPT_DIR / "aplicadas.json")
+
+
+ANUNCIO = os.environ.get("ANUNCIO_FILE") or os.path.join(tempfile.gettempdir(), "anuncio.txt")
+
+
+def medir_ats(rec, max_idade_s=1200):
+    """Records rec["ats"] = {"geral": %, "perfil": %|None} so the value of the per-job CV is measurable
+    (before, it only existed when the model remembered to write it down). Deterministic: runs
+    check_ats.py on the posting the model saved in step c1 (ANUNCIO_FILE, default <tmp>/anuncio.txt) and
+    the CV named in rec["cv"], only if that file is fresh (< 20 min), so another job's text is never used.
+    Best effort: any failure leaves the record untouched."""
+    if rec.get("ats") is not None:
+        return
+    m = re.search(r"(CV_[\w.-]+\.pdf)", str(rec.get("cv") or ""))
+    base = str(SCRIPT_DIR)
+    if not m:
+        return
+    cv = next((c for c in (str(rec.get("cv")), os.path.join(base, m.group(1))) if os.path.isfile(c)), None)
+    try:
+        fresco = time.time() - os.path.getmtime(ANUNCIO) < max_idade_s
+    except OSError:
+        fresco = False
+    if not (cv and fresco):
+        return
+    script = os.environ.get("OV_CHECK_ATS") or os.path.join(base, "check_ats.py")
+    try:
+        r = subprocess.run([sys.executable, script, ANUNCIO, cv], capture_output=True, text=True, timeout=60)
+        g = re.search(r"cobertura geral do CV: (\d+)%", r.stdout)
+        p = re.search(r"cobertura dos termos DO PERFIL: (\d+)%", r.stdout)
+        if g:
+            rec["ats"] = {"geral": int(g.group(1)), "perfil": int(p.group(1)) if p else None}
+    except Exception:
+        pass
 
 
 def load(path):
@@ -179,6 +216,7 @@ def main(argv):
         if any(a.get("chave") == rec["chave"] for a in d.setdefault("aplicadas", [])):
             print(f"ja existe em aplicadas: {rec['chave']}")
             return 1
+        medir_ats(rec)
         d["aplicadas"].append(rec)
         (d.get("bloqueados") or {}).pop(rec["chave"], None)
         if isinstance(d.get("quase_la"), dict):
