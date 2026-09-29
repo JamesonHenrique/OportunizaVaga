@@ -31,6 +31,11 @@
 #   navegar) e arquivamento de logs de rodada (bot/arquivar-logs-rodada.py) SAO
 #   espelhados abaixo; o arquivamento so roda se houver python3/python/py no PATH
 #   (mesmo criterio de scripts/validate.ps1), senao e pulado silenciosamente.
+# - Tambem espelhados: teto do backoff de rodada vazia (OV_VAZIA_MAX), impressao
+#   digital por chaves, filtro de modelos que o opencode nao lista mais, sessao
+#   morta apos erro de ferramenta, descoberta deterministica (OV_DESCOBRIR=1),
+#   modelo pago opt-in, validate-rodada apos a rodada. NAO portado (so Linux): o
+#   filtro do log interno do opencode por diretorio (parte do watchdog acima).
 
 [CmdletBinding()]
 param()
@@ -94,6 +99,20 @@ $RETRY_MAX = EnvInt 'OV_RETRY_MAX' 1800
 $QUOTA_STEPS = @(900, 1800, 3600)  # quota: 15min -> 30min -> 1h, reseta ao dar certo
 $NORMAL_WAIT = EnvInt 'OV_NORMAL_WAIT' 1200           # sleep base apos rodada ok (20min)
 $VAZIA_BASE = EnvInt 'OV_VAZIA_BASE' 3600             # backoff por rodada sem vaga nova: 1h na primeira
+$VAZIA_MAX = EnvInt 'OV_VAZIA_MAX' 14400              # teto do backoff (4h)
+function EnvStr($name, $def) {
+    $v = [Environment]::GetEnvironmentVariable($name)
+    if ([string]::IsNullOrWhiteSpace($v)) { return $def } else { return $v }
+}
+# Descoberta deterministica (sem LLM, opt-in): bot\descobrir.py monta uma fila de vagas pre-filtradas
+# pelo perfil; o prompt da rodada as avalia ANTES de varrer o site do rodizio. Ligue com OV_DESCOBRIR=1.
+$OV_DESCOBRIR = EnvStr 'OV_DESCOBRIR' '0'
+# Modelo PAGO so p/ rodadas com algo pronto para ENVIAR (opt-in): OV_USAR_PAGO_ENVIO=1 + OV_MODELO_PAGO.
+$OV_USAR_PAGO_ENVIO = EnvStr 'OV_USAR_PAGO_ENVIO' '0'
+$OV_MODELO_PAGO = EnvStr 'OV_MODELO_PAGO' ''
+$OV_PAGO_MAX_DIA = [int](EnvStr 'OV_PAGO_MAX_DIA' '2')
+# Rodada enxuta (opcional): JSON de config do opencode desligando MCPs que o loop nao usa.
+$OV_OPENCODE_CONFIG_CONTENT = EnvStr 'OV_OPENCODE_CONFIG_CONTENT' ''
 $MONITOR_URL = $env:MONITOR_URL
 if ([string]::IsNullOrWhiteSpace($MONITOR_URL)) { $MONITOR_URL = 'https://sua-url.vercel.app' }
 $LOG_MAX_BYTES = 2097152 # 2MB -> rotaciona
@@ -208,6 +227,9 @@ if (-not (Test-Path $AplicadasFile)) {
     Copy-Item (Join-Path $BOT_ROOT 'examples\aplicadas.example.json') $AplicadasFile -Force
 }
 $env:BOT_PERFIL = $PerfilFile
+# Exportados p/ bot\descobrir.py / tg-garimpo.py / validate-rodada.py (mesmos nomes do loop.sh).
+$env:STATE_DIR = $StateDir
+$env:APLICADAS_FILE = $AplicadasFile
 $env:OV_RECONHECIMENTO = if ([string]::IsNullOrWhiteSpace($env:OV_RECONHECIMENTO)) { '0' } else { $env:OV_RECONHECIMENTO }
 $env:OV_MAX_CANDIDATURAS = if ([string]::IsNullOrWhiteSpace($env:OV_MAX_CANDIDATURAS)) { '3' } else { $env:OV_MAX_CANDIDATURAS }
 $env:OV_RECONHECIMENTO_LIMIT = if ([string]::IsNullOrWhiteSpace($env:OV_RECONHECIMENTO_LIMIT)) { '10' } else { $env:OV_RECONHECIMENTO_LIMIT }
@@ -298,25 +320,54 @@ function Test-BrokenSession([string]$file) {
     return ($null -ne $hit)
 }
 
-# Impressao digital do estado: aplicadas + bloqueados + descartes da listagem.
+# Impressao digital do estado: hash de toda CHAVE de vaga registrada (aplicadas, bloqueados,
+# quase_la, aguardando_login). Descartes de listagem NAO contam como novidade.
+function Get-DictKeys($obj) {
+    if ($null -eq $obj) { return @() }
+    if ($obj -is [System.Collections.IDictionary]) { return @($obj.Keys) }
+    return @($obj | Get-Member -MemberType NoteProperty | ForEach-Object { $_.Name })
+}
 function Get-Fingerprint {
     try {
         $d = Get-Content $AplicadasFile -Raw -ErrorAction Stop | ConvertFrom-Json
-        $a = 0; $b = 0; $desc = 0
-        if ($d.aplicadas) { $a = @($d.aplicadas).Count }
-        if ($d.bloqueados) {
-            if ($d.bloqueados -is [System.Collections.IDictionary]) { $b = $d.bloqueados.Count }
-            else { $b = @($d.bloqueados | Get-Member -MemberType NoteProperty).Count }
+        $ks = New-Object System.Collections.ArrayList
+        foreach ($a in @($d.aplicadas)) { if ($a -and $a.chave) { [void]$ks.Add([string]$a.chave) } }
+        foreach ($sec in @('bloqueados', 'quase_la', 'aguardando_login')) {
+            foreach ($k in (Get-DictKeys $d.$sec)) { [void]$ks.Add("${sec}:$k") }
         }
-        if ($d.descartes_listagem_total) { $desc = [int]$d.descartes_listagem_total }
-        return ($a + $b + $desc)
-    } catch { return -1 }
+        $sorted = ($ks | Sort-Object -CaseSensitive) -join '|'
+        $md5 = [System.Security.Cryptography.MD5]::Create()
+        $hash = $md5.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($sorted))
+        return (($hash | ForEach-Object { $_.ToString('x2') }) -join '')
+    } catch { return '-1' }
 }
 
-# Backoff por rodada vazia: 1h na primeira e dobra SEM TETO (3600 -> 7200 -> ...).
+# Algo pronto para ENVIAR: fila da descoberta com score >= 3 ou vaga aguardando login com canal logado.
+function Test-EnvioPronto {
+    try {
+        $d = Get-Content $AplicadasFile -Raw -ErrorAction Stop | ConvertFrom-Json
+        $chk = $d.login_checagens
+        foreach ($k in (Get-DictKeys $d.aguardando_login)) {
+            $v = $d.aguardando_login.$k
+            if ($v -and $v.canal -and $chk -and $chk.($v.canal) -and $chk.($v.canal).logado -eq 'sim') { return $true }
+        }
+        $filaPath = Join-Path $StateDir 'vagas_fila.json'
+        if (Test-Path $filaPath) {
+            $f = Get-Content $filaPath -Raw | ConvertFrom-Json
+            foreach ($k in (Get-DictKeys $f.vagas)) {
+                $v = $f.vagas.$k
+                if ($v.status -eq 'nova' -and [int]$v.score -ge 3) { return $true }
+            }
+        }
+    } catch { }
+    return $false
+}
+
+# Backoff por rodada vazia: 1h na primeira e dobra (3600 -> 7200 -> 14400), teto VAZIA_MAX.
 function Get-EmptyWait([int]$n) {
     $w = $VAZIA_BASE
     for ($i = 1; $i -lt $n; $i++) { $w = $w * 2 }
+    if ($w -gt $VAZIA_MAX) { $w = $VAZIA_MAX }
     return $w
 }
 
@@ -384,6 +435,34 @@ function Render-Prompt {
     } else {
         $text += "`n`nPERFIL ATIVO: $PerfilNome. Use somente os termos, filtros e estado deste perfil. O limite desta rodada e $env:OV_MAX_CANDIDATURAS candidaturas novas.`n"
     }
+    if (-not $reconhecimento) {
+        # Termos da rodada: rotacao com contador persistente (2 termos por rodada), como no loop.sh.
+        try {
+            $termos = @()
+            if ($PerfilDoc -and $PerfilDoc.termos) { $termos = @($PerfilDoc.termos | Where-Object { $_ -is [string] -and $_.Trim() }) }
+            if ($termos.Count -gt 0) {
+                $idxFile = Join-Path $StateDir 'termo_idx'
+                $idx = 0
+                if (Test-Path $idxFile) { try { $idx = [int]((Get-Content $idxFile -Raw).Trim()) } catch { $idx = 0 } }
+                $n = [Math]::Min(2, $termos.Count)
+                $escolhidos = @(0..($n - 1) | ForEach-Object { $termos[($idx + $_) % $termos.Count] })
+                Set-Content -Path $idxFile -Value (($idx + 2) % $termos.Count)
+                $text += "`n`nTERMOS DESTA RODADA (use ESTES, nesta ordem, no site do rodizio): " + ($escolhidos -join ' | ') + "`n"
+            }
+        } catch { }
+        # Blocos da descoberta deterministica / Telegram (best-effort; "prompt" conta uma oferta por vaga).
+        if ($Py) {
+            $extras = @()
+            if ($OV_DESCOBRIR -eq '1') { $extras += ,@((Join-Path $BOT_ROOT 'bot\descobrir.py'), 'prompt', '5') }
+            if (Test-Path (Join-Path $StateDir 'telegram_vagas.json')) { $extras += ,@((Join-Path $BOT_ROOT 'bot\tg-garimpo.py'), 'prompt', '3') }
+            foreach ($x in $extras) {
+                try {
+                    $o = & $Py $x 2>$null
+                    if ($LASTEXITCODE -eq 0 -and $o) { $text += "`n`n" + ($o -join "`n") }
+                } catch { }
+            }
+        }
+    }
     # RESUMO DO ESTADO: mesmo mecanismo do loop.sh (via estado.py), so roda se
     # houver python no PATH. Sem python, a secao fica de fora (o agente ainda
     # pode ler $APLICADAS_FILE direto, so perde a economia de tokens).
@@ -416,9 +495,10 @@ function Invoke-ModelRound([string]$modelo, [string]$prompt, [string]$roundLog) 
     if ($null -eq $chromeLock) { return @{ Status = 75; TimedOut = $false } }
     try {
         $job = Start-Job -ScriptBlock {
-            param($bin, $mod, $ttl, $pr)
+            param($bin, $mod, $ttl, $pr, $cfg)
+            if ($cfg) { $env:OPENCODE_CONFIG_CONTENT = $cfg }
             & $bin run -m $mod --title $ttl $pr 2>&1
-        } -ArgumentList $OpencodeBin, $modelo, $title, $prompt
+        } -ArgumentList $OpencodeBin, $modelo, $title, $prompt, $OV_OPENCODE_CONFIG_CONTENT
         $done = Wait-Job -Job $job -Timeout $RUN_TIMEOUT_SEC
         if ($done) {
             $out = Receive-Job -Job $job
@@ -444,6 +524,23 @@ $FAILS = 0
 $QUOTA_HITS = 0
 $VAZIAS = 0
 $MODELOS = Get-ModelList
+# Descarta modelos que o opencode nao lista mais (nome morto gasta uma vaga da cascata).
+# Suave: se a listagem falhar ou estourar 30s, mantem a lista como esta.
+try {
+    $mj = Start-Job -ScriptBlock { param($bin) & $bin models 2>$null } -ArgumentList $OpencodeBin
+    if (Wait-Job -Job $mj -Timeout 30) {
+        $avail = @(Receive-Job -Job $mj | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+        if ($avail.Count -gt 0) {
+            $validos = New-Object System.Collections.ArrayList
+            foreach ($m in $MODELOS) {
+                if ($avail -contains $m) { [void]$validos.Add($m) }
+                else { Add-Content -Path 'loop.log' -Value ("[{0}] modelo indisponivel removido da cascata: {1}" -f (Write-Stamp), $m) }
+            }
+            if ($validos.Count -gt 0) { $MODELOS = $validos }
+        }
+    }
+    Remove-Job -Job $mj -Force -ErrorAction SilentlyContinue
+} catch { }
 
 while ($true) {
     Rotate-Log
@@ -466,6 +563,20 @@ while ($true) {
     }
     $FP_ANTES = Get-Fingerprint
     Write-LoopLog ("rodada iniciada (perfil {0}, rodadas vazias seguidas: {1})" -f $PerfilNome, $VAZIAS)
+    # Descoberta deterministica (opt-in): enche vagas_fila.json; a coleta respeita o intervalo no script.
+    if ($OV_DESCOBRIR -eq '1' -and $Py) {
+        try {
+            $dj = Start-Job -ScriptBlock { param($py, $sc) & $py $sc coletar 2>&1 } -ArgumentList $Py, (Join-Path $BOT_ROOT 'bot\descobrir.py')
+            if (Wait-Job -Job $dj -Timeout 180) {
+                $o = Receive-Job -Job $dj
+                if ($o) { Add-Content -Path 'loop.log' -Value $o }
+            } else {
+                Stop-Job -Job $dj -ErrorAction SilentlyContinue
+                Write-LoopLog 'descobrir: coleta falhou (segue sem fila)'
+            }
+            Remove-Job -Job $dj -Force -ErrorAction SilentlyContinue
+        } catch { Write-LoopLog 'descobrir: coleta falhou (segue sem fila)' }
+    }
     $prompt = Render-Prompt
 
     $STATUS = 0
@@ -485,6 +596,21 @@ while ($true) {
     }
     $cascata = @($MODELOS | Where-Object { -not ($cooldown.ContainsKey($_) -and $cooldown[$_] -gt $agoraS) })
     if ($cascata.Count -eq 0) { $cascata = $MODELOS }
+    # Modelo pago (opt-in) na frente da cascata so com algo pronto para enviar, ate OV_PAGO_MAX_DIA/dia.
+    if ($OV_USAR_PAGO_ENVIO -eq '1' -and $OV_MODELO_PAGO -and (Test-EnvioPronto)) {
+        $pagoFile = Join-Path $StateDir 'pago_dia'
+        $hoje = (Get-Date).ToString('yyyy-MM-dd')
+        $pagoHoje = 0
+        if (Test-Path $pagoFile) {
+            $l = Get-Content $pagoFile | Where-Object { $_ -like "$hoje *" } | Select-Object -Last 1
+            if ($l) { $pagoHoje = [int](($l -split '\s+')[1]) }
+        }
+        if ($pagoHoje -lt $OV_PAGO_MAX_DIA) {
+            $cascata = @($OV_MODELO_PAGO) + @($cascata)
+            Add-Content -Path $pagoFile -Value ("{0} {1}" -f $hoje, ($pagoHoje + 1))
+            Write-LoopLog ("rodada com envio pronto: {0} na frente da cascata ({1}/{2} hoje)" -f $OV_MODELO_PAGO, ($pagoHoje + 1), $OV_PAGO_MAX_DIA)
+        }
+    }
     if ($cascata.Count -lt $MODELOS.Count) {
         Write-LoopLog ("cascata sem {0} modelo(s) em resfriamento" -f ($MODELOS.Count - $cascata.Count))
     }
@@ -519,6 +645,16 @@ while ($true) {
             $IMPRODUTIVA = $true
             continue
         }
+        # Sessao que morreu logo apos uma tool-call com erro (terminou em "Error:" sem resumo final):
+        # ela navegou, entao o teste acima deixa passar. Cascateia para o proximo modelo.
+        if ($STATUS -ne 75 -and (Test-Path $ROUND_LOG)) {
+            $cauda = Get-Content $ROUND_LOG -Tail 8 -ErrorAction SilentlyContinue
+            if ($cauda | Select-String -Pattern @('Error: ', ([string][char]0x2717 + ' ')) -SimpleMatch -ErrorAction SilentlyContinue) {
+                Write-LoopLog ("modelo {0} morreu apos erro de ferramenta (sem resumo final), cascateando para o proximo" -f $MODELO)
+                $IMPRODUTIVA = $true
+                continue
+            }
+        }
         $IMPRODUTIVA = $false
         $MODELO_OK = $MODELO
         $TODOS_NO_LIMITE = $false
@@ -542,6 +678,30 @@ while ($true) {
             $out = & $Py $arquivarScript $AplicadasFile $logsJsonl 2>&1
             if ($out) { Add-Content -Path 'loop.log' -Value $out }
         } catch { }
+    }
+
+    # Fecha na fila as vagas registradas (ou ofertadas demais) e valida o estado apos cada rodada.
+    if ($Py) {
+        if ($OV_DESCOBRIR -eq '1') {
+            try { $o = & $Py (Join-Path $BOT_ROOT 'bot\descobrir.py') marcar 2>&1; if ($o) { Add-Content -Path 'loop.log' -Value $o } } catch { }
+        }
+        $vr = Join-Path $BOT_ROOT 'scripts\validate-rodada.py'
+        if (Test-Path $vr) {
+            try {
+                $o = & $Py $vr $AplicadasFile 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    Add-Content -Path 'validate-rodada.log' -Value ("validate-rodada: OK ({0})" -f (Write-Stamp))
+                } else {
+                    if ($o) { Add-Content -Path 'validate-rodada.log' -Value $o }
+                    Write-LoopLog 'ALERTA: validate-rodada reprovou o estado (ver bot\validate-rodada.log)'
+                    $ntf = Join-Path $BOT_ROOT 'scripts\notificar.ps1'
+                    if (Test-Path $ntf) {
+                        $ultima = (Get-Content 'validate-rodada.log' -Tail 1 -ErrorAction SilentlyContinue)
+                        try { & $ntf ("Candidaturas: validate-rodada reprovou o aplicadas.json - {0}" -f $ultima) } catch { }
+                    }
+                }
+            } catch { }
+        }
     }
 
     if (Test-BrokenSession $ROUND_LOG) {
@@ -584,9 +744,11 @@ while ($true) {
             } catch { }
         }
         $FP_DEPOIS = Get-Fingerprint
-        if (($FP_ANTES -ne -1) -and ($FP_DEPOIS -ne -1) -and ($FP_ANTES -eq $FP_DEPOIS)) {
+        if (($FP_ANTES -ne '-1') -and ($FP_DEPOIS -ne '-1') -and ($FP_ANTES -eq $FP_DEPOIS)) {
             $VAZIAS++
             $W = Get-EmptyWait $VAZIAS
+            # Ainda ha vaga boa na fila/login pronto: nao durma horas em cima dela.
+            if (($W -gt $NORMAL_WAIT) -and (Test-EnvioPronto)) { $W = $NORMAL_WAIT }
             Write-LoopLog ("rodada ok, NENHUMA vaga nova ({0}x seguidas), dormindo {1}min" -f $VAZIAS, ([int]($W / 60)))
             Start-Sleep -Seconds $W
         } else {
