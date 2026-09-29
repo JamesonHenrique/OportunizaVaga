@@ -88,6 +88,7 @@ Todas em `tests/`, saída TAP, offline e sem tocar em estado/Chrome/opencode rea
 | `test_modelos_saude.sh` | cascata adaptativa: ordem por sucesso, quarentena, mínimo de ativos, fail-open |
 | `test_opencode_enxuto.sh` | config enxuta: JSONC do exemplo, sem `vision`, MCPs desligados sem segredo, fail-open |
 | `test_vigia_vida.sh` | dead man's switch: loop parado (2 checagens), heartbeat velho/ausente (servidor local), `MONITOR_URL` opcional, estado ilegível |
+| `test_canario_fontes.sh` | contrato dos parsers (LinkedIn busca/vaga, Gupy) contra fixtures sintéticas + canário acusando parser quebrado |
 | `test_vaga_check.sh` | triagem pela descrição: 10 casos de referência, regras por perfil, CLI, descoberta offline |
 
 Os espelhos PowerShell (`chrome-lock.ps1`, `ctl.ps1`, `vigia-vida.ps1`, ajustes de `loop.ps1`/`followup.ps1` para a cascata adaptativa e a config enxuta) não têm teste automatizado:

@@ -58,6 +58,7 @@
 | `bot/modelos-saude.py` | Ordena a cascata de modelos pela taxa de sucesso real (logs de 7 dias), quarentena de modelo inútil, fail-open; chamado por `loop.sh`/`loop.ps1` antes de cada rodada |
 | `bot/opencode-enxuto.py` | Gera o `OPENCODE_CONFIG_CONTENT` enxuto (MCPs/ferramentas não usadas fora) a partir da config do opencode do usuário; fail-open; usado por `loop` e `followup` |
 | `bot/vigia-vida.sh` (+ `.ps1`) | Dead man's switch (cron/Task Scheduler a cada 15 min): avisa no Telegram se o loop parar em 2 checagens, o heartbeat do monitor envelhecer (`MONITOR_URL` opcional) ou o estado ficar ilegível |
+| `bot/canario-fontes.py` | Canário diário AO VIVO dos parsers do LinkedIn/Gupy: avisa no Telegram quando o portal muda o markup (o contrato offline fica em `tests/test_canario_fontes.sh`) |
 | `bot/sites/lib.sh` | Descoberta automática de adaptadores e contrato comum (`site_adapter_*`) |
 | `bot/sites/*.sh` | Adaptadores de portal: URL de busca, dica de remoto e termos por site |
 | `bot/chrome-lock.sh` (+ `.ps1`) | Protocolo único do Chrome compartilhado: lock + flags de prioridade (`alta` marca a vez, `normal` cede) |
