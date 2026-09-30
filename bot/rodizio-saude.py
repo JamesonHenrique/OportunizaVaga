@@ -155,10 +155,17 @@ def main(cmd, aplicadas_path, perfil_path=None):
         q = d.get("quase_la") or {}
         saude["rodada_atual"] = {"site": rod.get("proximo"), "pos": rod.get("pos"), "aplicadas_antes": len(d.get("aplicadas", [])),
                                  "quase_la_antes": sorted(q) if isinstance(q, dict) else []}
+    elif cmd == "pos-so-fila":
+        # queue-only round (bot/rodada-portao.py): notifications only — the site was NOT scanned (no streak, no advance)
+        cur = saude.pop("rodada_atual", None) or {}
+        for a in d.get("aplicadas", [])[int(cur.get("aplicadas_antes", len(d.get("aplicadas", [])))):]:
+            if not a.get("registro_retroativo"):
+                notify(f"✅ Candidatura enviada: {a.get('empresa')} — {a.get('vaga')} ({a.get('como')})")
     elif cmd == "pos":
         cur = saude.pop("rodada_atual", None)
         if cur and cur.get("site"):
             s = sites.setdefault(cur["site"], {"rodadas": 0, "vazias_seguidas": 0, "aplicadas": 0, "pausado_ate": None})
+            s["ultima_varredura"] = now.isoformat(timespec="minutes")   # read by bot/rodada-portao.py
             novas = len(d.get("aplicadas", [])) - int(cur.get("aplicadas_antes", 0))
             for a in d.get("aplicadas", [])[len(d.get("aplicadas", [])) - max(novas, 0):] if novas > 0 else []:
                 notify(f"✅ Candidatura enviada: {a.get('empresa')} — {a.get('vaga')} ({a.get('como')})")
@@ -192,7 +199,7 @@ def main(cmd, aplicadas_path, perfil_path=None):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2 or sys.argv[1] not in ("pre", "pos"):
+    if len(sys.argv) < 2 or sys.argv[1] not in ("pre", "pos", "pos-so-fila"):
         print(__doc__)
         sys.exit(2)
     args = sys.argv[2:]

@@ -491,6 +491,12 @@ function Render-Prompt {
             if ($LASTEXITCODE -eq 0 -and $resumo) {
                 $text += "`n`nRESUMO DO ESTADO (gerado agora de $AplicadasFile; NAO leia o arquivo inteiro)`n" + ($resumo -join "`n")
             }
+            # RESUMO DO CANDIDATO (same as loop.sh): the prompt no longer tells the model to read dados_candidato.json.
+            $env:DADOS_CANDIDATO_FILE = $DadosCandidatoFile
+            $cand = & $Py $estadoScript resumo-candidato 2>$null
+            if ($LASTEXITCODE -eq 0 -and $cand) {
+                $text += "`n`nRESUMO DO CANDIDATO (de $DadosCandidatoFile; NAO leia o arquivo inteiro — campo fora daqui: python $estadoScript dado CAMPO)`n" + ($cand -join "`n")
+            }
         } catch { }
     }
     Set-Content -Path $RuntimePromptFile -Value $text -Encoding UTF8

@@ -154,6 +154,8 @@ WATCHDOG_AFTER=240        # limite maximo de espera do watchdog
 WATCHDOG_MIN_WAIT=45      # antes disso nao aborta: rodada boa pode demorar a produzir saida
 WATCHDOG_STALL="${OV_WATCHDOG_STALL:-90}"   # quota no meio da rodada + saida parada ha Ns -> aborta e cascateia
 WATCHDOG_MIN_BYTES=800    # rodada que produziu menos que isso nao comecou de verdade
+WATCHDOG_HANG=${OV_WATCHDOG_HANG:-360}   # nenhuma saida por 6 min (sem erro do provider) = ferramenta travada -> aborta
+PORTAO_ESPERA=${OV_PORTAO_ESPERA:-1800}  # portao disse "nada a fazer": pergunta de novo em 30 min
 MONITOR_URL="${MONITOR_URL:-https://sua-url.vercel.app}"
 LOG_MAX_BYTES=2097152   # 2MB -> rotaciona
 ROUNDS_KEPT=20          # quantos logs completos de rodada manter
@@ -305,6 +307,10 @@ sys.path.insert(0, str(Path(bot_root) / 'bot'))
 import prompt_cond
 # Conditional blocks (<!--se:site=X-->...<!--/se-->, <!--se:telegram-->): keep only what this round can use.
 text = prompt_cond.aplicar(text, prompt_cond.site_da_rodada(aplicadas), prompt_cond.telegram_para_prompt(Path(aplicadas).parent))
+import os as _os
+SO_FILA = _os.environ.get('OV_SO_FILA') == '1'   # bot/rodada-portao.py: no site scan this round
+if SO_FILA:
+    text = prompt_cond.so_fila(text)
 text = text.replace('$APLICADAS_FILE', aplicadas)
 text = text.replace('$DADOS_CANDIDATO_FILE', dados)
 text = text.replace('$BOT_ROOT', bot_root)
@@ -328,6 +334,16 @@ try:
         text += '\n\nRESUMO DO ESTADO (gerado agora de ' + aplicadas + '; NAO leia o arquivo inteiro)\n' + res.stdout
 except Exception:
     pass
+# RESUMO DO CANDIDATO: the fields forms ask for; the model used to read the whole dados_candidato.json
+# (~10 KB) in half the sessions and keep it in context for every later call. The rest: estado.py dado CAMPO.
+try:
+    rc = subprocess.run([sys.executable, str(Path(bot_root) / 'bot' / 'estado.py'), 'resumo-candidato'], capture_output=True,
+                        text=True, timeout=30, env=dict(_os.environ, DADOS_CANDIDATO_FILE=dados))
+    if rc.returncode == 0 and rc.stdout.strip():
+        text += ('\n\nRESUMO DO CANDIDATO (de ' + dados + '; NAO leia o arquivo inteiro — campo fora daqui: python3 '
+                 + str(Path(bot_root) / 'bot' / 'estado.py') + ' dado CAMPO[.SUB])\n' + rc.stdout)
+except Exception:
+    pass
 # Blocos extras (so em rodada normal, nunca no modo reconhecimento: o "prompt" conta uma oferta
 # por vaga). Cada um e best-effort: falha silenciosa nunca impede a rodada.
 if modo not in {'1', 'true', 'True', 'sim', 'Sim'}:
@@ -335,7 +351,7 @@ if modo not in {'1', 'true', 'True', 'sim', 'Sim'}:
     # Termos da rodada: sessao nova nao tem memoria, entao o loop rotaciona os termos do perfil
     # com um contador persistente (2 termos por rodada).
     try:
-        termos = perfil_render.carregar(perfil).get('termos') or []
+        termos = [] if SO_FILA else (perfil_render.carregar(perfil).get('termos') or [])
         termos = [t for t in termos if isinstance(t, str) and t.strip()]
         if termos:
             idx_file = Path(aplicadas).parent / 'termo_idx'
@@ -410,6 +426,18 @@ while true; do
   if [ "$OV_DESCOBRIR" = "1" ]; then
     timeout 180 python3 "$BOT_ROOT/bot/descobrir.py" coletar >> loop.log 2>&1 || log "descobrir: coleta falhou (segue sem fila)"
   fi
+  # Round gate (opt-in OV_PORTAO=1, bot/rodada-portao.py): no model session when there is nothing to do;
+  # queue-only round (no site scan) when no site is due. Fail-open: an error means a normal round.
+  OV_SO_FILA=0
+  if [ "${OV_PORTAO:-0}" = "1" ]; then
+    PORTAO=$(APLICADAS_FILE="$APLICADAS_FILE" python3 "$BOT_ROOT/bot/rodada-portao.py" "$APLICADAS_FILE" 2>>loop.log || echo "completa portao sem resposta")
+    case "${PORTAO%% *}" in
+      pular) log "portao: ${PORTAO#* } — sem sessao de modelo, reavaliando em $((PORTAO_ESPERA / 60))min"; sleep "$PORTAO_ESPERA"; continue ;;
+      so_fila) OV_SO_FILA=1; log "portao: rodada SO FILA (${PORTAO#* })" ;;
+      *) log "portao: ${PORTAO#* }" ;;
+    esac
+  fi
+  export OV_SO_FILA
   render_prompt
   FP_ANTES=$(fingerprint "$APLICADAS_FILE")
   log "rodada iniciada (perfil ${PERFIL_NOME}, rodadas vazias seguidas: ${VAZIAS})"
@@ -447,8 +475,12 @@ while true; do
   fi
   [ "${#CASCATA[@]}" -lt "${#MODELOS_ORD[@]}" ] && log "cascata sem $(( ${#MODELOS_ORD[@]} - ${#CASCATA[@]} )) modelo(s) em resfriamento"
 
-  for MODELO in "${CASCATA[@]}"; do
+  CI=0; REPETIU=""
+  while [ "$CI" -lt "${#CASCATA[@]}" ]; do
+  MODELO=${CASCATA[$CI]}; CI=$((CI + 1))
   ROUND_START=$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')
+  # elapsed-time clock read by the model (bot/tempo-rodada.py, prompt rule 7d)
+  mkdir -p "$STATE_DIR"; date +%s > "$STATE_DIR/rodada_inicio"; rm -f "$STATE_DIR/rodada_travou"
   # </dev/null: opencode le stdin; sem TTY isso gerava "EBADF: bad file descriptor".
   # 9>&-: nao vaza o fd do flock para o filho.
   # Sessao nova a cada rodada: o historico nao carrega nada que aplicadas.json nao tenha.
@@ -475,7 +507,9 @@ while true; do
     esperado=0
     ultimo_tam=0
     parado=0
-    while [ "$esperado" -lt "$WATCHDOG_AFTER" ]; do
+    # runs for the whole round (the loop kills it after wait); before, it stopped after WATCHDOG_AFTER and a
+    # stall in the middle of the round hung until RUN_TIMEOUT.
+    while true; do
       sleep 15
       esperado=$((esperado + 15))
       tam=$(stat -c %s "$ROUND_LOG" 2>/dev/null || echo 0)
@@ -484,6 +518,13 @@ while true; do
       # any provider error (quota OR transient) + no output = the run is stuck: abort and let the loop go on
       if { [ "$tam" -lt "$WATCHDOG_MIN_BYTES" ] || [ "$parado" -ge "$WATCHDOG_STALL" ]; } \
          && [ -n "$(erro_opencode_log "$ROUND_START" "$PWD")" ]; then
+        kill -TERM -- "-$ROUND_PID" 2>/dev/null || kill -TERM "$ROUND_PID" 2>/dev/null
+        break
+      fi
+      # no output at all for WATCHDOG_HANG s and no provider error = a hung tool (e.g. a file upload that never
+      # returns): abort now instead of waiting for RUN_TIMEOUT; the loop retries the same model once.
+      if [ "$parado" -ge "$WATCHDOG_HANG" ]; then
+        echo "$parado" > "$STATE_DIR/rodada_travou"
         kill -TERM -- "-$ROUND_PID" 2>/dev/null || kill -TERM "$ROUND_PID" 2>/dev/null
         break
       fi
@@ -496,7 +537,19 @@ while true; do
   kill "$WATCHDOG_PID" 2>/dev/null
   wait "$WATCHDOG_PID" 2>/dev/null
 
-    if is_quota "$ROUND_LOG" || quota_in_opencode_log "$ROUND_START"; then
+    ERRO_PROV=$(erro_opencode_log "$ROUND_START" "$PWD")
+    if [ "$ERRO_PROV" = "transitorio" ] && [ "$REPETIU" != "$MODELO" ] && [ "$STATUS" -ne 75 ]; then
+      REPETIU="$MODELO"; CI=$((CI - 1))
+      log "modelo ${MODELO}: erro transitorio do provider (5xx/timeout), repetindo o MESMO modelo em 60s (sem resfriamento)"
+      sleep 60
+      continue
+    fi
+    if [ -f "$STATE_DIR/rodada_travou" ] && [ "$REPETIU" != "$MODELO" ]; then
+      REPETIU="$MODELO"; CI=$((CI - 1))
+      log "modelo ${MODELO}: rodada sem saida por $(cat "$STATE_DIR/rodada_travou")s (ferramenta travada), repetindo com o mesmo modelo"
+      continue
+    fi
+    if [ "$ERRO_PROV" = "quota" ] || { [ "$ERRO_PROV" != "transitorio" ] && is_quota "$ROUND_LOG"; }; then
       log "modelo ${MODELO} no limite, cascateando para o proximo"
       mkdir -p "$STATE_DIR"
       echo "$MODELO $(( $(date +%s) + 5400 ))" >> "$COOLDOWN_FILE"
@@ -572,6 +625,13 @@ while true; do
       log "quota/limite: TODOS os ${#MODELOS[@]} modelos gratuitos no teto (${QUOTA_HITS}x seguidas), rechecando em ${W}s"
     fi
     sleep "$W"
+  elif { [ "$STATUS" -eq 124 ] || [ "$STATUS" -eq 137 ] || [ "$STATUS" -eq 143 ]; } \
+       && [ "$FP_ANTES" != "-1" ] && [ "$FP_ANTES" != "$(fingerprint "$APLICADAS_FILE")" ]; then
+    # the round ran past RUN_TIMEOUT but DID record progress: not a failure (no retry backoff)
+    FAILS=0
+    python3 "$BOT_ROOT/bot/rodizio-saude.py" "$([ "$OV_SO_FILA" = 1 ] && echo pos-so-fila || echo pos)" "$APLICADAS_FILE" >> loop.log 2>&1 || true
+    log "rodada passou de ${RUN_TIMEOUT} mas GRAVOU progresso: conta como ok, dormindo $((NORMAL_WAIT / 60))min"
+    sleep "$NORMAL_WAIT"
   elif [ "$STATUS" -eq 124 ] || [ "$STATUS" -eq 137 ] || [ "$STATUS" -eq 143 ]; then
     FAILS=$((FAILS + 1))
     W=$(fail_wait "$FAILS")
@@ -588,7 +648,7 @@ while true; do
   else
     FAILS=0
     QUOTA_HITS=0
-    python3 "$BOT_ROOT/bot/rodizio-saude.py" pos "$APLICADAS_FILE" >> loop.log 2>&1 || true
+    python3 "$BOT_ROOT/bot/rodizio-saude.py" "$([ "$OV_SO_FILA" = 1 ] && echo pos-so-fila || echo pos)" "$APLICADAS_FILE" >> loop.log 2>&1 || true
     FP_DEPOIS=$(fingerprint "$APLICADAS_FILE")
     if [ "$FP_ANTES" != "-1" ] && [ "$FP_DEPOIS" != "-1" ] && [ "$FP_ANTES" = "$FP_DEPOIS" ]; then
       VAZIAS=$((VAZIAS + 1))
