@@ -32,6 +32,7 @@ fi
 # Cascata de modelos gratuitos (mesma familia do loop.sh; se um bater quota ou
 # travar, cascateia para o proximo em vez de esperar o timeout inteiro parado).
 MODELOS=(
+  "opencode/space-bunny-free"   # measured on a real instance: the most reliable free model (see bot/loop.sh)
   "opencode/muse-spark-1.3-contributor-free"
   "opencode/nemotron-3-ultra-free"
   "opencode/nemotron-3.5-lightning-free"
@@ -99,6 +100,12 @@ PY
     [ "$STATUS" -eq 75 ] && break   # Chrome ocupado por 30min: tenta de novo amanha
     if grep -qE "QUOTA_EXAUSTA|Rate limit|Model not found" "$FLOG"; then
       echo "[$(date '+%F %T')] follow-up: ${MODELO} sem cota/indisponivel, proximo" >> followup.log
+      STATUS=1
+      continue
+    fi
+    # a session that ended without opening a page did no follow-up: a weak model "succeeded" in 6s once
+    if ! grep -q "browser_navigate" "$FLOG"; then
+      echo "[$(date '+%F %T')] follow-up: ${MODELO} terminou sem abrir pagina (sessao improdutiva), proximo" >> followup.log
       STATUS=1
       continue
     fi

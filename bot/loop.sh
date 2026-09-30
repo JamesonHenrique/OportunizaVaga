@@ -70,7 +70,13 @@ OV_OPENCODE_CONFIG_CONTENT="${OV_OPENCODE_CONFIG_CONTENT:-}"
 # 1 = usa como segundo nivel, so depois que os 6 do Zen esgotarem. 0 = so Zen.
 USAR_OPENROUTER=1
 
+# Measured on a real instance (7 days, ~300 rounds): space-bunny 83 rounds with 0 unproductive sessions;
+# muse-spark-1.3 64 unproductive out of 85, nemotron-3-ultra 53, mimo-v2.6 54; nemotron-3.5-lightning caused
+# most of the 20-min timeouts. bot/modelos-saude.py reorders by real success anyway; names the installed
+# opencode no longer lists are dropped at start.
 MODELOS=(
+  "opencode/space-bunny-free"
+  "openrouter/thinkingmachines/inkling:free"
   "openrouter/nex-agi/nex-n2.5-pro:free"
   "opencode/muse-spark-1.3-contributor-free"
   "opencode/nemotron-3-ultra-free"
