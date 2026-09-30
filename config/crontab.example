@@ -44,6 +44,10 @@ BOT_DIR=$HOME/opensource/oportunizavaga
 # (created); nunca sessoes interativas suas. Teste antes com --dry. Config: OV_PODAR_PREFIXOS, OV_PODAR_PASTAS.
 #30 4 * * *                   python3 $BOT_DIR/bot/podar-sessoes.py 3 >> $BOT_DIR/bot/logs/podar-sessoes.log 2>&1
 
+# (Opcional) Status das candidaturas Gupy lido POR SCRIPT (sem LLM) em "Minhas candidaturas"; enquanto a leitura
+# tiver < 36h o follow-up semanal pula o Gupy. Precisa de sessao do Gupy no Chrome do robo + websocket-client.
+#10 9,19 * * *                $BOT_DIR/bot/chrome-lock.sh gupy alta 600 -- python3 $BOT_DIR/bot/gupy-status.py >> $BOT_DIR/bot/logs/gupy-status.log 2>&1
+
 # Dead man's switch: Telegram se o loop parar (2 checagens seguidas), o heartbeat do monitor envelhecer
 # (so com MONITOR_URL no ambiente do cron; sem ele essa checagem e pulada) ou o aplicadas.json quebrar
 */15 * * * *                  $BOT_DIR/bot/vigia-vida.sh >> $BOT_DIR/bot/logs/vigia-vida.log 2>&1

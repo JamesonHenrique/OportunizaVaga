@@ -43,6 +43,8 @@ def check(ap, allow_utc=False):
         if not isinstance(a, dict):
             continue
         c, data, ee = a.get("chave"), str(a.get("data") or ""), str(a.get("enviada_em") or "")
+        if a.get("registro_retroativo") and not data:
+            continue   # found later by bot/gupy-status.py: send date unknown on purpose (never invented)
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", data):
             falhas.append("%s: campo 'data' fora do formato YYYY-MM-DD: %r" % (c, data))
         if not allow_utc and (ee.endswith("Z") or ee.endswith("+00:00")):
