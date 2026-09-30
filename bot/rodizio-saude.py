@@ -166,8 +166,10 @@ def main(cmd, aplicadas_path, perfil_path=None):
         if cur and cur.get("site"):
             s = sites.setdefault(cur["site"], {"rodadas": 0, "vazias_seguidas": 0, "aplicadas": 0, "pausado_ate": None})
             s["ultima_varredura"] = now.isoformat(timespec="minutes")   # read by bot/rodada-portao.py
-            novas = len(d.get("aplicadas", [])) - int(cur.get("aplicadas_antes", 0))
-            for a in d.get("aplicadas", [])[len(d.get("aplicadas", [])) - max(novas, 0):] if novas > 0 else []:
+            # appended since pre, minus applications found later by bot/gupy-status.py (not sent this round)
+            novas_lista = [x for x in d.get("aplicadas", [])[int(cur.get("aplicadas_antes", 0)):] if not x.get("registro_retroativo")]
+            novas = len(novas_lista)
+            for a in novas_lista:
                 notify(f"✅ Candidatura enviada: {a.get('empresa')} — {a.get('vaga')} ({a.get('como')})")
             q = d.get("quase_la") or {}
             for k in (sorted(set(q) - set(cur.get("quase_la_antes", []))) if isinstance(q, dict) else []):

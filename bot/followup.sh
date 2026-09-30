@@ -56,7 +56,17 @@ try:
     ap = json.load(open(sys.argv[1], encoding='utf-8')).get('aplicadas', [])
 except Exception:
     ap = []
+import os, time
+# bot/gupy-status.py reads every Gupy status by script: while its read is fresh (<36h), skip Gupy here.
+try:
+    gupy_fresco = time.time() - os.path.getmtime(os.path.join(os.path.dirname(sys.argv[1]), 'gupy_status.json')) < 36 * 3600
+except OSError:
+    gupy_fresco = False
 for a in ap:
+    if a.get('status') == 'encerrada':
+        continue   # final: nothing to follow up (fewer tokens)
+    if gupy_fresco and 'gupy' in (str(a.get('como', '')) + str(a.get('url', '')) + str(a.get('chave', ''))).lower():
+        continue
     print(f"  {a.get('chave')} | {a.get('empresa')} | {str(a.get('vaga'))[:60]} | {str(a.get('como'))[:40]} | {a.get('data')} | {a.get('status', '-')}")
 PY
 )"

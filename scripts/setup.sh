@@ -41,6 +41,8 @@ for bin in bash python3 node flock fuser curl git timeout setsid; do
 done
 python3 -c "import reportlab" 2>/dev/null && ok "reportlab (gera o PDF por vaga)" \
   || warn "reportlab ausente — pip install reportlab (sem ele o c1 não gera CV)"
+python3 -c "import websocket" 2>/dev/null && ok "websocket-client (leitores por CDP: gupy-status, sonda-sites)" \
+  || warn "websocket-client ausente — pip install websocket-client (sem ele gupy-status/sonda-sites ficam desligados)"
 command -v pdftotext >/dev/null 2>&1 && ok "pdftotext (check_ats.py mede cobertura)" \
   || warn "pdftotext ausente (poppler-utils) — check_ats.py cai no fallback pypdf"
 [ -x "$HOME/.opencode/bin/opencode" ] && ok "opencode" || { warn "opencode ausente em ~/.opencode/bin (https://opencode.ai)"; HAVE_ALL=0; }

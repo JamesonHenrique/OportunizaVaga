@@ -11,7 +11,24 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   caía para modelos piores. Agora só 429/rate limit/quota é cota; 5xx/timeout/sobrecarga é transitório. O vigia da
   rodada aborta em qualquer erro do provedor com saída parada. Teste: `tests/test_opencode_erros.sh`.
 
+- **Registro retroativo** (candidatura feita fora do robô, sem data de envio conhecida) não quebra mais o
+  `scripts/validate-rodada.py` nem conta como envio recente no `rodizio-saude.py`.
+- **Follow-up** pula candidaturas `encerrada` e pula o Gupy enquanto `gupy_status.json` tiver < 36h; sessão
+  improdutiva conta como falha do modelo na cascata.
+
 ### Added
+- **Portão da rodada (`bot/rodada-portao.py`, opt-in `OV_PORTAO=1`)**: decide sem LLM se a rodada vale uma sessão de
+  modelo — `completa` (site do rodízio vencido por `rodizio_intervalo_h`), `so_fila` (só fila/rechecagens, sem varrer
+  site) ou `pular`. Site bloqueado (403/Cloudflare) é sondado por `bot/sonda-sites.py` e sai do rodízio por 12h.
+  Teste: `tests/test_portao.sh`.
+- **Status do Gupy por script (`bot/gupy-status.py`)**: lê "Minhas candidaturas" via CDP (`bot/cdp.py`, precisa de
+  `websocket-client`) e atualiza os status sem LLM; candidatura feita à mão vira `registro_retroativo`. Casamento 1-1
+  (id da vaga vence, empate fica ambíguo). Exemplo em `config/crontab.example`. Teste: `tests/test_gupy_status.sh`.
+- **Relógio da rodada (`bot/tempo-rodada.py`)**: o modelo pergunta antes de abrir vaga nova; evita candidatura pela
+  metade quando o timeout mata a rodada.
+- **`estado.py`**: `resumo-candidato` e `dado CAMPO` (o prompt recebe um resumo em vez de ler o JSON inteiro),
+  `del-aplicada` (move para `aplicadas_removidas`), validação de `status`, uso do comando impresso no erro.
+
 - **Canário dos parsers de portal (`bot/canario-fontes.py`)**: 1x/dia roda a busca do LinkedIn/Gupy ao vivo (só as `fontes`
   habilitadas) e avisa no Telegram, com exit 2, se algum parser não devolver dados usáveis (busca vazia, página de vaga sem
   descrição ou sem nível oficial, Gupy sem descrição). Contrato offline com fixtures **sintéticas** em
@@ -89,6 +106,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   `monitor/snapshot.test.mjs`.
 
 ### Changed
+- **Dieta do prompt** (pt/en): resumo do candidato injetado no render, c1 (CV por vaga) e c-Externo movidos para
+  `prompt_cv(.en).md`/`prompt_externo(.en).md` lidos só quando necessários (~24 KB → ~20 KB por chamada); regras 7d
+  (relógio), 7e (rascunhos em /tmp) e 7f (site bloqueado). `opencode-enxuto.py` nega 11 tools do Playwright pouco usadas.
+- **Cascata** (`loop.sh`/`followup.sh`): começa por `opencode/space-bunny-free`; erro transitório ou rodada travada
+  repete o mesmo modelo 1x antes de descer; vigia de travamento (`WATCHDOG_HANG`, 6 min sem saída); timeout que
+  registrou progresso conta como ok. Paridade no Windows (`loop.ps1`) só para o resumo do candidato — portão,
+  vigia e relógio ainda são só Linux.
 - **Loop** (`loop.sh`/`loop.ps1`): teto do backoff de rodada vazia (`OV_VAZIA_MAX`), impressão digital do estado por
   chaves, descarte de modelos que o opencode não lista mais, cascata quando a sessão morre após erro de ferramenta,
   rotação persistente de termos, modelo pago opt-in para rodadas com envio pronto, quota do log do opencode
