@@ -68,6 +68,14 @@ FIXED RULES:
    reason to block anymore. What matters is the CONTENT: job in Brazil, in Portuguese, within rule 1 (work model), with
    Brazilian hiring. A page load error (e.g. ERR_BLOCKED_BY_CLIENT) just means a blocked foreign
    aggregator or an adblocker — try reloading once; if it persists, log the exact domain in the reason.
+7d. CLOCK (the loop KILLS the round at the timeout and the application is left half done): run
+   `python3 $BOT_ROOT/bot/tempo-rodada.py` BEFORE opening each new job and before starting a form.
+   "ok" → go on · "NAO comece vaga nova" → finish the current one and end · "ENCERRE AGORA" → record and go to cleanup/answer.
+   A form that hangs (upload/click with no effect twice) → record it in quase_la with what was missing and move on.
+7e. SCRATCH FILES (copied posting, snapshot, notes): write ONLY under /tmp/ (e.g. /tmp/anuncio.txt), never in the robot
+   folder; and do not re-read large files/snapshots: extract only the part you need.
+7f. WHOLE SITE BLOCKED (403, "Solicitação bloqueada", Cloudflare/verification): do NOT record it in bloqueados (it is not
+   a job); write SITE_BLOQUEADO <site> on one line, do only the rechecks/queue and end.
 8. FOCUS: this round is applications ONLY. No profile maintenance, no exploring new sites off-rotation,
    don't try to fix a broken form for more than ~3 attempts — log it in bloqueados and move on.
 
@@ -80,14 +88,17 @@ STEP BY STEP (use agent-browser --cdp 9222 or playwright-chrome-real tools):
 
 a0) INITIAL CLEANUP: list tabs and close everything non-essential. If >3 tabs, close the oldest.
 
-a) Read $DADOS_CANDIDATO_FILE. Do NOT read the whole $APLICADAS_FILE (it grows over time and can
-   consume a large share of the round's tokens): the STATE SUMMARY is at the END of this prompt
-   (aplicadas, bloqueados, quase_la, rodizio, pular_*, descartes).
-   Detail of one key: `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE get KEY`.
-   ALWAYS write via estado.py (bash), never by hand-editing the JSON:
-     add-aplicada '<json>' | add-bloqueado KEY '<json>' | set-quase-la KEY '<json>|null'
-     descartes LEVEL MODEL STACK (this round's increments) | conta SITE '<json>' | rodizio-avancar
-   E.g.: python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE add-aplicada '{"chave":"...","empresa":"..."}'
+a) DATA: the CANDIDATE SUMMARY and the STATE SUMMARY are at the END of this prompt. Do NOT read $DADOS_CANDIDATO_FILE,
+   $APLICADAS_FILE or the estado.py source (thousands of tokens that stay in context for the whole round).
+   ALWAYS write via estado.py, never by editing JSON. COMMANDS (E = python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE):
+     E ja-visto "COMPANY" "TITLE"         already applied/blocked? (before opening a job)
+     E get KEY                            detail of ONE key
+     E add-aplicada '{"chave":"company_job_id","empresa":"...","vaga":"...","url":"https://...","como":"channel"}'
+     E add-bloqueado KEY '{"empresa":"...","vaga":"...","motivo":"...","url":"https://..."}'
+     E set-quase-la KEY '{"falta":"...","url":"..."}' (null removes) | E descartes LEVEL MODEL STACK | E conta SITE '<json>'
+     python3 $BOT_ROOT/bot/estado.py dado FIELD[.SUB]   candidate field outside the summary (e.g. respostas_padrao_gupy)
+   Command error: the message already shows the right usage — do not run --help.
+   Every mention of dados_candidato.json in this prompt = check the CANDIDATE SUMMARY or `estado.py dado FIELD`; do not open the file.
 
 a1) RECHECK (before looking for new jobs), in this order:
     1st) QUASE_LA / ALMOST THERE (top priority): walk the STATE SUMMARY -> quase_la; if the datum that
@@ -197,52 +208,9 @@ c) CHANNEL (priority — avoids abandoned applications and wasted effort):
        log in bloqueados and move on — never leave an application half-done because of sign-up.
    Forms: use respostas_padrao_gupy.
 
-c1) PER-JOB CV (effort rule): only generate the PDF when the channel REALLY attaches a file of
-   YOURS: e-mail (Gmail), LinkedIn upload, Indeed. ON GUPY DON'T GENERATE a per-job PDF — Gupy sends
-   the PROFILE CV (if the profile is bad/outdated, note it in manutencao_gupy for outside this round:
-   ATS summary, experiences with MM/YYYY-present period without claiming years, only real languages,
-   https links).
-
-   IMMUTABLE SOURCES: all content comes from bot/cv_base.md (master CV — if it doesn't exist, create
-   it ONCE from examples/cv_base.example.md filling only from dados_candidato.json) +
-   dados_candidato.json. NEVER write HTML/tex/reportlab by hand, NEVER invent company, period, year,
-   language, skill or number. There is always the same generator script — don't create another.
-
-   FLOW (5 steps):
-   1) Read the job description and extract ONLY what is true in your profile. Copy the EXACT wording
-      from the posting for the top-3 truthful keywords (same spelling: "Spring Boot" must not become
-      "springboot"). On the 1st mention of an acronym in the summary, write it out in parentheses
-      (e.g. "continuous integration/delivery (CI/CD)", "robotic process automation (RPA)") — ATS and
-      recruiters understand better.
-   2) Build the spec at /tmp/cv_spec.json:
-        { "empresa": "...", "vaga": "...",
-          "frase_key": "default",
-          "resumo_custom": "...",              // <=800 chars, 3-4 sentences, truthful, with job keywords
-          "categorias_ordem": ["...", "..."],   // subsections of "Habilidades técnicas" for the top
-          "so_categorias": ["...", "..."],      // 3-7 subsections to SHOW; the rest stay hidden
-          "palavras_chave_vaga": ["..."] }      // only real job skills that exist in my profile
-      Valid names are the "###" items under "## Habilidades técnicas" in YOUR bot/cv_base.md (if the
-      spec is wrong, the script fails and lists the valid ones). so_categorias is MANDATORY (3-7
-      subsections relevant to the job): without it the script FAILS (exit 2) — it is what keeps the
-      body at 10pt and the CV away from a wall of irrelevant skills. Map by job area (e.g. dev job →
-      "Backend"/"Frontend"/"Banco de dados"; automation job → the automation/integration category of
-      YOUR cv_base).
-   3) Generate the PDF (the script only returns exit 0 if the file has 1 page and the text passes the
-      name + sections self-check; any ERROR = fix the spec and run again):
-        python3 "$BOT_ROOT/bot/gerar_cv.py" /tmp/cv_spec.json \
-          "$BOT_ROOT/bot/CV_YOUR_NAME_<Company>.pdf"
-      filename WITHOUT the word "ATS" and with the candidate's real name (from dados_candidato.json
-      -> nome) instead of YOUR_NAME. The script prints "kw no CV: ..." and "kw DESCARTADAS (fora do
-      perfil): ..." — if something you asked for was dropped, it does NOT exist in the profile: DON'T
-      work around it nor regenerate the PDF with invented content; proceed with what passed.
-   4) Save the posting text to /tmp/anuncio.txt and measure coverage BEFORE attaching:
-        python3 "$BOT_ROOT/bot/check_ats.py" /tmp/anuncio.txt \
-          "$BOT_ROOT/bot/CV_YOUR_NAME_<Company>.pdf"
-      Target: coverage of PROFILE terms >= 75% (exit 0 = "OK"). If it failed, adjust the spec
-      (resumo_custom with the MISSING terms in the posting's wording, palavras_chave_vaga,
-      so_categorias) and regenerate — NEVER try to cover an "outside profile" term (the script itself
-      lists those as a job misalignment).
-   5) Attach the generated PDF (1 page) to the submission.
+c1) PER-JOB CV: only generate a PDF when the channel REALLY attaches a file of YOURS (e-mail/Gmail, LinkedIn upload,
+   Indeed, an ATS with upload). ON GUPY DO NOT GENERATE (the profile CV is sent). Generating one? FIRST read and follow
+   $BOT_ROOT/bot/prompt_cv.en.md (full flow: gerar_cv.py, check_ats, truthful keywords).
 
    TRANSFER PHRASE: use respostas_padrao_gupy -> frase_transferencia without editing it (if empty,
    build a truthful phrase in the same pattern using only REAL + SIMILAR from rule 4); log the PDF
@@ -255,32 +223,8 @@ c-LinkedIn) LINKEDIN IN FULL (not just "Easy Apply"):
      or the page truly fails to load; redirecting inside the ATS is normal, don't give up on it.
    - Apply the same rules 1/3/4 and the LISTING PRE-FILTER, like the other sites.
 
-c-Externo) NON-STANDARD ATS / SITE (rippling, greenhouse, lever, inhire.app, factorialhr, recrutei,
-   the company's own site...):
-   1. Redirected to another page/subdomain inside the ATS (e.g. company.inhire.app,
-      ats.rippling.com/...)? That's NORMAL — keep going through the flow to the final submit button.
-      Do not log a block for a redirect.
-   2. Order of preference: form WITHOUT an account (greenhouse/lever/rippling often are) → "Continue
-      with Google"/"Sign in with LinkedIn" ("email_contas" account, already logged into Chrome) → sign up
-      with e-mail+password.
-   3. Sign-up with a password: NEW strong password per site, always through the script:
-      NEVER generate, type or read the password yourself (shell commands and fill_form go to the log). With
-      the form open and the password fields visible, run:
-      node $BOT_ROOT/bot/nova-senha.mjs <domain> <email_contas>
-      It generates the password, saves it to ~/.config/oportunizavaga/credenciais.tsv (chmod 600, OUTSIDE
-      the repo; path overridable via OV_CREDENTIALS_FILE) and fills password + confirmation straight into
-      the tab. Fill the other fields with fill_form, without touching the password fields. NEVER write a
-      password into aplicadas.json, a log, the final reply or the CV — aplicadas.json can be published to
-      the monitor. In contas_criadas note only the site, e-mail, date and "password in credenciais.tsv".
-      E-mail confirmation: open the Gmail of the "email_contas" account
-      (mail.google.com/mail/?authuser=<email_contas>), click the verification link and go back to the form.
-   4. Aggregator with no application link (e.g. a post with no external button): look for the SAME job
-      (company + title) on LinkedIn, Gupy, Inhire or the company's careers site
-      ("<company> careers" / "<company> we're hiring") and apply there. Only log a block if you can't
-      find it on any channel.
-   5. Fields: use dados_candidato.json + respostas_padrao_gupy; CV upload = generate the per-job PDF
-      (rule c1). Missing datum (CPF, RG...) → quase_la, as in rule 4. Unsolvable captcha/long test →
-      bloqueados.
+c-Externo) NON-STANDARD ATS / SITE (rippling, greenhouse, lever, inhire.app, factorialhr, recrutei, own site...):
+    did the application leave the portal for a company ATS/site? FIRST read and follow $BOT_ROOT/bot/prompt_externo.en.md.
 
 c2) TWO-TIER (optional): to save strong-model quota, first run the cheap
    triage from bot/prompt_triage.md: paste the listing (cards/HTML) into

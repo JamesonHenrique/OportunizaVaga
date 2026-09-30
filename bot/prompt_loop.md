@@ -68,6 +68,14 @@ REGRAS FIXAS:
    de bloqueio. O que vale é o CONTEÚDO: vaga no Brasil, em português, dentro da regra 1 (modelo), com contratação
    brasileira. Um erro de carregamento de página (ex.: ERR_BLOCKED_BY_CLIENT) só significa agregador
    gringo bloqueado ou adblock — tente recarregar 1x; se persistir, registre o domínio exato no motivo.
+7d. RELÓGIO (o loop MATA a rodada no timeout e a candidatura fica pela metade): rode
+   `python3 $BOT_ROOT/bot/tempo-rodada.py` ANTES de abrir cada vaga nova e antes de começar um formulário.
+   "ok" → siga · "NAO comece vaga nova" → termine a atual e encerre · "ENCERRE AGORA" → registre e vá à limpeza/resposta.
+   Formulário que trava (upload/clique sem efeito 2x) → registre em quase_la com o que faltou e siga; não insista.
+7e. RASCUNHOS (anúncio copiado, snapshot, notas): grave SÓ em /tmp/ (ex.: /tmp/anuncio.txt), nunca na pasta do robô;
+   e não releia arquivos/snapshots grandes: extraia só o trecho que precisa.
+7f. SITE INTEIRO BLOQUEADO (403, "Solicitação bloqueada", Cloudflare/verificação): NÃO registre em bloqueados (não é
+   vaga); escreva SITE_BLOQUEADO <site> numa linha, faça só as rechecagens/fila e encerre.
 8. FOCO: esta rodada é SÓ candidatura. Não faça manutenção de perfil, não explore site novo fora do rodízio,
    não tente resolver um formulário quebrado por mais de ~3 tentativas — registre em bloqueados e siga.
 
@@ -80,14 +88,17 @@ PASSO A PASSO (use agent-browser --cdp 9222 ou tools playwright-chrome-real):
 
 a0) LIMPEZA INICIAL: liste abas e feche tudo que não for essencial. Se >3 abas, feche as mais antigas.
 
-a) Leia $DADOS_CANDIDATO_FILE. NÃO leia $APLICADAS_FILE inteiro (o arquivo cresce e pode
-   consumir boa parte dos tokens da rodada): o RESUMO DO ESTADO está no FIM deste prompt
-   (aplicadas, bloqueados, quase_la, rodízio, pular_*, descartes).
-   Detalhe de uma chave: `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE get CHAVE`.
-   GRAVE SEMPRE via estado.py (bash), nunca editando o JSON na mão:
-     add-aplicada '<json>' | add-bloqueado CHAVE '<json>' | set-quase-la CHAVE '<json>|null'
-     descartes NIVEL MODELO STACK (incrementos da rodada) | conta SITE '<json>' | rodizio-avancar
-   Ex.: python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE add-aplicada '{"chave":"...","empresa":"..."}'
+a) DADOS: o RESUMO DO CANDIDATO e o RESUMO DO ESTADO estão no FIM deste prompt. NÃO leia $DADOS_CANDIDATO_FILE,
+   $APLICADAS_FILE nem o código do estado.py (custam milhares de tokens e ficam no contexto a rodada inteira).
+   GRAVE SEMPRE via estado.py, nunca editando JSON. COMANDOS (E = python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE):
+     E ja-visto "EMPRESA" "TITULO"        já aplicada/bloqueada? (antes de abrir uma vaga)
+     E get CHAVE                          detalhe de UMA chave
+     E add-aplicada '{"chave":"empresa_vaga_id","empresa":"...","vaga":"...","url":"https://...","como":"canal"}'
+     E add-bloqueado CHAVE '{"empresa":"...","vaga":"...","motivo":"...","url":"https://..."}'
+     E set-quase-la CHAVE '{"falta":"...","url":"..."}' (null remove) | E descartes NIVEL MODELO STACK | E conta SITE '<json>'
+     python3 $BOT_ROOT/bot/estado.py dado CAMPO[.SUB]   campo do candidato fora do resumo (ex.: respostas_padrao_gupy)
+   Erro de comando: a mensagem já diz o uso certo — não rode --help.
+   Toda menção a dados_candidato.json neste prompt = consulte o RESUMO DO CANDIDATO ou `estado.py dado CAMPO`; não abra o arquivo.
 
 a1) RECHECAGEM (antes de buscar vaga nova), nesta ordem:
     1º) QUASE_LÁ (prioridade máxima): percorra o RESUMO DO ESTADO -> quase_la; se o dado que faltava
@@ -195,52 +206,9 @@ c) CANAL (prioridade — evita candidatura abandonada e esforço perdido):
        registre em bloqueados e siga — nunca deixe candidatura pela metade por causa de cadastro.
    Formulários: use respostas_padrao_gupy.
 
-c1) CV POR VAGA (regra de esforço): só gere o PDF quando o canal REALMENTE anexa um arquivo SEU:
-   e-mail (Gmail), upload do LinkedIn, Indeed. NO GUPY NÃO GERE PDF por vaga — o Gupy envia o CV do
-   PERFIL (se o perfil estiver ruim/desatualizado, anote em manutencao_gupy p/ fora desta rodada:
-   resumo com ATS, experiências com período MM/AAAA-atual sem afirmar anos, idiomas só o real,
-   links https).
-
-   FONTES IMUTÁVEIS: todo conteúdo vem de bot/cv_base.md (currículo mestre — se não existir, crie
-   UMA vez a partir de examples/cv_base.example.md preenchendo só com dados_candidato.json) +
-   dados_candidato.json. NUNCA escreva HTML/tex/reportlab na mão, NUNCA invente empresa, período,
-   ano, idioma, skill ou número. O gerador é sempre o mesmo script — não crie outro.
-
-   FLUXO (5 passos):
-   1) Leia a descrição da vaga/anúncio e extraia SÓ o que é verdadeiro no perfil dele. Copie a
-      formulação EXATA do anúncio para as top-3 keywords verdadeiras (mesma grafia: "Spring Boot"
-      não vira "springboot"). Na 1ª menção de siglas no resumo, escreva o extenso entre parênteses
-      (ex.: "integração contínua/entrega contínua (CI/CD)", "automação robótica de processos (RPA)")
-      — ATS e recrutadores entendem melhor.
-   2) Monte o spec em /tmp/cv_spec.json:
-        { "empresa": "...", "vaga": "...",
-          "frase_key": "default",
-          "resumo_custom": "...",              // <=800 chars, 3-4 frases, verdadeiro, com keywords da vaga
-          "categorias_ordem": ["...", "..."],   // subseções de "Habilidades técnicas" p/ o topo
-          "so_categorias": ["...", "..."],      // 3-7 subseções p/ MOSTRAR; as demais ficam ocultas
-          "palavras_chave_vaga": ["..."] }      // só skills reais da vaga que existem no meu perfil
-      Os nomes válidos são os "###" da seção "## Habilidades técnicas" do SEU bot/cv_base.md (se
-      o spec estiver errado, o script falha e lista os válidos). so_categorias é OBRIGATÓRIO (3-7
-      subseções relevantes à vaga): sem o campo o script FALHA (exit 2) — é ele que mantém o corpo
-      em 10pt legível e o CV longe de um muro de skills irrelevantes. Mapeie pela área da vaga
-      (ex.: vaga de dev → "Backend"/"Frontend"/"Banco de dados"; vaga de automação → a categoria
-      de automação/integração do SEU cv_base).
-   3) Gere o PDF (o script SÓ retorna exit 0 se o arquivo tiver 1 página e o texto passar na
-      auto-checagem de nome + seções; qualquer ERRO = corrija o spec e rode de novo):
-        python3 "$BOT_ROOT/bot/gerar_cv.py" /tmp/cv_spec.json \
-          "$BOT_ROOT/bot/CV_SEU_NOME_<Empresa>.pdf"
-      filename SEM a palavra "ATS" e com o nome real do candidato (de dados_candidato.json ->
-      nome) no lugar de SEU_NOME. O script imprime "kw no CV: ..." e "kw DESCARTADAS (fora do
-      perfil): ..." — se algo que você pediu caiu, é porque NÃO existe no perfil: NÃO tente
-      contornar nem recrie o PDF com conteúdo inventado; siga com o que passou.
-   4) Salve o texto do anúncio em /tmp/anuncio.txt e meça a cobertura ANTES de anexar:
-        python3 "$BOT_ROOT/bot/check_ats.py" /tmp/anuncio.txt \
-          "$BOT_ROOT/bot/CV_SEU_NOME_<Empresa>.pdf"
-      Meta: cobertura dos termos DO PERFIL >= 75% (exit 0 = "OK"). Se reprovou, ajuste o spec
-      (resumo_custom com os termos FALTANTES na formulação do anúncio, palavras_chave_vaga,
-      so_categorias) e gere o PDF de novo — NUNCA tente cobrir termo "fora do perfil" (o próprio
-      script lista esses termos como desalinhamento da vaga).
-   5) Anexe o PDF gerado (1 página) ao envio.
+c1) CV POR VAGA: só gere PDF quando o canal REALMENTE anexa um arquivo SEU (e-mail/Gmail, upload do LinkedIn,
+   Indeed, ATS com upload). NO GUPY NÃO GERE (vai o CV do perfil). Vai gerar? ANTES leia e siga
+   $BOT_ROOT/bot/prompt_cv.md (fluxo completo: gerar_cv.py, check_ats, keywords verdadeiras).
 
    FRASE DE TRANSFERÊNCIA: use respostas_padrao_gupy -> frase_transferencia sem editar o texto (se
    estiver vazia, monte uma frase verdadeira no mesmo padrão usando só REAL + SIMILAR da regra 4);
@@ -253,32 +221,8 @@ c-LinkedIn) LINKEDIN NO TODO (não só "Candidatura Simplificada"):
      página realmente travar; redirecionamento dentro do ATS é normal, não insista à toa.
    - Aplique as mesmas regras 1/3/4 e o PRÉ-FILTRO da listagem, igual aos outros sites.
 
-c-Externo) ATS / SITE SEM PADRÃO (rippling, greenhouse, lever, inhire.app, factorialhr, recrutei,
-   site próprio da empresa...):
-   1. Redirecionou para outra página/subdomínio dentro do ATS (ex.: empresa.inhire.app,
-      ats.rippling.com/...)? É NORMAL — continue o fluxo até o botão final de envio. Não registre
-      bloqueio por redirecionamento.
-   2. Ordem de preferência: formulário SEM conta (greenhouse/lever/rippling costumam ser) → "Continuar
-      com Google"/"Entrar com LinkedIn" (conta "email_contas", já logada no Chrome) → cadastro com
-      e-mail+senha.
-   3. Cadastro com senha: senha forte NOVA por site, sempre via script:
-      NUNCA gere, digite ou leia a senha você mesmo (comando de shell e fill_form vão para o log). Com o form
-      aberto e os campos de senha visíveis, rode:
-      node $BOT_ROOT/bot/nova-senha.mjs <dominio> <email_contas>
-      Ele gera a senha, grava em ~/.config/oportunizavaga/credenciais.tsv (chmod 600, FORA do repositório;
-      caminho configurável em OV_CREDENTIALS_FILE) e preenche senha + confirmação direto na aba. Preencha os
-      demais campos com fill_form, sem tocar nos campos de senha. NUNCA escreva senha em aplicadas.json, log,
-      resposta final ou CV — aplicadas.json pode ser publicado no monitor. Em contas_criadas anote só site,
-      e-mail, data e "senha em credenciais.tsv".
-      Confirmação por e-mail: abra o Gmail da conta "email_contas" (mail.google.com/mail/?authuser=<email_contas>),
-      clique no link de verificação e volte ao form.
-   4. Agregador sem link de candidatura (ex.: vaga só com texto, sem botão externo): procure a MESMA
-      vaga (empresa + título) no LinkedIn, Gupy, Inhire ou no site de carreiras da empresa
-      ("<empresa> carreiras" / "<empresa> trabalhe conosco") e aplique por lá. Só registre bloqueio se
-      não achar em nenhum canal.
-   5. Campos: use dados_candidato.json + respostas_padrao_gupy; upload de CV = gere o PDF por vaga
-      (regra c1). Dado ausente (CPF, RG...) → quase_la, como na regra 4. Captcha insolúvel/teste
-      longo → bloqueados.
+c-Externo) ATS / SITE SEM PADRÃO (rippling, greenhouse, lever, inhire.app, factorialhr, recrutei, site próprio...):
+    a candidatura saiu do portal para um ATS/site da empresa? ANTES leia e siga $BOT_ROOT/bot/prompt_externo.md.
 
 c2) TWO-TIER (opcional): para economizar quota do modelo forte, rode antes a
    triagem barata de bot/prompt_triage.md: cole a listagem (cards/HTML) no

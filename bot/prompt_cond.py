@@ -110,6 +110,29 @@ def aplicar(text, site, tg_fresco):
 ITEM = re.compile(r"^\s*\d+\) ")
 
 
+# Queue-only round (bot/rodada-portao.py): step b (rotation scan + site blocks) is useless and invites a scan.
+# Cut by its headers (pt and en prompts); nested <!--se:--> blocks rule out a wrapper block.
+_B = {"pt": ("\nb) RODÍZIO DE SITES", "\nc) CANAL",
+             "\nb) (fora nesta rodada: MODO SO FILA, sem varredura de site)\n",
+             "\n\nMODO SO FILA (decidido por script, bot/rodada-portao.py): NESTA RODADA NAO faca o passo b (nenhuma "
+             "varredura/busca no site do rodizio; ele foi varrido ha pouco). Faca SO as rechecagens e as VAGAS "
+             "PRE-FILTRADAS, depois a limpeza e a resposta final. Sem trabalho real nelas: encerre logo.\n"),
+      "en": ("\nb) SITE ROTATION", "\nc) CHANNEL",
+             "\nb) (skipped this round: QUEUE-ONLY MODE, no site scan)\n",
+             "\n\nQUEUE-ONLY MODE (decided by bot/rodada-portao.py): do NOT run step b this round (no search on the "
+             "rotation site; it was scanned recently). Do ONLY the rechecks and the PRE-FILTERED JOBS, then cleanup and "
+             "the final answer. Nothing real to do there: finish quickly.\n")}
+
+
+def so_fila(text):
+    """Returns the prompt without step b + the queue-only note (unchanged text if the headers are not found)."""
+    for ini, fim, troca, nota in _B.values():
+        if ini in text and fim in text and text.index(ini) < text.index(fim):
+            a, b = text.index(ini), text.index(fim)
+            return text[:a] + troca + text[b:] + nota
+    return text
+
+
 def cercar(fonte, corpo):
     """Fence only the numbered items (third-party titles/posts). The script's own header and
     footer ("Registre CADA uma...") are instructions and stay OUTSIDE, or rule 9 would tell the
