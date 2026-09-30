@@ -11,7 +11,7 @@ short line.
                                                   when "cv" names a CV_*.pdf and the posting saved in step c1 is fresh
   estado.py [--file F] add-bloqueado CHAVE JSON   set bloqueados[CHAVE] (JSON object or plain motivo)
   estado.py [--file F] set-quase-la CHAVE JSON    set quase_la[CHAVE]; JSON=null removes it
-  estado.py [--file F] descartes NIVEL MODELO STACK   increments descartes_listagem counters
+  estado.py [--file F] descartes N N N               increments descartes_listagem (nivel modelo stack), e.g. 3 1 2
   estado.py [--file F] status CHAVE ST [MSG] [EMAIL_DATA]   follow-up: em_analise/entrevista/encerrada/sem_resposta/sem_retorno_verificavel
   estado.py [--file F] conta SITE JSON            set contas_criadas[SITE]
   estado.py [--file F] rodizio-avancar            rodizio.proximo -> next in ordem; ultima_rodada=today
@@ -287,6 +287,7 @@ def main(argv):
         if rec.get("status") is not None and rec.get("status") not in STATUS_OK:
             print(f"erro: status '{str(rec.get('status'))[:40]}' desconhecido (use {', '.join(sorted(STATUS_OK))}; detalhe vai em 'obs'); NADA gravado")
             return 2
+        rec.setdefault("status", "enviada")   # without it the funnel/monitor miscount the application
         medir_ats(rec)
         d["aplicadas"].append(rec)
         (d.get("bloqueados") or {}).pop(rec["chave"], None)
@@ -308,8 +309,15 @@ def main(argv):
         else:
             q[k] = v
     elif cmd == "descartes":
+        # Models copy the placeholders ("descartes NIVEL MODELO STACK") or write "nivel 1 modelo 2 stack 3": labels
+        # are accepted; anything that is not a number gets the usage line instead of a ValueError traceback.
+        nums = [x.split("=", 1)[-1] for x in args
+                if x.lower().strip("=:") not in ("nivel", "modelo", "stack", "level", "model")]
+        if not nums or len(nums) > 3 or not all(x.isdigit() for x in nums):
+            print("erro: use numeros: descartes N_NIVEL N_MODELO N_STACK (ex.: descartes 3 1 2); nada gravado")
+            return 2
         dl = d.setdefault("descartes_listagem", {})
-        for name, n in zip(("nivel", "modelo", "stack"), args):
+        for name, n in zip(("nivel", "modelo", "stack"), nums):
             dl[name] = int(dl.get(name, 0)) + int(n)
         dl["total"] = sum(int(dl.get(x, 0)) for x in ("nivel", "modelo", "stack"))
     elif cmd == "status":

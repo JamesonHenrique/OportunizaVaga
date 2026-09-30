@@ -8,7 +8,7 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
-TOTAL=6
+TOTAL=7
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -127,7 +127,7 @@ with contextlib.redirect_stdout(buf):
 out = buf.getvalue()
 assert "VAGAS PRÉ-FILTRADAS" in out and "DADOS" in out, out   # aviso de conteudo de terceiros
 fila = json.load(open(ctx.fila_path, encoding="utf-8"))["vagas"]
-assert sorted(v["ofertas"] for v in fila.values() if v["status"] == "nova") == [0, 1]
+assert sorted(v.get("mostrada", 0) for v in fila.values() if v["status"] == "nova") == [0, 1]   # shown, not yet an offer
 for _ in range(2):
     with contextlib.redirect_stdout(io.StringIO()):
         d.prompt(ctx, 5)
@@ -136,12 +136,39 @@ ap = json.load(open(ctx.paths["aplicadas"], encoding="utf-8"))
 ap["aplicadas"].append({"chave": "gupy_exemplo_9000001", "url": "https://exemplo.gupy.io/jobs/9000001"})
 json.dump(ap, open(ctx.paths["aplicadas"], "w", encoding="utf-8"))
 with contextlib.redirect_stdout(io.StringIO()):
-    d.marcar(ctx)
+    d.marcar(ctx)            # no round log: each round with an open offer counts once
 fila = json.load(open(ctx.fila_path, encoding="utf-8"))["vagas"]
 assert fila["gupy:9000001"]["status"] == "processada", fila["gupy:9000001"]
+assert fila["li:1234567890"]["status"] == "nova" and fila["li:1234567890"]["ofertas"] == 1, fila["li:1234567890"]
+with contextlib.redirect_stdout(io.StringIO()):
+    d.prompt(ctx, 5)
+    d.marcar(ctx)
+fila = json.load(open(ctx.fila_path, encoding="utf-8"))["vagas"]
 assert fila["li:1234567890"]["status"] == "expirada", fila["li:1234567890"]
 PYSNIP
 run_snippet && relata 0 "prompt conta ofertas; marcar fecha registradas e expira excedentes" || relata 1 "prompt conta ofertas; marcar fecha registradas e expira excedentes"
+
+# 7 — marcar LOG: oferta so conta se o id aparece no log; DESCARTADA em texto vira bloqueado; duplicada filtrada.
+cat > "$SNIPPET" <<'PYSNIP'
+import contextlib, io
+ctx = d.Ctx()
+v = lambda i, e, t: {"id": "li:" + i, "fonte": "linkedin", "url": f"https://www.linkedin.com/jobs/view/{i}/",
+                     "titulo": t, "empresa": e, "status": "nova", "score": 2, "ofertas": 0}
+json.dump({"vagas": {"li:111": v("111", "Solfy", "Dev Jr"), "li:222": v("222", "Acme", "Backend Jr"),
+                     "li:333": v("333", "Beta", "Front Jr")}}, open(ctx.fila_path, "w", encoding="utf-8"))
+log = os.path.join(os.environ["STATE_DIR"], "r.log")
+open(log, "w").write("navigate https://www.linkedin.com/jobs/view/222/\n111 | Dev Jr | DESCARTADA por REGRA 1 (so remoto)\n")
+with contextlib.redirect_stdout(io.StringIO()):
+    d.prompt(ctx, 5)
+    d.marcar(ctx, log)
+f = json.load(open(ctx.fila_path, encoding="utf-8"))["vagas"]
+a = json.load(open(ctx.paths["aplicadas"], encoding="utf-8"))
+assert f["li:111"]["status"] == "processada" and "li_111" in a["bloqueados"], f["li:111"]
+assert f["li:222"]["ofertas"] == 1 and f["li:333"]["ofertas"] == 0 and "oferta_aberta" not in f["li:333"], f
+assert d.descarte({"id": "li:9"}, "9 | x | NAO DESCARTADA, aplicar") is None
+assert d._gemea({"empresa": "LINA ", "titulo": "Backend Júnior"}) == d._gemea({"empresa": "lina", "titulo": "Backend Junior"})
+PYSNIP
+run_snippet && relata 0 "marcar LOG: oferta so conta se aberta, descarte em texto registrado, duplicada" || relata 1 "marcar LOG: oferta so conta se aberta, descarte em texto registrado, duplicada"
 
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0

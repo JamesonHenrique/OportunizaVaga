@@ -95,7 +95,7 @@ a) DADOS: o RESUMO DO CANDIDATO e o RESUMO DO ESTADO estão no FIM deste prompt.
      E get CHAVE                          detalhe de UMA chave
      E add-aplicada '{"chave":"empresa_vaga_id","empresa":"...","vaga":"...","url":"https://...","como":"canal"}'
      E add-bloqueado CHAVE '{"empresa":"...","vaga":"...","motivo":"...","url":"https://..."}'
-     E set-quase-la CHAVE '{"falta":"...","url":"..."}' (null remove) | E descartes NIVEL MODELO STACK | E conta SITE '<json>'
+     E set-quase-la CHAVE '{"falta":"...","url":"..."}' (null remove) | E descartes 3 1 2 (NÚMEROS: nível, modelo, stack) | E conta SITE '<json>'
      python3 $BOT_ROOT/bot/estado.py dado CAMPO[.SUB]   campo do candidato fora do resumo (ex.: respostas_padrao_gupy)
    Erro de comando: a mensagem já diz o uso certo — não rode --help.
    Toda menção a dados_candidato.json neste prompt = consulte o RESUMO DO CANDIDATO ou `estado.py dado CAMPO`; não abra o arquivo.
@@ -145,7 +145,7 @@ b) RODÍZIO DE SITES: veja rodizio.proximo no RESUMO DO ESTADO. Use EXATAMENTE 1
     - (área/stack fora do perfil) o card é de outra área que não {{AREA}} ou já exibe como obrigatória
       competência fora de REAL + SIMILAR do SEU dados_candidato.json.
    Descarte de listagem NÃO vira entrada em bloqueados (é ruído): em vez disso, ao fim da rodada rode
-   UMA vez `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE descartes NIVEL MODELO STACK`
+   UMA vez `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE descartes 3 1 2` (NÚMEROS: nível, modelo, stack)
    (quantos descartou em cada) E anote até 5 títulos-amostra no log da rodada (ex.: "amostra_nivel: X, Y")
    para calibrar o filtro. Só abra a vaga que passar nos três filtros.
    TERMOS DO PERFIL (alterne por rodada, priorize os primeiros): {{TERMOS}}.
