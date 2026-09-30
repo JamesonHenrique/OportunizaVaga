@@ -12,8 +12,9 @@ What it does (merged by opencode over your own config, so nothing else changes):
   - the browser MCP ($OV_BROWSER_MCP, default "playwright-chrome-real") is kept with its command read from
     your config MINUS the "vision" capability (`--caps vision`: the coordinate tools were never called in
     the maintainer's logged rounds, but their schemas shipped with every request);
-  - built-in tools the robots never used are denied: edit, glob, grep, websearch, task, todowrite and the
-    browser's browser_close (override with OV_ENXUTO_NEGAR="a,b,c"). write and webfetch stay: models use them.
+  - built-in tools the robots never used are denied: edit, glob, grep, websearch, task, todowrite, plus the
+    browser tools never used in a week of rounds (PW_NEGAR: close, screenshot, drag, hover, resize, ...; measured
+    -2,145 tokens per call) (override with OV_ENXUTO_NEGAR="a,b,c"). write and webfetch stay: models use them.
     The agent can still grep/edit through bash; this only removes the dedicated tools' schemas.
 
 Usage: python3 bot/opencode-enxuto.py   -> JSON on stdout, or NOTHING when off/unavailable (fail-open:
@@ -27,6 +28,10 @@ import re
 import sys
 
 NEGAR = ["edit", "glob", "grep", "websearch", "task", "todowrite"]
+# Browser MCP tools never used in a week of real rounds (network_requests: few calls, ~10 KB output each).
+# Measured (same model, one-line prompt, first call): 11,191 -> 9,046 tokens with these denied.
+PW_NEGAR = ["close", "take_screenshot", "emulate_media", "drop", "network_request", "network_requests",
+            "drag", "hover", "resize", "navigate_back", "console_messages"]
 _TOKEN = re.compile(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*.*?\*/', re.S)
 _VIRGULA = re.compile(r'"(?:\\.|[^"\\])*"|,(?=\s*[}\]])')
 
@@ -76,7 +81,7 @@ def enxuto(user_cfg, navegador):
     if not (isinstance(cmd, list) and cmd and all(isinstance(x, str) for x in cmd)):
         raise KeyError(f"MCP '{navegador}' with a command list not found in the opencode config")
     negar = [t.strip() for t in os.environ["OV_ENXUTO_NEGAR"].split(",") if t.strip()] \
-        if os.environ.get("OV_ENXUTO_NEGAR") else NEGAR + [f"{navegador}_browser_close"]
+        if os.environ.get("OV_ENXUTO_NEGAR") else NEGAR + [f"{navegador}_browser_{t}" for t in PW_NEGAR]
     cfg = {"mcp": {nome: {"enabled": False} for nome in mcps if nome != navegador},
            "permission": {"*": "allow", "skill": "deny"}}
     cfg["mcp"][navegador] = {"type": "local", "command": sem_visao(cmd), "enabled": True}
