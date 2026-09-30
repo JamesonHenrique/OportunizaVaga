@@ -225,6 +225,9 @@ rotate_log() {
   fi
   # mantem apenas as ultimas ROUNDS_KEPT rodadas completas
   ls -1t logs/rodada-*.log 2>/dev/null | tail -n +$((ROUNDS_KEPT + 1)) | xargs -r rm -f
+  # page snapshots/console dumps of the browser MCP (~20 MB/day, some with filled-in forms = personal data);
+  # nothing reads them after the round: keep 2 days
+  find .playwright-mcp "$BOT_ROOT/.playwright-mcp" -maxdepth 1 -type f -mtime +1 -delete 2>/dev/null || true
 }
 
 log() {
@@ -603,7 +606,7 @@ while true; do
 
   # Fecha na fila as vagas que o robo registrou (ou ofertou demais); barato e idempotente.
   if [ "$OV_DESCOBRIR" = "1" ]; then
-    python3 "$BOT_ROOT/bot/descobrir.py" marcar >> loop.log 2>&1 || true
+    python3 "$BOT_ROOT/bot/descobrir.py" marcar "$ROUND_LOG" >> loop.log 2>&1 || true
   fi
   # Checagem semantica do estado apos cada rodada (o monitor le a ultima linha do log).
   if [ -f "$BOT_ROOT/scripts/validate-rodada.py" ]; then

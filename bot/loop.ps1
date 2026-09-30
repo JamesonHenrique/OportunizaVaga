@@ -725,7 +725,7 @@ while ($true) {
     # Fecha na fila as vagas registradas (ou ofertadas demais) e valida o estado apos cada rodada.
     if ($Py) {
         if ($OV_DESCOBRIR -eq '1') {
-            try { $o = & $Py (Join-Path $BOT_ROOT 'bot\descobrir.py') marcar 2>&1; if ($o) { Add-Content -Path 'loop.log' -Value $o } } catch { }
+            try { $o = & $Py (Join-Path $BOT_ROOT 'bot\descobrir.py') marcar $ROUND_LOG 2>&1; if ($o) { Add-Content -Path 'loop.log' -Value $o } } catch { }
         }
         $vr = Join-Path $BOT_ROOT 'scripts\validate-rodada.py'
         if (Test-Path $vr) {

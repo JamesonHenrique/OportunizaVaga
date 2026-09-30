@@ -95,7 +95,7 @@ a) DATA: the CANDIDATE SUMMARY and the STATE SUMMARY are at the END of this prom
      E get KEY                            detail of ONE key
      E add-aplicada '{"chave":"company_job_id","empresa":"...","vaga":"...","url":"https://...","como":"channel"}'
      E add-bloqueado KEY '{"empresa":"...","vaga":"...","motivo":"...","url":"https://..."}'
-     E set-quase-la KEY '{"falta":"...","url":"..."}' (null removes) | E descartes LEVEL MODEL STACK | E conta SITE '<json>'
+     E set-quase-la KEY '{"falta":"...","url":"..."}' (null removes) | E descartes 3 1 2 (NUMBERS: level, model, stack) | E conta SITE '<json>'
      python3 $BOT_ROOT/bot/estado.py dado FIELD[.SUB]   candidate field outside the summary (e.g. respostas_padrao_gupy)
    Command error: the message already shows the right usage — do not run --help.
    Every mention of dados_candidato.json in this prompt = check the CANDIDATE SUMMARY or `estado.py dado FIELD`; do not open the file.
@@ -147,7 +147,7 @@ b) SITE ROTATION: check rodizio.proximo in the STATE SUMMARY. Use EXACTLY 1 site
     - (off-profile field/stack) the card is from a field other than {{AREA}} or already lists as mandatory
       a skill outside YOUR dados_candidato.json REAL + SIMILAR set.
    Listing discards do NOT become bloqueados entries (they're noise): instead, at the end of the round run
-   ONCE `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE descartes LEVEL MODEL STACK`
+   ONCE `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE descartes 3 1 2` (NUMBERS: level, model, stack)
    (how many you discarded in each) AND note up to 5 sample titles in the round log
    (e.g. "amostra_nivel: X, Y") to calibrate the filter. Only open jobs passing all three filters.
    PROFILE TERMS (rotate per round, prioritize the first ones): {{TERMOS}}.

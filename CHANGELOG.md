@@ -6,6 +6,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **Fila do descobridor (`bot/descobrir.py marcar LOG`)**: a oferta só conta quando o id da vaga aparece no log da
+  rodada (vaga que o modelo nem abriu não perde a chance; teto `max_mostrada`=6); vaga que o modelo descartou só no
+  texto (`DESCARTADA`) vira `bloqueados` e não volta toda rodada; mesma empresa + título entra como `duplicada`.
+  `loop.sh`/`loop.ps1` passam o log. Teste 7 em `tests/test_descobrir.sh`.
+- **`estado.py descartes`** aceita rótulos (`nivel 1 modelo 2 stack 3`) e recusa o placeholder copiado sem traceback;
+  `add-aplicada` sem status grava `enviada`. Testes 21–22 em `tests/test_estado.sh`.
+- **`.playwright-mcp/`** (snapshots de página, alguns com formulário preenchido) é podado a 2 dias pelo `loop.sh`
+  (ainda não no `loop.ps1`).
 - **Cota x erro transitório do provedor (`bot/lib/opencode-erros.sh`)**: qualquer `AI_APICallError` contava como
   cota, então um 503 "Service Unavailable" ou timeout de cabeçalho punha o melhor modelo em resfriamento e a rodada
   caía para modelos piores. Agora só 429/rate limit/quota é cota; 5xx/timeout/sobrecarga é transitório. O vigia da

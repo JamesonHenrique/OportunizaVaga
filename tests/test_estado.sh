@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 ESTADO="bot/estado.py"
 
-TOTAL=20
+TOTAL=22
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -185,7 +185,19 @@ relata $? "resumo-candidato traz o essencial e deixa documentos fora"
 DADOS_CANDIDATO_FILE=examples/dados_candidato.example.json python3 "$ESTADO" dado experiencia.tecnologias | grep -q .
 relata $? "dado le campo aninhado do dados_candidato"
 
-if [ "$FAIL" -eq 0 ]; then
+if # 21 — descartes: placeholder copiado e recusado sem traceback; rotulos aceitos.
+OUT21="$(python3 "$ESTADO" --file "$TMP_STATE" descartes NIVEL MODELO STACK 2>&1)"; A=$?
+python3 "$ESTADO" --file "$TMP_STATE" descartes nivel 1 modelo 2 stack 3 >/dev/null 2>&1; B=$?
+[ "$A" -ne 0 ] && [ "$B" -eq 0 ] && ! echo "$OUT21" | grep -q Traceback \
+  && python3 -c "import json,sys;assert json.load(open(sys.argv[1]))['descartes_listagem']['stack']>=3" "$TMP_STATE"
+relata $? "descartes: placeholder recusado sem traceback, rotulos aceitos"
+
+# 22 — add-aplicada sem status grava "enviada" (o funil nao perde a candidatura).
+python3 "$ESTADO" --file "$TMP_STATE" add-aplicada '{"chave":"z_dev_77","empresa":"Z","vaga":"Dev","url":"https://z.example/77"}' >/dev/null 2>&1
+python3 -c "import json,sys;assert [a for a in json.load(open(sys.argv[1]))['aplicadas'] if a['chave']=='z_dev_77'][0]['status']=='enviada'" "$TMP_STATE"
+relata $? "add-aplicada sem status grava enviada"
+
+[ "$FAIL" -eq 0 ]; then
   echo "# verde: $N/$TOTAL"
   exit 0
 else
