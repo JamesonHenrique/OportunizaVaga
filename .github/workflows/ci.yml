@@ -75,6 +75,7 @@ jobs:
           bash tests/test_dry_run.sh
           bash tests/test_estado.sh
           bash tests/test_rodizio_saude.sh
+          bash tests/test_opencode_erros.sh
           bash tests/test_perfil_render.sh
           bash tests/test_jsonlock.sh
           bash tests/test_prompt_cond.sh

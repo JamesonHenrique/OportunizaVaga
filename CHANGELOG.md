@@ -5,6 +5,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Cota x erro transitório do provedor (`bot/lib/opencode-erros.sh`)**: qualquer `AI_APICallError` contava como
+  cota, então um 503 "Service Unavailable" ou timeout de cabeçalho punha o melhor modelo em resfriamento e a rodada
+  caía para modelos piores. Agora só 429/rate limit/quota é cota; 5xx/timeout/sobrecarga é transitório. O vigia da
+  rodada aborta em qualquer erro do provedor com saída parada. Teste: `tests/test_opencode_erros.sh`.
+
 ### Added
 - **Canário dos parsers de portal (`bot/canario-fontes.py`)**: 1x/dia roda a busca do LinkedIn/Gupy ao vivo (só as `fontes`
   habilitadas) e avisa no Telegram, com exit 2, se algum parser não devolver dados usáveis (busca vazia, página de vaga sem
