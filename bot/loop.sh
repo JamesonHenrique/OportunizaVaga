@@ -248,34 +248,12 @@ is_quota() {
   grep -qE '^[[:space:]]*QUOTA_EXAUSTA|Error from provider.*([Rr]ate limit|[Qq]uota|429|[Ee]xhausted|[Tt]oo [Mm]any)|AI_RetryError|RateLimitError' "$1"
 }
 
-# O opencode NAO imprime rate limit no stdout quando entra em retry silencioso:
-# a rodada simplesmente trava ate o timeout. O erro so existe no log interno.
-# Sem isto, rodada bloqueada por quota queima 20min de timeout + 5min de backoff, em loop.
-OC_LOG_DIR="$HOME/.local/share/opencode/log"
-quota_in_opencode_log() {   # $1 = timestamp ISO do inicio da rodada
-  local f
-  f=$(ls -t "$OC_LOG_DIR"/*.log 2>/dev/null | head -1)
-  [ -n "$f" ] || return 1
-  # O log e compartilhado por TODOS os agentes opencode da maquina: so conta erro de runs cuja
-  # instancia nasceu neste diretorio (quota de outro robo nao pode abortar a nossa rodada).
-  # Le so o fim do arquivo (pode passar de dezenas de MB).
-  tail -c 8000000 "$f" | awk -v since="$1" -v dir="$PWD" '
-    /message="creating instance"/ {
-      if (match($0, /run=[0-9a-f]+/)) { r = substr($0, RSTART + 4, RLENGTH - 4) }
-      if (index($0, "directory=" dir) && !index($0, "directory=" dir "/")) mine[r] = 1
-      next
-    }
-    /Rate limit exceeded|AI_RetryError|AI_APICallError|[Tt]oo [Mm]any [Rr]equests/ {
-      if (!match($0, /run=[0-9a-f]+/)) next
-      r = substr($0, RSTART + 4, RLENGTH - 4)
-      if (!(r in mine)) next
-      if (match($0, /timestamp=[0-9T:.-]+Z/)) {
-        ts = substr($0, RSTART + 10, RLENGTH - 10)
-        if (ts >= since) found = 1
-      }
-    }
-    END { exit(found ? 0 : 1) }
-  '
+# O opencode NAO imprime rate limit no stdout quando entra em retry silencioso: o erro so existe no log
+# interno. bot/lib/opencode-erros.sh separa COTA de erro TRANSITORIO (503, timeout de cabecalho, sobrecarga):
+# antes qualquer AI_APICallError contava como cota e punha o melhor modelo em resfriamento por um 503.
+. "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/lib/opencode-erros.sh"
+quota_in_opencode_log() {   # $1 = timestamp ISO do inicio da rodada; so COTA real
+  [ "$(erro_opencode_log "$1" "$PWD")" = "quota" ]
 }
 
 # Impressao digital do estado: hash de toda CHAVE de vaga que o robo registrou (aplicadas,
@@ -503,8 +481,9 @@ while true; do
       tam=$(stat -c %s "$ROUND_LOG" 2>/dev/null || echo 0)
       if [ "$tam" -eq "$ultimo_tam" ]; then parado=$((parado + 15)); else parado=0; ultimo_tam=$tam; fi
       [ "$esperado" -lt "$WATCHDOG_MIN_WAIT" ] && continue
+      # any provider error (quota OR transient) + no output = the run is stuck: abort and let the loop go on
       if { [ "$tam" -lt "$WATCHDOG_MIN_BYTES" ] || [ "$parado" -ge "$WATCHDOG_STALL" ]; } \
-         && quota_in_opencode_log "$ROUND_START"; then
+         && [ -n "$(erro_opencode_log "$ROUND_START" "$PWD")" ]; then
         kill -TERM -- "-$ROUND_PID" 2>/dev/null || kill -TERM "$ROUND_PID" 2>/dev/null
         break
       fi
