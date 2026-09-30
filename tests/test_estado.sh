@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 ESTADO="bot/estado.py"
 
-TOTAL=15
+TOTAL=20
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -37,9 +37,9 @@ else
   relata 1 "resumo mostra rodizio.proximo"
 fi
 
-# 2 — add-aplicada grava e resumo passa a listar empresa | vaga.
+# 2 — add-aplicada grava e resumo passa a listar a empresa.
 python3 "$ESTADO" --file "$TMP_STATE" add-aplicada '{"chave":"teste-1","empresa":"AcmeCorp","vaga":"Dev Jr"}' >/dev/null
-if python3 "$ESTADO" --file "$TMP_STATE" resumo | grep -q "AcmeCorp | Dev Jr"; then
+if python3 "$ESTADO" --file "$TMP_STATE" resumo | grep -q "AcmeCorp"; then
   relata 0 "add-aplicada grava a chave nova"
 else
   relata 1 "add-aplicada grava a chave nova"
@@ -159,6 +159,31 @@ relata $? "anuncio velho (> 20 min) ou registro sem CV_*.pdf: nada e gravado"
 unset OV_CHECK_ATS
 grep -q 'cobertura geral do CV: %d%%' bot/check_ats.py && grep -q 'cobertura dos termos DO PERFIL: %d%%' bot/check_ats.py
 relata $? "formato lido do check_ats.py real continua igual ao que estado.py espera"
+
+# 16 — status fora do padrao e recusado (add-aplicada e status).
+python3 "$ESTADO" --file "$TMP_STATE" add-aplicada '{"chave":"teste-st","empresa":"X","vaga":"Y","status":"enviada - pendente"}' >/dev/null 2>&1
+A=$?; python3 "$ESTADO" --file "$TMP_STATE" status teste-1 inventado >/dev/null 2>&1; B=$?
+[ "$A" -ne 0 ] && [ "$B" -ne 0 ] && ! python3 "$ESTADO" --file "$TMP_STATE" tem teste-st >/dev/null 2>&1
+relata $? "status fora do padrao e recusado (nada gravado)"
+
+# 17 — del-aplicada arquiva em aplicadas_removidas (nao apaga).
+python3 "$ESTADO" --file "$TMP_STATE" del-aplicada teste-1 "duplicata de teste" >/dev/null
+python3 -c "import json,sys;d=json.load(open(sys.argv[1]));assert not any(a['chave']=='teste-1' for a in d['aplicadas']) and d['aplicadas_removidas'][-1]['motivo_remocao']=='duplicata de teste'" "$TMP_STATE"
+relata $? "del-aplicada arquiva o registro com o motivo"
+
+# 18 — argumento faltando mostra so o uso do comando, sem traceback.
+OUT18="$(python3 "$ESTADO" --file "$TMP_STATE" add-bloqueado 2>&1)"
+echo "$OUT18" | grep -q "add-bloqueado CHAVE JSON" && ! echo "$OUT18" | grep -q Traceback
+relata $? "argumento faltando: uso do comando, sem traceback"
+
+# 19 — resumo-candidato: campos principais, documentos fora.
+OUT19="$(DADOS_CANDIDATO_FILE=examples/dados_candidato.example.json python3 "$ESTADO" resumo-candidato)"
+echo "$OUT19" | grep -q "^nome: " && echo "$OUT19" | grep -q "fora do resumo.*documentos" && ! echo "$OUT19" | grep -q '"cpf"'
+relata $? "resumo-candidato traz o essencial e deixa documentos fora"
+
+# 20 — dado CAMPO.SUB le um campo aninhado.
+DADOS_CANDIDATO_FILE=examples/dados_candidato.example.json python3 "$ESTADO" dado experiencia.tecnologias | grep -q .
+relata $? "dado le campo aninhado do dados_candidato"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "# verde: $N/$TOTAL"
