@@ -1,6 +1,6 @@
 #!/bin/bash
 # tests/test_rodizio_saude.sh — suite minima em bash puro (sem framework), saida TAP.
-# Cobre: bot/rodizio-saude.py (pausa de 48h apos N rodadas seguidas sem candidatura).
+# Cobre: bot/rodizio-saude.py (pausa progressiva 12h->48h de site SECO, minimo de sites ativos, ordem do dia).
 # Uso: bash tests/test_rodizio_saude.sh   (exit 0 = tudo verde)
 set -u
 
@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 SAUDE="bot/rodizio-saude.py"
 
-TOTAL=8
+TOTAL=10
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -161,6 +161,51 @@ else
   relata 1 "OV_RODIZIO_REORDENAR=0 mantem a ordem"
 fi
 rm -rf "$DIR7"
+
+# 9 — seco = nenhuma chave nova (vaga bloqueada conta como site vivo); pausa 12h, depois 24h; nunca abaixo de MIN_ATIVOS.
+python3 - "$ROOT" "$TMPDIR_STATE" <<'PYEOF'
+import importlib.util, json, os, sys
+from datetime import datetime
+R, T = sys.argv[1], sys.argv[2]
+os.environ["OV_RODIZIO_SAUDE"] = T + "/s9.json"; os.environ["NOTIFY"] = "true"
+s = importlib.util.spec_from_file_location("r", R + "/bot/rodizio-saude.py"); r = importlib.util.module_from_spec(s); s.loader.exec_module(r)
+ap = T + "/a9.json"
+def estado(ordem): json.dump({"aplicadas": [], "bloqueados": {}, "rodizio": {"ordem": ordem, "proximo": ordem[0], "pos": 0, "ordem_calculada_em": datetime.now().strftime("%Y-%m-%d")}}, open(ap, "w"))
+def rodada(bloquear=None):
+    d = json.load(open(ap)); d["rodizio"]["proximo"] = "a"; d["rodizio"]["pos"] = 0; json.dump(d, open(ap, "w"))
+    r.main("pre", ap)
+    if bloquear:
+        d = json.load(open(ap)); d["bloqueados"][bloquear] = {"motivo": "x"}; json.dump(d, open(ap, "w"))
+    r.main("pos", ap)
+estado(["a", "b", "c", "d"]); json.dump({"sites": {}}, open(os.environ["OV_RODIZIO_SAUDE"], "w"))
+for i in range(4): rodada(bloquear=f"k{i}")
+assert not json.load(open(os.environ["OV_RODIZIO_SAUDE"]))["sites"]["a"].get("pausado_ate"), "bloqueio novo = site vivo"
+h = lambda: (datetime.fromisoformat(json.load(open(os.environ["OV_RODIZIO_SAUDE"]))["sites"]["a"]["pausado_ate"]) - datetime.now()).total_seconds() / 3600
+for i in range(4): rodada()
+assert 11 < h() < 12.1, h()
+sd = json.load(open(os.environ["OV_RODIZIO_SAUDE"])); sd["sites"]["a"]["pausado_ate"] = None; json.dump(sd, open(os.environ["OV_RODIZIO_SAUDE"], "w"))
+for i in range(4): rodada()
+assert 23 < h() < 24.1, h()
+estado(["a", "b"]); json.dump({"sites": {}}, open(os.environ["OV_RODIZIO_SAUDE"], "w"))
+for i in range(4): rodada()
+assert not json.load(open(os.environ["OV_RODIZIO_SAUDE"]))["sites"]["a"].get("pausado_ate"), "so 1 outro site ativo: nao pausa"
+PYEOF
+relata $? "seco = sem chave nova; pausa 12h -> 24h; nunca abaixo de MIN_ATIVOS"
+
+# 10 — ordem do dia (OV_SITES_CONFIG com rodizio_produtivos): produtivos em dobro + 1 explorador nao pausado.
+python3 - "$ROOT" "$TMPDIR_STATE" <<'PYEOF'
+import importlib.util, json, os, sys
+from datetime import datetime, timedelta
+R, T = sys.argv[1], sys.argv[2]
+s = importlib.util.spec_from_file_location("r", R + "/bot/rodizio-saude.py"); r = importlib.util.module_from_spec(s); s.loader.exec_module(r)
+json.dump({"rodizio_produtivos": ["linkedin", "gupy"], "rodizio_exploracao": ["catho", "remotar"]}, open(T + "/sites.json", "w"))
+os.environ["OV_SITES_CONFIG"] = T + "/sites.json"
+assert r.config_rodizio() == (["linkedin", "gupy"], ["catho", "remotar"])
+now = datetime(2026, 9, 30, 12, 0)
+o, _ = r.ordem_do_dia(["linkedin", "gupy"], ["catho", "remotar"], {"catho": {"pausado_ate": (now + timedelta(hours=5)).isoformat()}}, [], now)
+assert len(o) == 5 and o.count("linkedin") == 2 and o.count("remotar") == 1 and "catho" not in o, o
+PYEOF
+relata $? "ordem do dia: produtivos em dobro + 1 explorador nao pausado (OV_SITES_CONFIG)"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "# verde: $N/$TOTAL"

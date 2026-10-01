@@ -53,7 +53,7 @@
 | `bot/podar-sessoes.py` | (opt-in) Poda sessões antigas do robô no opencode, com filtro título+pasta; DB em 600 |
 | `bot/gerar_cv.py` | Gera o PDF por vaga (regra `c1`) só a partir de `bot/cv_base.md` + `dados_candidato.json`; 1 página ou exit 2 |
 | `bot/check_ats.py` | Mede a cobertura dos termos do anúncio no CV (meta >= 75%) antes de anexar |
-| `bot/rodizio-saude.py` | Pausa (48h) site com 4 rodadas seguidas sem candidatura nova; reordena o rodízio 1x/dia pelo rendimento; hooks `pre`/`pos` no `loop.sh` |
+| `bot/rodizio-saude.py` | Pausa site SECO (4 rodadas sem nenhuma vaga nova registrada — bloqueio conta como site vivo) por 12h, dobrando até 48h, nunca abaixo de 3 sites ativos; reordena o rodízio 1x/dia pelo rendimento (com `rodizio_produtivos`/`rodizio_exploracao`: produtivos em dobro + 1 explorador do dia); hooks `pre`/`pos`/`pos-so-fila` no `loop.sh` |
 | `bot/vaga_check.py` | Triagem determinística pela descrição + nível oficial do LinkedIn (conservadora, dirigida pelo perfil); usada por `descobrir.py` e pelo passo c0 do prompt. Ver `docs/OPERACAO.md` |
 | `bot/modelos-saude.py` | Ordena a cascata de modelos pela taxa de sucesso real (logs de 7 dias), quarentena de modelo inútil, fail-open; chamado por `loop.sh`/`loop.ps1` antes de cada rodada |
 | `bot/opencode-enxuto.py` | Gera o `OPENCODE_CONFIG_CONTENT` enxuto (MCPs/ferramentas não usadas fora) a partir da config do opencode do usuário; fail-open; usado por `loop` e `followup` |
