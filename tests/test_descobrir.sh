@@ -8,7 +8,7 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
-TOTAL=9
+TOTAL=12
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -212,6 +212,58 @@ cam = {c[5]: c[7] for c in chamadas if "set-campo" in c}
 assert all(c[1] == "/privado/estado.py" for c in chamadas) and cam == {"acme_a_4000000001": "fila", "acme_b_4000000002": "rodizio"}, chamadas
 PYSNIP
 run_snippet && relata 0 "instalacao privada: termos_arquivo, score_palavras, prompt_registro, OV_ESTADO_PY, caminho" || relata 1 "instalacao privada: termos_arquivo, score_palavras, prompt_registro, OV_ESTADO_PY, caminho"
+
+# 10 — Gupy pela API paginada do portal (limit = gupy_limite, so remoto); erro na API = cai na pagina (__NEXT_DATA__).
+cat > "$SNIPPET" <<'PYSNIP'
+urls = []
+API = json.dumps({"data": [{"id": 77, "name": "Dev Jr", "jobUrl": "https://x.gupy.io/job/1", "careerPageName": "X",
+                            "publishedDate": "2026-09-29T10:00:00Z", "description": "Java remoto"}], "pagination": {"total": 1}})
+d.get = lambda url, timeout=20: urls.append(url) or (API if "/api/job-search/jobs" in url else GU)
+ctx = d.Ctx()
+v = d.gupy(ctx, "dev jr")
+assert [x["id"] for x in v] == ["gupy:77"] and "limit=100" in urls[0] and "workplaceType=remote" in urls[0] and len(urls) == 1, urls
+pag = lambda off: json.dumps({"data": [{"id": off + i, "name": "Dev Jr", "jobUrl": f"https://x.gupy.io/job/{off + i}"} for i in range(100 if off < 200 else 50)],
+                              "pagination": {"total": 100}})   # the real API lies about total
+urls.clear(); d.get = lambda url, timeout=20: urls.append(url) or pag(int(url.split("offset=")[1].split("&")[0]))
+assert len(d.gupy(ctx, "dev")) == 250 and len(urls) == 3 and "offset=200" in urls[2], urls
+def quebra(url, timeout=20):
+    urls.append(url)
+    if "/api/job-search/" in url: raise OSError("api fora")
+    return GU
+d.get = quebra
+assert d.gupy(ctx, "dev jr") and "job-search/term=" in urls[-1], urls[-2:]
+PYSNIP
+run_snippet && relata 0 "gupy: API paginada do portal, com fallback para a pagina" || relata 1 "gupy: API paginada do portal, com fallback para a pagina"
+
+# 11 — titulo_exige: termo amplo traz outras areas; sem palavra da area = filtrada "area" (lista vazia = desligado).
+cat > "$SNIPPET" <<'PYSNIP'
+json.dump({"titulo_exige": ["desenvolvedor", "software", "trainee"]}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
+ctx = d.Ctx()
+assert d.motivo_filtro(ctx, {"titulo": "Analista Fiscal Junior"}, []) == "area"
+assert d.motivo_filtro(ctx, {"titulo": "Desenvolvedor Júnior"}, []) is None
+assert d.motivo_filtro(ctx, {"titulo": "Consultor(a) Técnico(a) Trainee"}, []) is None
+json.dump({}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
+assert d.motivo_filtro(d.Ctx(), {"titulo": "Analista Fiscal Junior"}, []) is None
+PYSNIP
+run_snippet && relata 0 "titulo_exige: outra area vira filtrada 'area'" || relata 1 "titulo_exige: outra area vira filtrada 'area'"
+
+# 12 — LinkedIn: sufixo "remoto" na busca (o guest ignora f_WT) e card com cidade no local = "modelo" (perfil so remoto).
+cat > "$SNIPPET" <<'PYSNIP'
+json.dump({"linkedin_sufixo": "remoto", "linkedin_cidade_fora": True}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
+ctx = d.Ctx(); urls = []
+d.get = lambda url, timeout=20: urls.append(url) or LI
+d.linkedin(ctx, "java junior"); d.linkedin(ctx, "python junior remoto")
+assert "keywords=java+junior+remoto" in urls[0] and "keywords=python+junior+remoto&" in urls[1], urls
+li = lambda t, l: {"titulo": t, "local": l, "fonte": "linkedin"}
+assert d.motivo_filtro(ctx, li("Dev Java Jr", "São Paulo, SP"), []) == "modelo"
+assert d.motivo_filtro(ctx, li("Dev Java Jr", "Belo Horizonte e Região"), []) == "modelo"
+assert d.motivo_filtro(ctx, li("Dev Java Jr (Remoto)", "São Paulo, SP"), []) is None
+assert d.motivo_filtro(ctx, li("Dev Java Jr", "Brasil"), []) is None
+assert d.motivo_filtro(ctx, {"titulo": "Dev Java Jr", "local": "São Paulo, SP", "fonte": "gupy"}, []) is None
+json.dump({}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
+assert d.motivo_filtro(d.Ctx(), li("Dev Java Jr", "São Paulo, SP"), []) is None   # off by default
+PYSNIP
+run_snippet && relata 0 "linkedin: sufixo remoto e cidade no local = modelo" || relata 1 "linkedin: sufixo remoto e cidade no local = modelo"
 
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0

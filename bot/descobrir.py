@@ -17,7 +17,7 @@ Sources (public, no login; endpoints as observed in 2026, they may change withou
   - LinkedIn guest search: jobs-guest/jobs/api/seeMoreJobPostings/search
   - LinkedIn job page: jobs-guest/jobs/api/jobPosting/<id> (description + official experience level,
     up to max_descricoes per collection; the Gupy list already carries the description)
-  - Gupy portal: portal.gupy.io/job-search/term=.. (__NEXT_DATA__ of the search page)
+  - Gupy portal: portal.gupy.io/api/job-search/jobs?jobName=..&limit=..&offset=.. (fallback: __NEXT_DATA__ of the search page)
 Indeed is left out on purpose: it sits behind Cloudflare.
 Be polite: a handful of requests every ~90 min. See docs/USO-ETICO.md.
 """
@@ -42,7 +42,8 @@ UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chr
 DEFAULTS = {
     "intervalo_min": 90,        # sources are not hit more often than this
     "termos_por_coleta": 4,     # search terms are rotated across collections
-    "gupy_por_coleta": 8,   # 01/10: the portal page brings 10 jobs per term (old API: 30)
+    "gupy_por_coleta": 8,
+    "gupy_limite": 300,         # max jobs per Gupy term, fetched in pages of 100 (portal API limit/offset)   # 01/10: the portal page brings 10 jobs per term (old API: 30)
     "max_ofertas": 2,           # a job the model OPENED in N rounds and never registered is dropped
     "max_mostrada": 6,          # safety net: shown in N prompts and never even opened -> dropped too
     "max_dias": 14,             # same recency rule as the prompt
@@ -53,6 +54,9 @@ DEFAULTS = {
     "stack_evitar": [],         # title words that reject a job (unless it also has stack_preferida)
     "stack_preferida": [],      # title words that rescue a job and add score (also used by vaga_check on the description)
     "score_palavras": [],       # title words worth +2 in the queue ranking; empty = stack_preferida (else profile terms)
+    "linkedin_sufixo": "",      # appended to LinkedIn keywords without a remote word (e.g. "remoto"); "" = off
+    "linkedin_cidade_fora": False,  # remote-only profile: LinkedIn card located in a city/state ("Sao Paulo, SP") = "modelo"
+    "titulo_exige": [],         # title must have at least one of these words (area check for broad terms); [] = off
     "termos_arquivo": "",       # JSON {"termos": [...]} that overrides the profile terms (shared with a prompt); "" = profile
     "prompt_registro": "",      # closing line of the prompt block (how to register each job); "" = default text
     "max_descricoes": 12,       # LinkedIn description fetches per collection (0 = description triage off; Gupy is free)
@@ -84,6 +88,7 @@ class Ctx:
         self.tipos = vf.regex_tipos(self.info["pular_tipos"])
         self.stack_fora = vf.regex_lista(cfg["stack_evitar"])
         self.stack_boa = vf.regex_lista(cfg["stack_preferida"])
+        self.area = vf.regex_lista(cfg["titulo_exige"])
         termos = self.info["termos"] or ["desenvolvedor junior"]
         if cfg["termos_arquivo"]:
             termos = [t for t in vf.load_json(cfg["termos_arquivo"], {}).get("termos", []) if isinstance(t, str) and t.strip()] or termos
@@ -147,8 +152,16 @@ def parse_gupy(data):
     return out
 
 
+REMOTO_TXT = re.compile(r"\b(remot[oa]s?|remote|home ?office|anywhere|teletrabalho)\b")
+CIDADE_LOCAL = re.compile(r",\s*[A-Z]{2}$|\se\s+regi[aã]o$|\bmetropolitan|\barea$", re.I)
+
+
 def linkedin(ctx, termo):
     wt = "%2C".join(perfil_render.LINKEDIN_WT[m] for m in ctx.info["modelos"] if m in perfil_render.LINKEDIN_WT)
+    # 01/10: the guest search IGNORES f_WT (same 10 ids with and without it); a remote word in the keywords is
+    # what pulls remote postings (0 -> 5 of 10 with location "Brasil" in a live test).
+    if ctx.cfg["linkedin_sufixo"] and not REMOTO_TXT.search(vf.norm(termo)):
+        termo = f"{termo} {ctx.cfg['linkedin_sufixo']}"
     q = urllib.parse.urlencode({"keywords": termo, "geoId": ctx.cfg["linkedin_geo_id"],
                                 "f_TPR": f"r{int(ctx.cfg['linkedin_dias']) * 86400}", "start": "0"})
     # f_WT is appended by hand: urlencode would escape the "%2C" separator twice.
@@ -166,11 +179,31 @@ def gupy_jobs_da_pagina(page):
 
 
 def gupy(ctx, termo):
-    # employability-portal.gupy.io/api/v1/jobs returns 404 since 2026-10; the portal's
-    # search page carries the same job objects (10 per page)
-    q = urllib.parse.urlencode({"term": termo})
-    if ctx.info["modelos"] == ["remoto"]:
-        q += "&workplaceTypes[]=remote"
+    """The portal's own JSON search (portal.gupy.io/api/job-search/jobs: limit/offset, same job objects; 01/10:
+    'desenvolvedor' remote = 252 jobs, the search page showed 10). Fallback: the search page's __NEXT_DATA__
+    (employability-portal.gupy.io/api/v1/jobs returns 404 since 2026-10)."""
+    remoto = ctx.info["modelos"] == ["remoto"]
+    teto, pagina, todos = int(ctx.cfg["gupy_limite"]), 100, []
+    try:
+        while len(todos) < teto:
+            params = {"jobName": termo, "limit": str(min(pagina, teto - len(todos))), "offset": str(len(todos))}
+            if remoto:
+                params["workplaceType"] = "remote"
+            doc = json.loads(get("https://portal.gupy.io/api/job-search/jobs?" + urllib.parse.urlencode(params)))
+            data = doc.get("data")
+            if not isinstance(data, list):
+                raise ValueError("gupy api: sem data")
+            todos += data
+            # pagination.total is NOT reliable (01/10: limit=100 reports total=100 while offset 100/200 still
+            # return 100/53 jobs): keep paging while pages come back full
+            if len(data) < int(params["limit"]):
+                break
+            time.sleep(random.uniform(1, 2))   # polite between pages
+        return parse_gupy(todos)
+    except Exception:
+        if todos:
+            return parse_gupy(todos)
+    q = urllib.parse.urlencode({"term": termo}) + ("&workplaceTypes[]=remote" if remoto else "")
     return parse_gupy(gupy_jobs_da_pagina(get("https://portal.gupy.io/job-search/" + q)))
 
 
@@ -217,10 +250,17 @@ def motivo_filtro(ctx, v, pular_empresas, hoje=None):
         return "empresa"
     if not vf.nivel_ok(t, ctx.bom, ctx.fora):
         return "nivel"
+    if ctx.area and not ctx.area.search(nt):
+        return "area"   # broad terms ("analista", "junior") bring other areas: Analista Fiscal, Advogado Junior
     modelos = ctx.info["modelos"]
     alvo = nt + " " + vf.norm(v.get("local") or "")
     if ("presencial" not in modelos and re.search(r"presencial|on site|onsite", alvo)) or \
        ("hibrido" not in modelos and re.search(r"hibrid[oa]", alvo)):
+        return "modelo"
+    # 01/10 measured on the queue history: LinkedIn cards located in a city -> 70 jobs, 0 sends, 29 blocked as
+    # hybrid/on-site by the model; located in the country ("Brasil") -> 16 jobs, 3 sends, 0 hybrid.
+    if ctx.cfg["linkedin_cidade_fora"] and modelos == ["remoto"] and v.get("fonte") == "linkedin" \
+            and CIDADE_LOCAL.search((v.get("local") or "").strip()) and not REMOTO_TXT.search(nt):
         return "modelo"
     if ctx.tipos and ctx.tipos.search(nt):
         return "tipo"
