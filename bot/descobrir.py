@@ -17,7 +17,7 @@ Sources (public, no login; endpoints as observed in 2026, they may change withou
   - LinkedIn guest search: jobs-guest/jobs/api/seeMoreJobPostings/search
   - LinkedIn job page: jobs-guest/jobs/api/jobPosting/<id> (description + official experience level,
     up to max_descricoes per collection; the Gupy list already carries the description)
-  - Gupy portal: employability-portal.gupy.io/api/v1/jobs
+  - Gupy portal: portal.gupy.io/job-search/term=.. (__NEXT_DATA__ of the search page)
 Indeed is left out on purpose: it sits behind Cloudflare.
 Be polite: a handful of requests every ~90 min. See docs/USO-ETICO.md.
 """
@@ -151,12 +151,22 @@ def linkedin(ctx, termo):
                               + q + (f"&f_WT={wt}" if wt else "")))
 
 
+def gupy_jobs_da_pagina(page):
+    """Job list embedded in the portal's server-rendered search page (__NEXT_DATA__)."""
+    m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', page, re.S)
+    if not m:
+        raise ValueError("gupy: __NEXT_DATA__ ausente")
+    props = json.loads(m.group(1))["props"]["pageProps"]
+    return (props.get("initialJobList") or {}).get("data") or []
+
+
 def gupy(ctx, termo):
-    params = {"jobName": termo, "limit": "30"}
+    # employability-portal.gupy.io/api/v1/jobs returns 404 since 2026-10; the portal's
+    # search page carries the same job objects (10 per page)
+    q = urllib.parse.urlencode({"term": termo})
     if ctx.info["modelos"] == ["remoto"]:
-        params["workplaceType"] = "remote"
-    data = json.loads(get("https://employability-portal.gupy.io/api/v1/jobs?" + urllib.parse.urlencode(params)))
-    return parse_gupy(data.get("data"))
+        q += "&workplaceTypes[]=remote"
+    return parse_gupy(gupy_jobs_da_pagina(get("https://portal.gupy.io/job-search/" + q)))
 
 
 FONTES = {"linkedin": linkedin, "gupy": gupy}

@@ -46,7 +46,7 @@ FIX = os.path.join(os.environ["ROOT"], "tests", "fixtures")
 d.agora = lambda: datetime.fromisoformat("2026-09-29T12:00:00-03:00")
 d.time.sleep = lambda s: None
 LI = open(os.path.join(FIX, "linkedin_search.html"), encoding="utf-8").read()
-GU = open(os.path.join(FIX, "gupy_jobs.json"), encoding="utf-8").read()
+GU = open(os.path.join(FIX, "gupy_jobs.html"), encoding="utf-8").read()
 d.get = lambda url, timeout=20: LI if "linkedin" in url else GU
 exec(open(os.environ["SNIPPET"], encoding="utf-8").read())
 PYEOF
@@ -65,7 +65,7 @@ run_snippet && relata 0 "parse_linkedin extrai id/titulo/empresa/data" || relata
 
 # 2 — parser Gupy: descarta pais estrangeiro; sem pais assume Brasil.
 cat > "$SNIPPET" <<'PYSNIP'
-jobs = d.parse_gupy(json.loads(GU)["data"])
+jobs = d.parse_gupy(d.gupy_jobs_da_pagina(GU))
 assert [j["id"] for j in jobs] == ["gupy:9000001", "gupy:9000003"], jobs
 assert jobs[0]["publicada"] == "2026-09-28" and jobs[0]["empresa"] == "Exemplo Gupy", jobs[0]
 PYSNIP
