@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
-"""Adaptive rotation: pauses for 48h a site that goes PAUSE_AFTER rounds in a row without any
-new application, so rounds are not wasted re-scanning dry sites. Deterministic, no LLM.
+"""Adaptive rotation: pauses a DRY site — PAUSE_AFTER rounds in a row without registering any new job
+(application, block, quase_la or aguardando_login). A site that shows jobs the robot discards is alive,
+not dry (a "no application" rule once paused every site at the same time). Pause is 12h, doubling per
+repeat up to 48h, and never leaves fewer than MIN_ATIVOS sites active. Deterministic, no LLM.
 
   rodizio-saude.py pre  [APLICADAS] [--perfil PERFIL]   before the round: skip paused sites in
                                      rodizio.proximo (and, with --perfil, sites outside the profile's area)
-  rodizio-saude.py pos  [APLICADAS]   after a successful round: update the site's streak
+  rodizio-saude.py pos  [APLICADAS]   after a successful round: update the site's streak (+ ultima_varredura)
+  rodizio-saude.py pos-so-fila [APLICADAS]  after a queue-only round (rodada-portao.py): notifications only,
+                                      the site was not scanned (no streak, no advance)
 
-Once a day (first `pre`; recorded in rodizio.ordem_calculada_em) the order is recomputed by each
-site's yield: same number of slots, >=1 per site, the rest proportional to a smoothed score
-(applications per round + positive replies), interleaved so a site does not repeat back to back.
-Disable with OV_RODIZIO_REORDENAR=0.
+Once a day (first `pre`; recorded in rodizio.ordem_calculada_em; RODIZIO_RECALCULAR=1 forces it) the order
+is recomputed. With rodizio_produtivos in the sites config: productive (+ promoted) sites twice each,
+weighted by yield, + ONE explorer of the day from rodizio_exploracao (an explorer with an application in
+the last PROMOCAO_DIAS days counts as productive). Without it: the current order reweighted by yield
+(applications per round + positive replies). Disable reordering with OV_RODIZIO_REORDENAR=0.
 
-State: rodizio_saude.json next to APLICADAS (same state dir as the profile, so each
-profile's site-health tracking stays isolated); also read by the monitor.
-Optional notifications: scripts/notificar.sh (Telegram), only if the script exists.
+Paths (env, read at call time): OV_RODIZIO_SAUDE (state file; default rodizio_saude.json next to
+APLICADAS), OV_SITES_CONFIG (sites config with rodizio_produtivos/rodizio_exploracao; default
+bot/sites_permitidos.json when present), NOTIFY (notifier; default scripts/notificar.sh when present),
+OV_NOTIFY_RESUMO=1 (the notifier understands --resumo: non-urgent alerts go to the daily digest).
 """
 import json
 import os
@@ -28,8 +34,29 @@ from jsonlock import gravar, travado  # noqa: E402
 DEFAULT_APLICADAS = SCRIPT_DIR / "aplicadas.json"
 NOTIFICAR_SH = SCRIPT_DIR.parent / "scripts" / "notificar.sh"
 PAUSE_AFTER = 4
-PAUSE_HOURS = 48
-REORDENAR = os.environ.get("OV_RODIZIO_REORDENAR", "1") != "0"   # daily yield-based reorder (0 = keep the order as is)
+PAUSE_HOURS = 12          # first pause; doubles on each consecutive pause of the same site
+PAUSE_MAX_HOURS = 48
+MIN_ATIVOS = 3            # never pause below this many active sites
+PROMOCAO_DIAS = 7
+POSITIVOS = {"etapa_teste", "proxima_etapa", "entrevista"}
+
+
+def reordenar_ligado():
+    return os.environ.get("OV_RODIZIO_REORDENAR", "1") != "0"
+
+
+def saude_path(aplicadas_path):
+    return Path(os.environ.get("OV_RODIZIO_SAUDE") or Path(aplicadas_path).resolve().parent / "rodizio_saude.json")
+
+
+def chaves_vistas(d):
+    """Every job key the robot has registered anywhere (new key = the site had a new job)."""
+    ks = {a.get("chave") for a in d.get("aplicadas", []) if isinstance(a, dict)}
+    for sec in ("bloqueados", "quase_la", "aguardando_login", "bloqueados_arquivados"):
+        v = d.get(sec)
+        if isinstance(v, dict):
+            ks |= set(v)
+    return ks
 
 
 def load(p, default):
@@ -44,11 +71,14 @@ def save(p, d):
     gravar(str(p), d, indent=1)   # jsonlock.py: unique tmp + atomic replace
 
 
-def notify(msg):
-    if not NOTIFICAR_SH.exists():
+def notify(msg, resumo=False):
+    """resumo=True: not urgent (sent, paused) — goes to the daily digest when the notifier supports it."""
+    cmd = os.environ.get("NOTIFY") or (str(NOTIFICAR_SH) if NOTIFICAR_SH.exists() else "")
+    if not cmd:
         return
     try:
-        subprocess.run([str(NOTIFICAR_SH), msg], timeout=30)
+        subprocess.run([cmd] + (["--resumo"] if resumo and os.environ.get("OV_NOTIFY_RESUMO") == "1" else []) + [msg],
+                       timeout=30)
     except Exception:
         pass
 
@@ -56,9 +86,6 @@ def notify(msg):
 def paused(site_info, now):
     until = site_info.get("pausado_ate")
     return bool(until) and datetime.fromisoformat(until) > now
-
-
-POSITIVOS = {"etapa_teste", "proxima_etapa", "entrevista"}
 
 
 def nota_site(site, info, aplicadas):
@@ -96,11 +123,42 @@ def reordenar(ordem, sites, aplicadas):
     return nova, notas
 
 
+def config_rodizio():
+    """(rodizio_produtivos, rodizio_exploracao) from the sites config; ([], []) = plain yield reorder."""
+    p = os.environ.get("OV_SITES_CONFIG") or str(SCRIPT_DIR / "sites_permitidos.json")
+    c = load(p, {})
+    return c.get("rodizio_produtivos") or [], c.get("rodizio_exploracao") or []
+
+
+def promovidos(exploracao, sites, now):
+    """An exploration site that produced an application in the last PROMOCAO_DIAS days acts as productive
+    (twice a day in the order, productive interval in the gate) until the streak runs out."""
+    out = []
+    for x in exploracao:
+        u = (sites.get(x) or {}).get("ultima_aplicada")
+        try:
+            if u and (now - datetime.fromisoformat(u)).days < PROMOCAO_DIAS:
+                out.append(x)
+        except ValueError:
+            pass
+    return out
+
+
+def ordem_do_dia(produtivos, exploracao, sites, aplicadas, now):
+    """Productive (+ promoted) sites twice each, weighted by yield, + the day's explorer (skips paused ones)."""
+    prom = promovidos(exploracao, sites, now)
+    base, notas = reordenar((produtivos + prom) * 2, sites, aplicadas)
+    livres = [x for x in exploracao if x not in prom and not paused(sites.get(x, {}), now)] or [x for x in exploracao if x not in prom]
+    if livres:
+        exp = livres[now.toordinal() % len(livres)]
+        base = base[:len(base) // 2] + [exp] + base[len(base) // 2:]
+    return base, notas
+
+
 def sites_fora_do_perfil(perfil_path):
     if not perfil_path:
         return set()
     try:
-        sys.path.insert(0, str(SCRIPT_DIR))
         import perfil_render
         return set(perfil_render.resolver(perfil_render.carregar(perfil_path))["sites_pular"])
     except Exception:
@@ -109,8 +167,8 @@ def sites_fora_do_perfil(perfil_path):
 
 def main(cmd, aplicadas_path, perfil_path=None):
     now = datetime.now()
-    saude_path = Path(aplicadas_path).resolve().parent / "rodizio_saude.json"
-    saude = load(saude_path, {"sites": {}})
+    sp = saude_path(aplicadas_path)
+    saude = load(sp, {"sites": {}})
     sites = saude.setdefault("sites", {})
     d = load(aplicadas_path, None)
     if d is None:
@@ -119,9 +177,14 @@ def main(cmd, aplicadas_path, perfil_path=None):
     rod = d.get("rodizio", {})
     ordem = rod.get("ordem") or []
 
-    if cmd == "pre" and ordem and REORDENAR and rod.get("ordem_calculada_em") != now.strftime("%Y-%m-%d"):
+    forcar = os.environ.get("RODIZIO_RECALCULAR") == "1"   # recompute today's order now (config changed)
+    if cmd == "pre" and ordem and reordenar_ligado() and (forcar or rod.get("ordem_calculada_em") != now.strftime("%Y-%m-%d")):
         # Once a day, before the first round: the order follows each site's yield.
-        nova, notas = reordenar(ordem, sites, d.get("aplicadas", []))
+        produtivos, exploracao = config_rodizio()
+        if produtivos:
+            nova, notas = ordem_do_dia(produtivos, exploracao, sites, d.get("aplicadas", []), now)
+        else:
+            nova, notas = reordenar(ordem, sites, d.get("aplicadas", []))
         if nova != ordem:
             prox = rod.get("proximo")
             rod["ordem"] = nova
@@ -154,29 +217,30 @@ def main(cmd, aplicadas_path, perfil_path=None):
             print(f"rodizio-saude: pulando {','.join(pulados)} (pausados/fora da area), rodada vai em {ordem[pos]}")
         q = d.get("quase_la") or {}
         saude["rodada_atual"] = {"site": rod.get("proximo"), "pos": rod.get("pos"), "aplicadas_antes": len(d.get("aplicadas", [])),
-                                 "quase_la_antes": sorted(q) if isinstance(q, dict) else []}
+                                 "quase_la_antes": sorted(q) if isinstance(q, dict) else [],
+                                 "chaves_antes": len(chaves_vistas(d))}
     elif cmd == "pos-so-fila":
-        # queue-only round (bot/rodada-portao.py): notifications only — the site was NOT scanned (no streak, no advance)
+        # queue-only round (rodada-portao.py): notifications only — the site was NOT scanned (no streak, no advance)
         cur = saude.pop("rodada_atual", None) or {}
         for a in d.get("aplicadas", [])[int(cur.get("aplicadas_antes", len(d.get("aplicadas", [])))):]:
             if not a.get("registro_retroativo"):
-                notify(f"✅ Candidatura enviada: {a.get('empresa')} — {a.get('vaga')} ({a.get('como')})")
+                notify(f"✅ Candidatura enviada: {a.get('empresa')} — {a.get('vaga')} ({a.get('como')})", resumo=True)
     elif cmd == "pos":
         cur = saude.pop("rodada_atual", None)
         if cur and cur.get("site"):
             s = sites.setdefault(cur["site"], {"rodadas": 0, "vazias_seguidas": 0, "aplicadas": 0, "pausado_ate": None})
-            s["ultima_varredura"] = now.isoformat(timespec="minutes")   # read by bot/rodada-portao.py
-            # appended since pre, minus applications found later by bot/gupy-status.py (not sent this round)
+            # appended since pre, minus applications found later by gupy-status (not sent this round)
             novas_lista = [x for x in d.get("aplicadas", [])[int(cur.get("aplicadas_antes", 0)):] if not x.get("registro_retroativo")]
             novas = len(novas_lista)
             for a in novas_lista:
-                notify(f"✅ Candidatura enviada: {a.get('empresa')} — {a.get('vaga')} ({a.get('como')})")
+                notify(f"✅ Candidatura enviada: {a.get('empresa')} — {a.get('vaga')} ({a.get('como')})", resumo=True)
             q = d.get("quase_la") or {}
             for k in (sorted(set(q) - set(cur.get("quase_la_antes", []))) if isinstance(q, dict) else []):
                 notify(f"⚠️ Vaga quase lá, falta um dado seu: {k} — {json.dumps(q[k], ensure_ascii=False)[:250]}")
             s["rodadas"] += 1
-            # The loop owns the rotation (the agent may have already advanced it at the
-            # START of the round and then done the next site). Advance only if it did not.
+            s["ultima_varredura"] = now.isoformat(timespec="minutes")   # read by rodada-portao.py (interval)
+            # The loop owns the rotation (the agent may have already advanced it at the START of the
+            # round and then done the next site). Advance only if it did not.
             if ordem and rod.get("proximo") == cur["site"]:
                 p0 = cur.get("pos")
                 if not (isinstance(p0, int) and 0 <= p0 < len(ordem) and ordem[p0] == cur["site"]):
@@ -187,16 +251,28 @@ def main(cmd, aplicadas_path, perfil_path=None):
                 save(aplicadas_path, d)
             if novas > 0:
                 s["aplicadas"] += novas
+                s["ultima_aplicada"] = now.isoformat(timespec="minutes")   # promotion of exploration sites
+            # Old state files have no chaves_antes: treat as "had news" instead of guessing dry.
+            teve_vaga = novas > 0 or "chaves_antes" not in cur or len(chaves_vistas(d)) > int(cur["chaves_antes"])
+            if teve_vaga:
                 s["vazias_seguidas"] = 0
+                s["pausas_seguidas"] = 0
             else:
                 s["vazias_seguidas"] += 1
                 if s["vazias_seguidas"] >= PAUSE_AFTER:
-                    s["pausado_ate"] = (now + timedelta(hours=PAUSE_HOURS)).isoformat(timespec="minutes")
+                    ativos = [x for x in set(ordem) if x != cur["site"] and not paused(sites.get(x, {}), now)]
                     s["vazias_seguidas"] = 0
-                    print(f"rodizio-saude: {cur['site']} pausado ate {s['pausado_ate']} ({PAUSE_AFTER} rodadas sem aplicar)")
-                    notify(f"⏸️ Site {cur['site']} pausado por {PAUSE_HOURS}h: {PAUSE_AFTER} rodadas seguidas sem candidatura")
+                    if len(ativos) < MIN_ATIVOS:
+                        print(f"rodizio-saude: {cur['site']} seco, mas NAO pausado (so {len(ativos)} outros sites ativos)")
+                    else:
+                        horas = min(PAUSE_MAX_HOURS, PAUSE_HOURS * 2 ** int(s.get("pausas_seguidas", 0)))
+                        s["pausas_seguidas"] = int(s.get("pausas_seguidas", 0)) + 1
+                        s["pausado_ate"] = (now + timedelta(hours=horas)).isoformat(timespec="minutes")
+                        print(f"rodizio-saude: {cur['site']} pausado ate {s['pausado_ate']} ({PAUSE_AFTER} rodadas sem vaga nova)")
+                        notify(f"⏸️ Site {cur['site']} pausado por {horas}h: {PAUSE_AFTER} rodadas seguidas sem nenhuma vaga nova",
+                               resumo=True)
     saude["atualizado"] = now.isoformat(timespec="minutes")
-    save(saude_path, saude)
+    save(sp, saude)
     return 0
 
 
