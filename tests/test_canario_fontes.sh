@@ -9,7 +9,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 PY="${PYTHON:-python3}"
 
-TOTAL=5
+TOTAL=6
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -103,6 +103,17 @@ c.d.get = so_gupy
 assert c.checar() == [] and all("gupy" in u for u in chamadas) and chamadas, chamadas
 PYEOF
 relata $? "canario respeita 'fontes' (sem LinkedIn = nenhuma requisicao ao LinkedIn)"
+
+# 6 — Gupy usa o proprio termo curto (gupy_termos[0]), nao o termo longo do LinkedIn (falso alarme de 01/10).
+echo '{"fontes": ["gupy"], "gupy_termos": ["termo curto gupy"]}' > "$OV_DESCOBERTA_CONFIG"
+"$PY" - <<PYEOF
+exec(open("$TMP/pre.py").read())
+c = carrega_canario()
+chamadas = []
+c.d.get = lambda url, timeout=20: chamadas.append(url) or rd("gupy_busca_desc.html")
+assert c.checar() == [] and "term=termo+curto+gupy" in chamadas[0], chamadas
+PYEOF
+relata $? "canario: Gupy busca com o termo curto do Gupy"
 echo '{"fontes": ["linkedin", "gupy"]}' > "$OV_DESCOBERTA_CONFIG"
 
 # 5 — CLI: falha => exit 2 e notificacao; usa o notificador do ambiente (rede trocada por um wrapper sem rede real).
