@@ -8,7 +8,7 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
-TOTAL=12
+TOTAL=13
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -264,6 +264,25 @@ json.dump({}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
 assert d.motivo_filtro(d.Ctx(), li("Dev Java Jr", "São Paulo, SP"), []) is None   # off by default
 PYSNIP
 run_snippet && relata 0 "linkedin: sufixo remoto e cidade no local = modelo" || relata 1 "linkedin: sufixo remoto e cidade no local = modelo"
+
+# 13 — paginacao: LinkedIn pagina 1 + N-1 a partir do cursor do termo (volta ao inicio na pagina vazia); Gupy ate a pagina curta.
+cat > "$SNIPPET" <<'PYSNIP'
+import re as _re
+json.dump({"linkedin_paginas": 3, "linkedin_sufixo": "remoto"}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
+ctx = d.Ctx(); starts = []
+def card(i): return f'<li><a href="https://br.linkedin.com/jobs/view/dev-{i}?x"></a><h3 class="base-search-card__title">Dev Jr {i}</h3></li>'
+def li_get(url, timeout=20):
+    st = int(_re.search(r"start=(\d+)", url).group(1)); starts.append(st)
+    return "".join(card(4000000000 + st + k) for k in range(10 if st < 50 else 0))
+d.get = li_get
+assert len(d.linkedin(ctx, "java junior")) == 30 and starts == [0, 10, 20] and ctx.li_cursor == {"java junior": 30}, (starts, ctx.li_cursor)
+starts.clear(); d.linkedin(ctx, "java junior"); assert starts == [0, 30, 40] and ctx.li_cursor["java junior"] == 50, starts
+starts.clear(); d.linkedin(ctx, "java junior"); assert starts == [0, 50] and ctx.li_cursor["java junior"] == 10, starts   # empty page wraps
+pag = lambda off: json.dumps({"data": [{"id": off + i, "name": "Dev", "jobUrl": f"https://x.gupy.io/job/{off + i}"} for i in range(100 if off < 300 else 79)]})
+urls = []; d.get = lambda url, timeout=20: urls.append(url) or pag(int(url.split("offset=")[1].split("&")[0]))
+assert len(d.gupy(ctx, "analista")) == 379 and len(urls) == 4, len(urls)
+PYSNIP
+run_snippet && relata 0 "paginacao: LinkedIn incremental por cursor, Gupy ate o fim" || relata 1 "paginacao: LinkedIn incremental por cursor, Gupy ate o fim"
 
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0
