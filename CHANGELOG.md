@@ -6,6 +6,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **Contagem de site's `bot/rodizio-saude.py`**: `pos` creditava ao site da rodada **toda** candidatura
+  anexada durante ela, inclusive as que saíram pela fila em outro canal (Gupy/Inhire/Telegram). Um site de
+  exploração chegou a `4 aplicadas` sem nenhuma candidatura registrada nele, e esse número falso entrava na
+  promoção D1 e na reordenação por rendimento. Agora a atribuição usa a regra `de_site()` — o `como` da
+  candidatura precisa nomear o site —, a mesma que `nota_site()` já usava, para contador e nota nunca
+  divergirem. Teste 11 em `tests/test_rodizio_saude.sh`.
+- **Promoção D1 morta (`bot/rodizio-saude.py pos-so-fila`)**: `ultima_aplicada` só era carimbada no caminho
+  `pos`, mas a maioria das candidaturas chega pela fila (caminho `pos-so-fila`), então um site de exploração
+  dificilmente era promovido. `pos-so-fila` agora carimba `ultima_aplicada` no site que o `como` nomeia, sem
+  tocar em streak (`rodadas`) nem avançar o rodízio — a rodada não varreu site nenhum. Teste 11.
 - **Fila do descobridor (`bot/descobrir.py marcar LOG`)**: a oferta só conta quando o id da vaga aparece no log da
   rodada (vaga que o modelo nem abriu não perde a chance; teto `max_mostrada`=6); vaga que o modelo descartou só no
   texto (`DESCARTADA`) vira `bloqueados` e não volta toda rodada; mesma empresa + título entra como `duplicada`.
