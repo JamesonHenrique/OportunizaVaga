@@ -19,7 +19,7 @@ trap 'rm -rf "$TMP"' EXIT
 cp tests/fixtures/aplicadas.descobrir.json "$TMP/aplicadas.json"
 export BOT_PERFIL="$ROOT/config/perfis/junior-backend.example.json"
 export STATE_DIR="$TMP" APLICADAS_FILE="$TMP/aplicadas.json" OV_DESCOBERTA_CONFIG="$ROOT/config/descoberta.example.json"
-export ROOT
+export ROOT NOTIFY=true   # coletar may alert; never reach the real notifier
 
 # 1 — os 10 casos de referencia (perfil junior-backend + descoberta.example.json).
 "$PY" - <<'PYEOF'

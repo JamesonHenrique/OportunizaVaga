@@ -31,7 +31,7 @@ cat > "$TMP/descoberta.json" <<'JSON'
 JSON
 export BOT_PERFIL="$ROOT/config/perfis/junior-backend.example.json"
 export STATE_DIR="$TMP" APLICADAS_FILE="$TMP/aplicadas.json" OV_DESCOBERTA_CONFIG="$TMP/descoberta.json"
-export ROOT
+export ROOT NOTIFY=true   # coletar may alert; never reach the real notifier
 export SNIPPET="$TMP/snippet.py"
 
 # Roda $SNIPPET com o modulo carregado, rede/relogio/sleep simulados.
@@ -169,6 +169,18 @@ assert d.descarte({"id": "li:9"}, "9 | x | NAO DESCARTADA, aplicar") is None
 assert d._gemea({"empresa": "LINA ", "titulo": "Backend Júnior"}) == d._gemea({"empresa": "lina", "titulo": "Backend Junior"})
 PYSNIP
 run_snippet && relata 0 "marcar LOG: oferta so conta se aberta, descarte em texto registrado, duplicada" || relata 1 "marcar LOG: oferta so conta se aberta, descarte em texto registrado, duplicada"
+
+# 8 — fonte fora do ar: aviso na hora; um termo falhando nao avisa; volta avisa 1x.
+cat > "$SNIPPET" <<'PYSNIP'
+msgs = []; d.notificar = msgs.append; fila = {}
+d.avisar_fontes(fila, {"gupy": [4, 4, 0], "linkedin": [3, 0, 40]}, ["gupy:HTTPError"] * 4)
+assert len(msgs) == 1 and "gupy" in msgs[0] and "HTTPError" in msgs[0] and fila["fontes_quebradas"] == ["gupy"], (msgs, fila)
+d.avisar_fontes(fila, {"gupy": [4, 1, 0]}, ["gupy:URLError"])   # 0 vagas = still down
+assert len(msgs) == 2 and "voltou" not in msgs[1], msgs
+d.avisar_fontes(fila, {"gupy": [4, 0, 30]}, [])
+assert len(msgs) == 3 and "voltou" in msgs[2] and fila["fontes_quebradas"] == [], msgs
+PYSNIP
+run_snippet && relata 0 "fonte fora do ar avisa na hora; volta avisa 1x" || relata 1 "fonte fora do ar avisa na hora; volta avisa 1x"
 
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0

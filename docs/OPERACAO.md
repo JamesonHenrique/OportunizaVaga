@@ -119,3 +119,7 @@ novas" para sempre. O canário roda 1x/dia, **ao vivo**, o primeiro termo do per
 As fixtures de `tests/fixtures/` (`linkedin_search.html`, `linkedin_vaga.html`, `gupy_busca_desc.html`) são **sintéticas**:
 fixam o markup que o projeto *assume*, então testes verdes offline não provam que o portal ainda o serve; só o canário
 detecta a mudança. Ao atualizar um parser, atualize a fixture junto. Teste: `tests/test_canario_fontes.sh`.
+
+**Aviso imediato (`bot/descobrir.py`, `avisar_fontes`):** a cada coleta, se todas as buscas de uma fonte
+derem erro ou 0 vagas, o notificador avisa na hora (sem esperar o canário); quando a fonte volta, avisa uma
+vez. Fontes caídas ficam em `fontes_quebradas` na fila. Teste: `tests/test_descobrir.sh` (caso 8).

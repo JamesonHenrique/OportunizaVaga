@@ -15,7 +15,6 @@ portal still serves it. Only this live canary detects drift. It costs 2-3 reques
 The search term is the first of the active profile; env NOTIFY overrides the notifier (tests).
 """
 import os
-import subprocess
 import sys
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,19 +22,7 @@ sys.path.insert(0, BOT_DIR)
 import descobrir as d  # noqa: E402
 
 
-def _notificar(msg):
-    alvo = os.environ.get("NOTIFY")
-    scripts = os.path.join(os.path.dirname(BOT_DIR), "scripts")
-    if alvo:
-        cmd = [alvo, msg]
-    elif os.name == "nt":
-        cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(scripts, "notificar.ps1"), msg]
-    else:
-        cmd = [os.path.join(scripts, "notificar.sh"), msg]
-    try:
-        subprocess.run(cmd, check=False, timeout=60)
-    except (OSError, subprocess.TimeoutExpired):
-        pass
+_notificar = d.notificar
 
 
 def checar(ctx=None, termo=None):
