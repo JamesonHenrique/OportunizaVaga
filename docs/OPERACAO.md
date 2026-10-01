@@ -123,3 +123,15 @@ detecta a mudança. Ao atualizar um parser, atualize a fixture junto. Teste: `te
 **Aviso imediato (`bot/descobrir.py`, `avisar_fontes`):** a cada coleta, se todas as buscas de uma fonte
 derem erro ou 0 vagas, o notificador avisa na hora (sem esperar o canário); quando a fonte volta, avisa uma
 vez. Fontes caídas ficam em `fontes_quebradas` na fila. Teste: `tests/test_descobrir.sh` (caso 8).
+
+
+## Kit de entrevista e funil por fonte (`bot/kit-entrevista.py`, `bot/funil-fontes.py`)
+
+`kit-entrevista.py` (sugestão de cron: `*/30 7-22 * * *`): para cada candidatura em teste/entrevista/próxima
+etapa ainda não marcada como feita (`acao_feita_em`/`teste_feito_em`), manda pelo notificador um kit por mudança
+de status (vaga, link, como foi enviada, CV, data do convite quando o assunto do Gmail traz) e um lembrete no dia
+do evento. Marca `kit_status`, `evento_em` e `lembrete_em` via `estado.py set-campo`, então nada repete.
+Caminhos por env: `APLICADAS_FILE`, `OV_GMAIL_STATUS`, `NOTIFY`, `OV_ESTADO_PY`; texto do "feito": `OV_KIT_FEITO`.
+
+`funil-fontes.py [APLICADAS] [--curto]`: envio → retorno → avanço por fonte e por `caminho` (fila × rodízio),
+mais "sem resposta há >21 dias" calculado na hora (o status nunca é rebaixado). Teste: `tests/test_kit_funil.sh`.
