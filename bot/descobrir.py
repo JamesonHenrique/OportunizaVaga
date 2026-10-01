@@ -43,12 +43,14 @@ DEFAULTS = {
     "intervalo_min": 90,        # sources are not hit more often than this
     "termos_por_coleta": 4,     # search terms are rotated across collections
     "gupy_por_coleta": 8,
-    "gupy_limite": 300,         # max jobs per Gupy term, fetched in pages of 100 (portal API limit/offset)   # 01/10: the portal page brings 10 jobs per term (old API: 30)
+    "gupy_limite": 2000,        # max jobs per Gupy term, fetched in pages of 100 until a page comes back short   # 01/10: the portal page brings 10 jobs per term (old API: 30)
     "max_ofertas": 2,           # a job the model OPENED in N rounds and never registered is dropped
     "max_mostrada": 6,          # safety net: shown in N prompts and never even opened -> dropped too
     "max_dias": 14,             # same recency rule as the prompt
     "linkedin_geo_id": "106057199",  # LinkedIn geoId for Brazil; location=Brasil alone returns US jobs
     "linkedin_dias": 7,
+    "linkedin_paginas": 1,      # pages per term per collection (page 1 + N-1 from a cursor kept in the queue); 1 = old behaviour
+    "linkedin_max_start": 990,  # cursor wraps here (the guest search stops around 1000)
     "fontes": ["linkedin", "gupy"],
     "gupy_termos": [],          # empty = first two words of each profile term
     "stack_evitar": [],         # title words that reject a job (unless it also has stack_preferida)
@@ -100,6 +102,7 @@ class Ctx:
                 if short and short not in gupy:
                     gupy.append(short)
         self.gupy_termos = gupy
+        self.li_cursor = {}         # LinkedIn paging cursor per term; coletar() loads/saves it in the queue file
         # Score words: explicit score_palavras, else preferred stack, else distinctive words of the profile terms.
         self.score_re = vf.regex_lista(cfg["score_palavras"]) or self.stack_boa
         if not self.score_re:
@@ -160,13 +163,38 @@ def linkedin(ctx, termo):
     wt = "%2C".join(perfil_render.LINKEDIN_WT[m] for m in ctx.info["modelos"] if m in perfil_render.LINKEDIN_WT)
     # 01/10: the guest search IGNORES f_WT (same 10 ids with and without it); a remote word in the keywords is
     # what pulls remote postings (0 -> 5 of 10 with location "Brasil" in a live test).
+    chave = termo   # cursor key: the profile term, not the suffixed keywords
     if ctx.cfg["linkedin_sufixo"] and not REMOTO_TXT.search(vf.norm(termo)):
         termo = f"{termo} {ctx.cfg['linkedin_sufixo']}"
-    q = urllib.parse.urlencode({"keywords": termo, "geoId": ctx.cfg["linkedin_geo_id"],
-                                "f_TPR": f"r{int(ctx.cfg['linkedin_dias']) * 86400}", "start": "0"})
-    # f_WT is appended by hand: urlencode would escape the "%2C" separator twice.
-    return parse_linkedin(get("https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?"
-                              + q + (f"&f_WT={wt}" if wt else "")))
+    def pagina(start):
+        q = urllib.parse.urlencode({"keywords": termo, "geoId": ctx.cfg["linkedin_geo_id"],
+                                    "f_TPR": f"r{int(ctx.cfg['linkedin_dias']) * 86400}", "start": str(start)})
+        # f_WT is appended by hand: urlencode would escape the "%2C" separator twice.
+        return parse_linkedin(get("https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?"
+                                  + q + (f"&f_WT={wt}" if wt else "")))
+    # Incremental paging (01/10: 100+ jobs per term in 7 days, 10 per page, good ones down to page 15): page 1
+    # always (fresh jobs), plus linkedin_paginas-1 pages from this term's cursor, which survives between
+    # collections in the queue file; an empty page or linkedin_max_start wraps the cursor to the start.
+    out = pagina(0)
+    extra = int(ctx.cfg["linkedin_paginas"]) - 1
+    if extra <= 0 or len(out) < 10:
+        return out
+    cur = ctx.li_cursor.get(chave, 10)
+    for _ in range(extra):
+        if cur >= int(ctx.cfg["linkedin_max_start"]):
+            cur = 10
+            break
+        time.sleep(random.uniform(1.5, 3))   # polite between pages
+        try:
+            vs = pagina(cur)
+        except Exception:
+            break   # keep what we have; retry from the same cursor next time
+        out += vs
+        cur = cur + 10 if len(vs) >= 10 else 10
+        if cur == 10:
+            break
+    ctx.li_cursor[chave] = cur
+    return out
 
 
 def gupy_jobs_da_pagina(page):
@@ -397,6 +425,7 @@ def coletar(ctx, force=False, fontes=None):
     g0 = int(fila.get("gupy_idx", 0))
     gupy_termos = [ctx.gupy_termos[(g0 + k) % len(ctx.gupy_termos)] for k in range(min(n_g, len(ctx.gupy_termos)))]
     fila["gupy_idx"] = (g0 + n_g) % len(ctx.gupy_termos)
+    ctx.li_cursor = dict(fila.get("li_cursor") or {})
     conhecidos, blobs, pular_empresas = ids_conhecidos(ctx.paths["aplicadas"])
     vagas = fila.setdefault("vagas", {})
     stats = {"lidas": 0, "novas": 0, "erros": []}
@@ -455,6 +484,7 @@ def coletar(ctx, force=False, fontes=None):
     limite = (agora() - timedelta(days=21)).isoformat()
     for k in [k for k, v in vagas.items() if v.get("status") != "nova" and v.get("visto_em", "") < limite]:
         vagas.pop(k)
+    fila["li_cursor"] = {t: c for t, c in ctx.li_cursor.items() if t in ctx.termos}
     fila["ultima_coleta"] = agora().isoformat(timespec="seconds")
     fila["stats"] = {**stats, "filtradas": filtro, "termos": escolhidos + gupy_termos}
     tot = fila.setdefault("totais", {})
