@@ -61,6 +61,7 @@ DEFAULTS = {
     "titulo_exige": [],         # title must have at least one of these words (area check for broad terms); [] = off
     "termos_arquivo": "",       # JSON {"termos": [...]} that overrides the profile terms (shared with a prompt); "" = profile
     "prompt_registro": "",      # closing line of the prompt block (how to register each job); "" = default text
+    "tempo_max_s": 150,         # collection deadline: no new search after it, what was collected is saved (callers time out at 180)
     "max_descricoes": 12,       # LinkedIn description fetches per collection (0 = description triage off; Gupy is free)
 }
 STOP_TERMO = {"desenvolvedor", "desenvolvedora", "analista", "vaga", "remoto", "remota", "pessoa", "home", "office"}
@@ -431,7 +432,6 @@ def coletar(ctx, force=False, fontes=None):
     stats = {"lidas": 0, "novas": 0, "erros": []}
     filtro = {}
     por_fonte = {}   # fonte -> [searches, errors, jobs read]
-    n_desc = 0
     gemeas = {_gemea(v) for v in vagas.values() if v.get("empresa") and v.get("status") in ("nova", "processada")}
     fontes = fontes or ctx.cfg["fontes"]
     buscas = []
@@ -439,7 +439,15 @@ def coletar(ctx, force=False, fontes=None):
         buscas += [("linkedin", t) for t in escolhidos]
     if "gupy" in fontes:
         buscas += [("gupy", t) for t in gupy_termos]
+    # Phase 1 — fetch + title filters. A deadline (tempo_max_s) keeps the whole collection inside the caller's
+    # timeout (01/10: paging made it 113 s of 180; past the timeout nothing would be saved).
+    t0, prazo = time.time(), float(ctx.cfg["tempo_max_s"])
+    fora_do_prazo = lambda: time.time() - t0 > prazo
+    candidatas, vistas_agora = [], set()
     for nome, termo in buscas:
+        if fora_do_prazo():
+            stats["erros"].append(f"{nome}:prazo")
+            continue
         pf = por_fonte.setdefault(nome, [0, 0, 0])
         pf[0] += 1
         try:
@@ -451,8 +459,9 @@ def coletar(ctx, force=False, fontes=None):
         pf[2] += len(achadas)
         for v in achadas:
             stats["lidas"] += 1
-            if v["id"] in vagas or v["id"] in conhecidos:
+            if v["id"] in vagas or v["id"] in conhecidos or v["id"] in vistas_agora:
                 continue
+            vistas_agora.add(v["id"])
             if ja_registrada(v, blobs):
                 vagas[v["id"]] = {"status": "processada", "motivo": "ja registrada (outro site)", "visto_em": _stamp()}
                 continue
@@ -461,25 +470,31 @@ def coletar(ctx, force=False, fontes=None):
                 filtro[m] = filtro.get(m, 0) + 1
                 vagas[v["id"]] = {"status": "filtrada", "motivo": m, "visto_em": _stamp()}
                 continue
-            if v["fonte"] == "gupy" or n_desc < int(ctx.cfg["max_descricoes"]):
-                n_desc += v["fonte"] == "linkedin"
-                md = motivo_descricao(ctx, v)
-                if v["fonte"] == "linkedin":
-                    time.sleep(random.uniform(1.5, 3))  # polite: one extra request per LinkedIn job
-                if md:
-                    filtro["descricao"] = filtro.get("descricao", 0) + 1
-                    vagas[v["id"]] = {"status": "filtrada", "motivo": md, "titulo": v["titulo"][:80], "visto_em": _stamp()}
-                    continue
-            if _gemea(v) in gemeas:   # same company + title under another id (after the real filters)
-                filtro["duplicada"] = filtro.get("duplicada", 0) + 1
-                vagas[v["id"]] = {"status": "filtrada", "motivo": "duplicada", "visto_em": _stamp()}
-                continue
-            v.pop("_descricao", None)
-            v.update(status="nova", score=score(ctx, v), ofertas=0, termo=termo, visto_em=_stamp())
-            vagas[v["id"]] = v
-            gemeas.add(_gemea(v))
-            stats["novas"] += 1
+            v["score"], v["termo"] = score(ctx, v), termo
+            candidatas.append(v)
         time.sleep(random.uniform(2, 5))  # polite: a handful of requests every ~90 min
+    # Phase 2 — description triage. Gupy descriptions come with the search (free); LinkedIn pages cost one request
+    # each, so they go to the best-scored candidates first (01/10: 900+ listings, max_descricoes of them checked).
+    li_ordem = sorted((v for v in candidatas if v["fonte"] == "linkedin"), key=lambda v: -v["score"])
+    checar = {v["id"] for v in li_ordem[:int(ctx.cfg["max_descricoes"])]}
+    for v in sorted(candidatas, key=lambda v: -v["score"]):
+        if v["fonte"] != "linkedin" or (v["id"] in checar and not fora_do_prazo()):
+            md = motivo_descricao(ctx, v)
+            if v["fonte"] == "linkedin":
+                time.sleep(random.uniform(1.5, 3))  # polite: one extra request per LinkedIn job
+            if md:
+                filtro["descricao"] = filtro.get("descricao", 0) + 1
+                vagas[v["id"]] = {"status": "filtrada", "motivo": md, "titulo": v["titulo"][:80], "visto_em": _stamp()}
+                continue
+        if _gemea(v) in gemeas:   # same company + title under another id (after the real filters)
+            filtro["duplicada"] = filtro.get("duplicada", 0) + 1
+            vagas[v["id"]] = {"status": "filtrada", "motivo": "duplicada", "visto_em": _stamp()}
+            continue
+        v.pop("_descricao", None)
+        v.update(status="nova", ofertas=0, visto_em=_stamp())
+        vagas[v["id"]] = v
+        gemeas.add(_gemea(v))
+        stats["novas"] += 1
     # Forget filtered/closed ids after 21 days so the file does not grow forever.
     limite = (agora() - timedelta(days=21)).isoformat()
     for k in [k for k, v in vagas.items() if v.get("status") != "nova" and v.get("visto_em", "") < limite]:
