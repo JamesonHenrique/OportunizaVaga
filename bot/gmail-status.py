@@ -19,7 +19,7 @@ import sys
 import tempfile
 import time
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 
 BOT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOT_DIR = os.path.join(BOT_ROOT, "bot")
@@ -71,6 +71,8 @@ def data_email(texto_n, hoje=None):
         dt = datetime(y, mo, d).date()
     except ValueError:
         return None
+    if hoje < dt <= hoje + timedelta(days=60):  # a near-future date is an event in the subject
+        return None                              # ("Entrevista @ Thu Oct 1"), not the mail date
     if dt > hoje:  # "17 de dez." seen in January = last year
         dt = dt.replace(year=dt.year - 1)
     return dt.isoformat()
