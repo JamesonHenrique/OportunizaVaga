@@ -42,7 +42,7 @@ UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chr
 DEFAULTS = {
     "intervalo_min": 90,        # sources are not hit more often than this
     "termos_por_coleta": 4,     # search terms are rotated across collections
-    "gupy_por_coleta": 4,
+    "gupy_por_coleta": 8,   # 01/10: the portal page brings 10 jobs per term (old API: 30)
     "max_ofertas": 2,           # a job the model OPENED in N rounds and never registered is dropped
     "max_mostrada": 6,          # safety net: shown in N prompts and never even opened -> dropped too
     "max_dias": 14,             # same recency rule as the prompt

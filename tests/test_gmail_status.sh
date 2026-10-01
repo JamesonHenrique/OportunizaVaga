@@ -25,7 +25,7 @@ def dt(t, hoje=HOJE): return g.data_email(g.norm(t), hoje)
 '"$1"
 }
 
-N=0; FAIL=0; TOTAL=12
+N=0; FAIL=0; TOTAL=13
 echo "1..$TOTAL"
 check() { # check <descricao> <esperado> <snippet que imprime>
   N=$((N + 1))
@@ -44,6 +44,7 @@ check "HH:MM -> hoje"                              "2026-09-29"    "print(dt('Ac
 check "'Sep 17' -> 2026-09-17"                     "2026-09-17"    "print(dt('Acme hiring Sep 17'))"
 check "dd/mm/yyyy -> 2026-09-17"                   "2026-09-17"    "print(dt('Acme 17/09/2026'))"
 check "data futura vira ano anterior"              "2025-12-17"    "print(dt('Acme 17 de dez.'))"
+check "evento proximo no assunto nao vira ano passado" "None"      "print(dt('Convite: Entrevista Inicial - Acme @ Thu Oct 1, 202'))"
 check "sem data -> None"                           "None"          "print(dt('Acme sem data aqui'))"
 check "ORDEM so avanca (encerrada > entrevista > etapa_teste)" "True" "print(g.ORDEM['encerrada']>g.ORDEM['entrevista']>g.ORDEM['etapa_teste']>g.ORDEM['em_analise']>g.ORDEM['enviada'])"
 

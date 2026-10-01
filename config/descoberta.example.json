@@ -6,7 +6,7 @@
   ],
   "intervalo_min": 90,
   "termos_por_coleta": 4,
-  "gupy_por_coleta": 4,
+  "gupy_por_coleta": 8,
   "max_ofertas": 2,
   "max_dias": 14,
   "linkedin_geo_id": "106057199",
