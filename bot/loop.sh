@@ -429,6 +429,8 @@ while true; do
   ensure_monitor
 
   ROUND_LOG="logs/rodada-$(date '+%Y%m%d-%H%M%S').log"
+  # Round id: estado.py stamps it as "rodada" on records; descobrir.py marcar uses it for "caminho" (fila|rodizio).
+  OV_RODADA=$(basename "$ROUND_LOG" .log); OV_RODADA=${OV_RODADA#rodada-}; export OV_RODADA
   python3 "$BOT_ROOT/bot/rodizio-saude.py" pre "$APLICADAS_FILE" --perfil "$PERFIL_FILE" >> loop.log 2>&1 || true
   # Descoberta deterministica (opt-in, sem LLM; a coleta respeita o intervalo dentro do script):
   # enche <estado>/vagas_fila.json, que o render_prompt injeta no prompt.

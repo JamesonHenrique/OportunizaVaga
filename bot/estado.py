@@ -15,6 +15,7 @@ short line.
   estado.py [--file F] status CHAVE ST [MSG] [EMAIL_DATA]   follow-up: em_analise/entrevista/encerrada/sem_resposta/sem_retorno_verificavel
   estado.py [--file F] conta SITE JSON            set contas_criadas[SITE]
   estado.py [--file F] rodizio-avancar            rodizio.proximo -> next in ordem; ultima_rodada=today
+  estado.py [--file F] set-campo CHAVE CAMPO VALOR  fix/add one field of an aplicada (VALOR: JSON or text)
   estado.py [--file F] del-aplicada CHAVE MOTIVO  move a WRONG record (e.g. a duplicate) to aplicadas_removidas (kept, not lost)
   estado.py dado CAMPO[.SUB]                       one field of dados_candidato.json (e.g. respostas_padrao_gupy.pretensao)
   estado.py resumo-candidato                      compact candidate digest injected into the prompt (bot/loop.sh)
@@ -288,6 +289,8 @@ def main(argv):
             print(f"erro: status '{str(rec.get('status'))[:40]}' desconhecido (use {', '.join(sorted(STATUS_OK))}; detalhe vai em 'obs'); NADA gravado")
             return 2
         rec.setdefault("status", "enviada")   # without it the funnel/monitor miscount the application
+        if os.environ.get("OV_RODADA") and not rec.get("rodada"):
+            rec["rodada"] = os.environ["OV_RODADA"]   # which loop round wrote it (logs/rodada-<id>.log)
         medir_ats(rec)
         d["aplicadas"].append(rec)
         (d.get("bloqueados") or {}).pop(rec["chave"], None)
@@ -340,6 +343,13 @@ def main(argv):
         rec["followup_em"] = datetime.now().astimezone().isoformat(timespec="seconds")
         if len(args) > 2 and args[2]:
             rec["followup_msg"] = args[2][:400]
+    elif cmd == "set-campo":
+        k, campo, val = args[0], args[1], parse(args[2])
+        rec = next((a for a in d.get("aplicadas", []) if a.get("chave") == k), None)
+        if rec is None:
+            print(f"nao existe em aplicadas: {k}")
+            return 1
+        rec[campo] = val
     elif cmd == "del-aplicada":
         # archived, not deleted: aplicadas_removidas keeps the record + why, so it can be restored by hand
         k, motivo = args[0], args[1]
