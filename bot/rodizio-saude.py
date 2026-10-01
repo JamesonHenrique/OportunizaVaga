@@ -23,6 +23,7 @@ OV_NOTIFY_RESUMO=1 (the notifier understands --resumo: non-urgent alerts go to t
 """
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timedelta
@@ -88,11 +89,32 @@ def paused(site_info, now):
     return bool(until) and datetime.fromisoformat(until) > now
 
 
+def de_site(rec, site):
+    """Did this record come FROM that site? The `como` field is the only place the channel is written
+    ("Gupy via Google", "LinkedIn Candidatura Simplificada", "Indeed Candidatura Rapida"). Same test
+    nota_site() uses, so the counter and the yield score never disagree.
+
+    Why this exists (01/10): `pos` credited EVERY application appended during the round to the round's
+    site, including ones that came out of the queue on another channel. eu.dev.br reached "4 aplicadas"
+    with zero applications recorded in it, which fed the D1 promotion a number it never earned.
+
+    A domain is shortened to its first label ("eu.dev.br" -> "eu"), which is too short to match loosely:
+    "Queues engineer" contains it. So short labels must land on a word boundary, while a distinctive
+    label ("linkedin", "indeed", "gupy") matches anywhere.
+    """
+    como = str(rec.get("como", "")).lower()
+    label = site.split(".")[0].lower()
+    if not label:
+        return False
+    if len(label) >= 5:
+        return label in como
+    return re.search(rf"\b{re.escape(label)}\b", como) is not None
+
+
 def nota_site(site, info, aplicadas):
     """Yield score: smoothed applications per round + 2 per positive reply whose `como` names the
     site. Smoothing keeps new/rare sites alive instead of zeroing them."""
-    resp = sum(1 for a in aplicadas if (a.get("status") or "") in POSITIVOS
-               and site.split(".")[0] in str(a.get("como", "")).lower())
+    resp = sum(1 for a in aplicadas if (a.get("status") or "") in POSITIVOS and de_site(a, site))
     return (info.get("aplicadas", 0) + 2 * resp + 1) / (info.get("rodadas", 0) + 3)
 
 
@@ -222,9 +244,23 @@ def main(cmd, aplicadas_path, perfil_path=None):
     elif cmd == "pos-so-fila":
         # queue-only round (rodada-portao.py): notifications only — the site was NOT scanned (no streak, no advance)
         cur = saude.pop("rodada_atual", None) or {}
-        for a in d.get("aplicadas", [])[int(cur.get("aplicadas_antes", len(d.get("aplicadas", [])))):]:
+        novas_lista = [x for x in d.get("aplicadas", [])[int(cur.get("aplicadas_antes", len(d.get("aplicadas", [])))):]]
+        for a in novas_lista:
             if not a.get("registro_retroativo"):
                 notify(f"✅ Candidatura enviada: {a.get('empresa')} — {a.get('vaga')} ({a.get('como')})", resumo=True)
+        # 01/10: this path never wrote ultima_aplicada, so the D1 promotion could only ever see sites
+        # that happened to be scanned. But most applications arrive through the queue, so the promotion
+        # was effectively dead. Credit the site the `como` names; no streak and no rotation advance,
+        # because this round scanned nothing.
+        carimbadas = []
+        for a in novas_lista:
+            for nome in sites:
+                if de_site(a, nome) and nome not in carimbadas:
+                    carimbadas.append(nome)
+        for nome in carimbadas:
+            info = sites.setdefault(nome, {"rodadas": 0, "vazias_seguidas": 0, "aplicadas": 0, "pausado_ate": None})
+            info["aplicadas"] += sum(1 for a in novas_lista if de_site(a, nome))
+            info["ultima_aplicada"] = now.isoformat(timespec="minutes")
     elif cmd == "pos":
         cur = saude.pop("rodada_atual", None)
         if cur and cur.get("site"):
@@ -249,8 +285,12 @@ def main(cmd, aplicadas_path, perfil_path=None):
                 rod["proximo"], rod["pos"] = ordem[p1], p1
                 rod["ultima_rodada"] = now.strftime("%Y-%m-%d")
                 save(aplicadas_path, d)
-            if novas > 0:
-                s["aplicadas"] += novas
+            # 01/10: only credit the round's site for what came out of IT. A round can send an
+            # application through the queue (gupy/inhire/telegram) while scanning eu.dev.br; counting
+            # that as eu.dev.br's yield inflated sites with applications recorded elsewhere.
+            do_site = sum(1 for a in novas_lista if de_site(a, cur["site"]))
+            if do_site > 0:
+                s["aplicadas"] += do_site
                 s["ultima_aplicada"] = now.isoformat(timespec="minutes")   # promotion of exploration sites
             # Old state files have no chaves_antes: treat as "had news" instead of guessing dry.
             teve_vaga = novas > 0 or "chaves_antes" not in cur or len(chaves_vistas(d)) > int(cur["chaves_antes"])

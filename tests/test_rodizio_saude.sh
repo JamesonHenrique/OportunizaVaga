@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 SAUDE="bot/rodizio-saude.py"
 
-TOTAL=10
+TOTAL=12
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -206,6 +206,81 @@ o, _ = r.ordem_do_dia(["linkedin", "gupy"], ["catho", "remotar"], {"catho": {"pa
 assert len(o) == 5 and o.count("linkedin") == 2 and o.count("remotar") == 1 and "catho" not in o, o
 PYEOF
 relata $? "ordem do dia: produtivos em dobro + 1 explorador nao pausado (OV_SITES_CONFIG)"
+
+# 11 — 01/10: pos credita ao site da rodada SO o que saiu por ele. Uma rodada que varreu eu.dev.br e
+# aplicou pela fila (gupy/inhire) nao pode inflar o rendimento de eu.dev.br — foi assim que ele chegou a
+# "4 aplicadas" sem nenhuma candidatura registrada nele, alimentando a promocao D1 com um numero falso.
+# pos-so-fila (item 12) tambem carimba ultima_aplicada, o que antes so acontecia no caminho pos.
+python3 - "$ROOT" <<'PYEOF'
+import importlib.util, json, os, sys, tempfile
+from datetime import datetime
+R = sys.argv[1]
+s = importlib.util.spec_from_file_location("r", R + "/bot/rodizio-saude.py"); r = importlib.util.module_from_spec(s); s.loader.exec_module(r)
+T = tempfile.mkdtemp()
+os.environ["OV_RODIZIO_SAUDE"] = T + "/saude.json"; os.environ["NOTIFY"] = "true"
+ap = T + "/ap.json"
+saude = lambda: json.load(open(os.environ["OV_RODIZIO_SAUDE"]))["sites"]
+def gravar(sites, prox):
+    json.dump({"sites": sites}, open(os.environ["OV_RODIZIO_SAUDE"], "w"))
+    json.dump({"aplicadas": [], "bloqueados": {}, "quase_la": {}, "aguardando_login": {},
+               "rodizio": {"ordem": ["eu.dev.br", "linkedin"], "proximo": prox, "pos": 0,
+                           "ordem_calculada_em": datetime.now().strftime("%Y-%m-%d")}}, open(ap, "w"))
+# (a) pos: aplicacao pela fila durante a rodada de eu.dev.br -> eu.dev.br NAO ganha aplicada/ultima_aplicada
+gravar({"eu.dev.br": {"rodadas": 1, "vazias_seguidas": 0, "aplicadas": 0, "pausado_ate": None}}, "eu.dev.br")
+r.main("pre", ap)
+d = json.load(open(ap)); d["aplicadas"].append({"chave": "k1", "empresa": "X", "vaga": "Dev",
+                                               "como": "Gupy (conta via Google)"}); json.dump(d, open(ap, "w"))
+r.main("pos", ap)
+eu = saude()["eu.dev.br"]
+assert eu["aplicadas"] == 0, f"fila nao pode virar rendimento do site: {eu}"
+assert not eu.get("ultima_aplicada"), f"ultima_aplicada falsa no site errado: {eu}"
+# (b) pos: aplicacao que saiu pelo proprio site -> credito normal
+gravar({"eu.dev.br": {"rodadas": 1, "vazias_seguidas": 0, "aplicadas": 0, "pausado_ate": None}}, "eu.dev.br")
+r.main("pre", ap)
+d = json.load(open(ap)); d["aplicadas"].append({"chave": "k2", "empresa": "X", "vaga": "Dev",
+                                               "como": "eu.dev.br (site da empresa)"}); json.dump(d, open(ap, "w"))
+r.main("pos", ap)
+eu = saude()["eu.dev.br"]
+assert eu["aplicadas"] == 1 and eu.get("ultima_aplicada"), eu
+# (c) pos-so-fila: carimba ultima_aplicada no site que o `como` nomeia (antes nunca carimbava)
+gravar({"linkedin": {"rodadas": 0, "vazias_seguidas": 0, "aplicadas": 0, "pausado_ate": None}}, "linkedin")
+r.main("pre", ap)
+d = json.load(open(ap)); d["aplicadas"].append({"chave": "k3", "empresa": "Y", "vaga": "Dev",
+                                               "como": "LinkedIn Candidatura Simplificada"}); json.dump(d, open(ap, "w"))
+r.main("pos-so-fila", ap)
+li = saude()["linkedin"]
+assert li.get("ultima_aplicada"), f"pos-so-fila precisa carimba ultima_aplicada: {li}"
+assert li["aplicadas"] == 1 and li["rodadas"] == 0, f"pos-so-fila nao mexe em streak: {li}"
+# (d) de_site ignora substring acidental e respeita o prefixo antes do ponto
+assert r.de_site({"como": "Gupy via Google"}, "eu.dev.br") is False
+assert r.de_site({"como": "Remotar (via Inhire)"}, "remotar") is True
+assert r.de_site({"como": "telegram: vaga colhida"}, "linkedin") is False
+PYEOF
+relata $? "pos credita so o que saiu pelo site; pos-so-fila carimba ultima_aplicada sem mexer no streak"
+
+# 12 — de_site() e a regra unica: o que o contador conta e o que a nota usa.
+python3 - "$ROOT" <<'PYEOF'
+import importlib.util, sys
+s = importlib.util.spec_from_file_location("r", sys.argv[1] + "/bot/rodizio-saude.py"); r = importlib.util.module_from_spec(s); s.loader.exec_module(r)
+casos = [({"como": "Gupy (conta via Google)"}, "gupy", True),
+         ({"como": "LinkedIn Candidatura Simplificada (easy-apply)"}, "linkedin", True),
+         ({"como": "Indeed Candidatura Rapida (SmartApply), login Google"}, "indeed", True),
+         ({"como": "eu.dev.br (vaga da empresa)"}, "eu.dev.br", True),
+         ({"como": "e-mail x via Gmail"}, "gupy", False),
+         ({"como": "vaga colhida no telegram"}, "linkedin", False),
+         ({}, "linkedin", False),
+         ({"como": None}, "linkedin", False),
+         # rotulo curto ("eu") precisa cair em fronteira de palavra: "Queues" contem "eu"
+         ({"como": "Queues engineer"}, "eu.dev.br", False),
+         ({"como": "Engenheiro de software"}, "eu.dev.br", False)]
+for rec, site, esp in casos:
+    assert r.de_site(rec, site) is esp, (rec, site, esp)
+# a nota usa exatamente a mesma regra (positivos contam 2x)
+ap = [{"status": "entrevista", "como": "Gupy via Google"}, {"status": "em_analise", "como": "Gupy via Google"}]
+assert r.nota_site("gupy", {"rodadas": 0, "aplicadas": 0}, ap) == (0 + 2 + 1) / 3
+assert r.nota_site("linkedin", {"rodadas": 0, "aplicadas": 0}, ap) == (0 + 0 + 1) / 3
+PYEOF
+relata $? "de_site: regra unica de atribuicao (contador e nota concordam)"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "# verde: $N/$TOTAL"
