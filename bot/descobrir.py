@@ -307,6 +307,38 @@ def _gemea(v):
     return vf.norm(v.get("empresa")).strip() + "|" + vf.norm(v.get("titulo")).strip()
 
 
+def notificar(msg):
+    """Telegram via scripts/notificar.sh|ps1 (no-op until configured); env NOTIFY overrides it (tests)."""
+    alvo = os.environ.get("NOTIFY")
+    scripts = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
+    if alvo:
+        cmd = [alvo, msg]
+    elif os.name == "nt":
+        cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(scripts, "notificar.ps1"), msg]
+    else:
+        cmd = [os.path.join(scripts, "notificar.sh"), msg]
+    try:
+        subprocess.run(cmd, check=False, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+def avisar_fontes(fila, por_fonte, erros):
+    """Alert right away when every search of a source failed or came back empty
+    (the canary runs once a day); one 'voltou' notice when it recovers."""
+    quebradas = set(fila.get("fontes_quebradas") or [])
+    for nome, (buscas, falhas, lidas) in por_fonte.items():
+        if buscas and (falhas == buscas or lidas == 0):
+            tipos = sorted({e.split(":", 1)[1] for e in erros if e.startswith(nome + ":")}) or ["0 vagas"]
+            notificar(f"🧪 Busca do {nome} falhou em {buscas}/{buscas} termos ({', '.join(tipos)}): "
+                      f"fila sem vagas dessa fonte. Ver bot/descobrir.py / bot/canario-fontes.py")
+            quebradas.add(nome)
+        elif nome in quebradas:
+            notificar(f"✅ Busca do {nome} voltou ({lidas} vagas lidas)")
+            quebradas.discard(nome)
+    fila["fontes_quebradas"] = sorted(quebradas)
+
+
 def coletar(ctx, force=False, fontes=None):
     fila = vf.load_json(ctx.fila_path, {"vagas": {}, "stats": {}})
     ult = fila.get("ultima_coleta")
@@ -324,6 +356,7 @@ def coletar(ctx, force=False, fontes=None):
     vagas = fila.setdefault("vagas", {})
     stats = {"lidas": 0, "novas": 0, "erros": []}
     filtro = {}
+    por_fonte = {}   # fonte -> [searches, errors, jobs read]
     n_desc = 0
     gemeas = {_gemea(v) for v in vagas.values() if v.get("empresa") and v.get("status") in ("nova", "processada")}
     fontes = fontes or ctx.cfg["fontes"]
@@ -333,11 +366,15 @@ def coletar(ctx, force=False, fontes=None):
     if "gupy" in fontes:
         buscas += [("gupy", t) for t in gupy_termos]
     for nome, termo in buscas:
+        pf = por_fonte.setdefault(nome, [0, 0, 0])
+        pf[0] += 1
         try:
             achadas = FONTES[nome](ctx, termo)
         except Exception as e:  # one source down never stops the others
             stats["erros"].append(f"{nome}:{type(e).__name__}")
+            pf[1] += 1
             continue
+        pf[2] += len(achadas)
         for v in achadas:
             stats["lidas"] += 1
             if v["id"] in vagas or v["id"] in conhecidos:
@@ -379,6 +416,7 @@ def coletar(ctx, force=False, fontes=None):
     for k, n in filtro.items():
         tot[k] = tot.get(k, 0) + n
     tot["novas"] = tot.get("novas", 0) + stats["novas"]
+    avisar_fontes(fila, por_fonte, stats["erros"])
     vf.save_json(ctx.fila_path, fila)
     print(f"descobrir: {stats['lidas']} lidas, {stats['novas']} novas na fila, filtradas={filtro}"
           + (f", erros={stats['erros']}" if stats["erros"] else ""))
