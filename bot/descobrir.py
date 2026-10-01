@@ -52,6 +52,9 @@ DEFAULTS = {
     "gupy_termos": [],          # empty = first two words of each profile term
     "stack_evitar": [],         # title words that reject a job (unless it also has stack_preferida)
     "stack_preferida": [],      # title words that rescue a job and add score (also used by vaga_check on the description)
+    "score_palavras": [],       # title words worth +2 in the queue ranking; empty = stack_preferida (else profile terms)
+    "termos_arquivo": "",       # JSON {"termos": [...]} that overrides the profile terms (shared with a prompt); "" = profile
+    "prompt_registro": "",      # closing line of the prompt block (how to register each job); "" = default text
     "max_descricoes": 12,       # LinkedIn description fetches per collection (0 = description triage off; Gupy is free)
 }
 STOP_TERMO = {"desenvolvedor", "desenvolvedora", "analista", "vaga", "remoto", "remota", "pessoa", "home", "office"}
@@ -82,6 +85,8 @@ class Ctx:
         self.stack_fora = vf.regex_lista(cfg["stack_evitar"])
         self.stack_boa = vf.regex_lista(cfg["stack_preferida"])
         termos = self.info["termos"] or ["desenvolvedor junior"]
+        if cfg["termos_arquivo"]:
+            termos = [t for t in vf.load_json(cfg["termos_arquivo"], {}).get("termos", []) if isinstance(t, str) and t.strip()] or termos
         self.termos = termos
         gupy = list(cfg["gupy_termos"])
         if not gupy:
@@ -90,8 +95,8 @@ class Ctx:
                 if short and short not in gupy:
                     gupy.append(short)
         self.gupy_termos = gupy
-        # Score words: explicit preferred stack, else distinctive words of the profile terms.
-        self.score_re = self.stack_boa
+        # Score words: explicit score_palavras, else preferred stack, else distinctive words of the profile terms.
+        self.score_re = vf.regex_lista(cfg["score_palavras"]) or self.stack_boa
         if not self.score_re:
             nivel_words = re.compile(vf.NIVEL_PALAVRAS["junior"] + "|" + vf.NIVEL_PALAVRAS["trainee"]
                                      + "|" + vf.NIVEL_PALAVRAS["estagio"] + "|" + vf.NIVEL_PALAVRAS["pleno"]
@@ -451,8 +456,9 @@ def prompt(ctx, n):
         tag = " [descrição ok]" if v.get("desc_checada") else ""
         print(f"  {i}) [score {v.get('score', 0)}]{tag} {(v.get('empresa') or '?')[:60]} — {titulo} | {v['fonte']} | "
               f"{(v.get('local') or '')[:40]} | publ. {v.get('publicada') or '?'} | {v['url']}")
-    print("  Registre CADA uma com o campo \"url\" acima: aplicou → estado.py add-aplicada; incompatível ou "
-          "exige login → estado.py add-bloqueado. Descarte sem registro faz a vaga voltar na próxima rodada.")
+    print("  " + (ctx.cfg["prompt_registro"] or "Registre CADA uma com o campo \"url\" acima: aplicou → estado.py "
+                 "add-aplicada; incompatível ou exige login → estado.py add-bloqueado. Descarte sem registro faz a "
+                 "vaga voltar na próxima rodada."))
     vf.save_json(ctx.fila_path, fila)
     return 0
 
@@ -477,13 +483,34 @@ def descarte(v, texto):
     return None
 
 
+def estado_py():
+    """The estado.py that owns aplicadas.json (env OV_ESTADO_PY: a private install keeps its own write door)."""
+    return os.environ.get("OV_ESTADO_PY") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "estado.py")
+
+
 def registrar_descarte(ctx, v, motivo):
     rec = {"empresa": v.get("empresa") or "?", "vaga": v.get("titulo") or "?", "url": v.get("url"),
            "motivo": f"descartada pelo modelo (registrada por descobrir.py): {motivo}"}
-    r = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "estado.py"),
-                        "--file", ctx.paths["aplicadas"], "add-bloqueado", v["id"].replace(":", "_"),
-                        json.dumps(rec, ensure_ascii=False)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    r = subprocess.run([sys.executable, estado_py(), "--file", ctx.paths["aplicadas"], "add-bloqueado",
+                        v["id"].replace(":", "_"), json.dumps(rec, ensure_ascii=False)],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return r.returncode == 0
+
+
+def carimbar_caminho(ctx, ofertadas):
+    """caminho=fila|rodizio on the records written by this round (env OV_RODADA, stamped by estado.py as "rodada"),
+    so the funnel can tell whether the queue or the site scan sends more applications."""
+    rodada = os.environ.get("OV_RODADA")
+    if not rodada:
+        return
+    for a in vf.load_json(ctx.paths["aplicadas"], {}).get("aplicadas", []):
+        if not isinstance(a, dict) or a.get("rodada") != rodada or a.get("caminho"):
+            continue
+        ids = job_ids(a.get("chave"), a)
+        blob = [vf.norm(f"{a.get('chave')} {a.get('empresa')} {a.get('vaga')}").replace("_", " ")]
+        da_fila = any(k in ids or ja_registrada(v, blob) for k, v in ofertadas.items())
+        subprocess.run([sys.executable, estado_py(), "--file", ctx.paths["aplicadas"], "set-campo", a["chave"], "caminho",
+                        "fila" if da_fila else "rodizio"], check=False, capture_output=True, timeout=30)
 
 
 def marcar(ctx, log=None):
@@ -500,9 +527,12 @@ def marcar(ctx, log=None):
         except OSError:
             log = None
     fechadas = expiradas = descartadas = 0
+    ofertadas = {}
     for k, v in fila.get("vagas", {}).items():
         if v.get("status") != "nova":
             continue
+        if v.get("oferta_aberta"):
+            ofertadas[k] = v
         if v.pop("oferta_aberta", False) and (not log or _tocada(v, texto)):
             v["ofertas"] = int(v.get("ofertas", 0)) + 1
             motivo = descarte(v, texto) if log else None
@@ -515,6 +545,7 @@ def marcar(ctx, log=None):
                 int(v.get("mostrada", 0)) >= int(ctx.cfg["max_mostrada"]):
             v["status"], expiradas = "expirada", expiradas + 1
     vf.save_json(ctx.fila_path, fila)
+    carimbar_caminho(ctx, ofertadas)
     print(f"descobrir: {fechadas} processadas pelo robo, {descartadas} descartes do modelo registrados, "
           f"{expiradas} expiradas, {len(pendentes(fila))} pendentes")
     return 0

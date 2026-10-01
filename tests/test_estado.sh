@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 ESTADO="bot/estado.py"
 
-TOTAL=22
+TOTAL=23
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -196,6 +196,12 @@ relata $? "descartes: placeholder recusado sem traceback, rotulos aceitos"
 python3 "$ESTADO" --file "$TMP_STATE" add-aplicada '{"chave":"z_dev_77","empresa":"Z","vaga":"Dev","url":"https://z.example/77"}' >/dev/null 2>&1
 python3 -c "import json,sys;assert [a for a in json.load(open(sys.argv[1]))['aplicadas'] if a['chave']=='z_dev_77'][0]['status']=='enviada'" "$TMP_STATE"
 relata $? "add-aplicada sem status grava enviada"
+
+# 23 — OV_RODADA vira "rodada" no registro; set-campo grava um campo (JSON ou texto).
+OV_RODADA=R9 python3 "$ESTADO" --file "$TMP_STATE" add-aplicada '{"chave":"y_dev_78","empresa":"Y","vaga":"Dev"}' >/dev/null 2>&1
+python3 "$ESTADO" --file "$TMP_STATE" set-campo y_dev_78 caminho fila >/dev/null 2>&1
+python3 -c "import json,sys;a=[a for a in json.load(open(sys.argv[1]))['aplicadas'] if a['chave']=='y_dev_78'][0];assert a['rodada']=='R9' and a['caminho']=='fila',a" "$TMP_STATE"
+relata $? "OV_RODADA carimba rodada; set-campo grava campo"
 
 [ "$FAIL" -eq 0 ]; then
   echo "# verde: $N/$TOTAL"

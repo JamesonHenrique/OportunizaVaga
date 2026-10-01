@@ -8,7 +8,7 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
-TOTAL=7
+TOTAL=9
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -181,6 +181,37 @@ d.avisar_fontes(fila, {"gupy": [4, 0, 30]}, [])
 assert len(msgs) == 3 and "voltou" in msgs[2] and fila["fontes_quebradas"] == [], msgs
 PYSNIP
 run_snippet && relata 0 "fonte fora do ar avisa na hora; volta avisa 1x" || relata 1 "fonte fora do ar avisa na hora; volta avisa 1x"
+
+# 9 — instalacao privada: termos_arquivo, score_palavras, prompt_registro, OV_ESTADO_PY e caminho (fila|rodizio).
+cat > "$SNIPPET" <<'PYSNIP'
+import io, contextlib, subprocess
+T = os.environ["STATE_DIR"]
+json.dump({"termos": ["termo do arquivo"]}, open(T + "/termos.json", "w"))
+json.dump({"termos_arquivo": T + "/termos.json", "score_palavras": ["automacao"], "prompt_registro": "RODAPE PRIVADO"},
+          open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
+ctx = d.Ctx()
+assert ctx.termos == ["termo do arquivo"], ctx.termos
+assert d.score(ctx, {"titulo": "Analista de Automação"}) >= 2 and d.score(ctx, {"titulo": "Desenvolvedor Java"}) < 2
+json.dump({"vagas": {"li:4000000001": {"status": "nova", "score": 2, "titulo": "Dev", "empresa": "Acme", "fonte": "linkedin",
+                                      "url": "https://www.linkedin.com/jobs/view/4000000001/"}}}, open(ctx.fila_path, "w"))
+buf = io.StringIO()
+with contextlib.redirect_stdout(buf):
+    d.prompt(ctx, 5)
+assert "RODAPE PRIVADO" in buf.getvalue(), buf.getvalue()
+chamadas = []
+real_run = subprocess.run
+d.subprocess.run = lambda cmd, **k: chamadas.append(cmd) or real_run(["true"])
+os.environ["OV_ESTADO_PY"] = "/privado/estado.py"; os.environ["OV_RODADA"] = "R1"
+rec = lambda c, u: {"chave": c, "empresa": "Acme", "vaga": "Dev", "status": "enviada", "url": u, "rodada": "R1"}
+json.dump({"aplicadas": [rec("acme_a_4000000001", "https://www.linkedin.com/jobs/view/4000000001/"),
+                         rec("acme_b_4000000002", "https://www.linkedin.com/jobs/view/4000000002/")],
+           "bloqueados": {}}, open(ctx.paths["aplicadas"], "w"))
+with contextlib.redirect_stdout(io.StringIO()):
+    d.marcar(ctx)
+cam = {c[5]: c[7] for c in chamadas if "set-campo" in c}
+assert all(c[1] == "/privado/estado.py" for c in chamadas) and cam == {"acme_a_4000000001": "fila", "acme_b_4000000002": "rodizio"}, chamadas
+PYSNIP
+run_snippet && relata 0 "instalacao privada: termos_arquivo, score_palavras, prompt_registro, OV_ESTADO_PY, caminho" || relata 1 "instalacao privada: termos_arquivo, score_palavras, prompt_registro, OV_ESTADO_PY, caminho"
 
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0
