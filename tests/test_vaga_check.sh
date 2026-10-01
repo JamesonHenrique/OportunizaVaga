@@ -98,7 +98,7 @@ d.time.sleep = lambda s: None
 os.environ["OV_DESCOBERTA_CONFIG"] = os.path.join(os.environ["STATE_DIR"], "desc.json")
 json.dump({"fontes": ["gupy"], "intervalo_min": 0, "stack_evitar": ["php", ".net"], "stack_preferida": ["python"]},
           open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
-d.get = lambda url, timeout=20: rd("gupy_busca_desc.json")
+d.get = lambda url, timeout=20: rd("gupy_busca_desc.html")
 ctx = d.Ctx()
 with contextlib.redirect_stdout(io.StringIO()):
     d.coletar(ctx, force=True)

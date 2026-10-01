@@ -41,7 +41,7 @@ def carrega_canario():
 def rede_boa(url, timeout=20):
     if "seeMoreJobPostings" in url: return rd("linkedin_search.html")
     if "jobPosting" in url: return rd("linkedin_vaga.html")
-    if "gupy.io" in url: return rd("gupy_busca_desc.json")
+    if "gupy.io" in url: return rd("gupy_busca_desc.html")
     raise AssertionError("url inesperada: " + url)
 PYEOF
 
@@ -73,14 +73,14 @@ relata $? "canario: portais saudaveis = nenhuma falha"
 "$PY" - <<PYEOF
 exec(open("$TMP/pre.py").read())
 c = carrega_canario()
-c.d.get = lambda url, timeout=20: "<html></html>" if "linkedin" in url else '{"data": []}'
+c.d.get = lambda url, timeout=20: "<html></html>" if "linkedin" in url else '<script id="__NEXT_DATA__">{"props": {"pageProps": {"initialJobList": {"data": []}}}}</script>'
 f = c.checar()
 assert "LinkedIn busca: 0 vagas" in f and "Gupy busca: 0 vagas" in f, f
 # LinkedIn search ok, job page without description/level; Gupy without description
 def meio(url, timeout=20):
     if "seeMoreJobPostings" in url: return rd("linkedin_search.html")
     if "jobPosting" in url: return "<html><div>mudou</div></html>"
-    return '{"data": [{"id": 1, "name": "Dev Jr", "jobUrl": "https://x.example/1", "country": "Brasil"}]}'
+    return '<script id="__NEXT_DATA__">{"props": {"pageProps": {"initialJobList": {"data": [{"id": 1, "name": "Dev Jr", "jobUrl": "https://x.example/1"}]}}}}</script>'
 c.d.get = meio
 f = c.checar()
 assert "LinkedIn vaga: descricao vazia" in f and "LinkedIn vaga: sem nivel de experiencia oficial" in f and "Gupy busca: sem descricao" in f, f
@@ -98,7 +98,7 @@ c = carrega_canario()
 chamadas = []
 def so_gupy(url, timeout=20):
     chamadas.append(url)
-    return rd("gupy_busca_desc.json")
+    return rd("gupy_busca_desc.html")
 c.d.get = so_gupy
 assert c.checar() == [] and all("gupy" in u for u in chamadas) and chamadas, chamadas
 PYEOF
@@ -110,7 +110,7 @@ echo '{"fontes": ["linkedin", "gupy"]}' > "$OV_DESCOBERTA_CONFIG"
 "$PY" - <<PYEOF
 exec(open("$TMP/pre.py").read())
 c = carrega_canario()
-c.d.get = lambda url, timeout=20: "<html></html>" if "linkedin" in url else '{"data": []}'
+c.d.get = lambda url, timeout=20: "<html></html>" if "linkedin" in url else '<script id="__NEXT_DATA__">{"props": {"pageProps": {"initialJobList": {"data": []}}}}</script>'
 rc = c.main()
 assert rc == 2, rc
 PYEOF

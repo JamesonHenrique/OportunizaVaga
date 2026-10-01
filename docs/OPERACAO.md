@@ -116,6 +116,6 @@ novas" para sempre. O canário roda 1x/dia, **ao vivo**, o primeiro termo do per
 **e** nível de experiência oficial; API da Gupy com vagas e descrição. Falhou = mensagem `[CANARIO] ...` no Telegram
 (`scripts/notificar.sh`; no Windows `notificar.ps1`) e exit 2.
 
-As fixtures de `tests/fixtures/` (`linkedin_search.html`, `linkedin_vaga.html`, `gupy_busca_desc.json`) são **sintéticas**:
+As fixtures de `tests/fixtures/` (`linkedin_search.html`, `linkedin_vaga.html`, `gupy_busca_desc.html`) são **sintéticas**:
 fixam o markup que o projeto *assume*, então testes verdes offline não provam que o portal ainda o serve; só o canário
 detecta a mudança. Ao atualizar um parser, atualize a fixture junto. Teste: `tests/test_canario_fontes.sh`.
