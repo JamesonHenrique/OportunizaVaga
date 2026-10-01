@@ -8,7 +8,7 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
-TOTAL=13
+TOTAL=14
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -283,6 +283,28 @@ urls = []; d.get = lambda url, timeout=20: urls.append(url) or pag(int(url.split
 assert len(d.gupy(ctx, "analista")) == 379 and len(urls) == 4, len(urls)
 PYSNIP
 run_snippet && relata 0 "paginacao: LinkedIn incremental por cursor, Gupy ate o fim" || relata 1 "paginacao: LinkedIn incremental por cursor, Gupy ate o fim"
+
+# 14 — coleta: triagem por descricao comeca pelo maior score (max_descricoes); prazo estourado nao abre busca e GRAVA a fila.
+cat > "$SNIPPET" <<'PYSNIP'
+import io, contextlib
+json.dump({"fontes": ["linkedin"], "max_descricoes": 1, "intervalo_min": 0}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
+ctx = d.Ctx()
+json.dump({"vagas": {}}, open(ctx.fila_path, "w")); json.dump({"aplicadas": []}, open(ctx.paths["aplicadas"], "w"))
+vs = [{"id": "li:4100000001", "fonte": "linkedin", "titulo": "Analista Junior", "empresa": "A", "url": "u1", "local": "Brasil"},
+      {"id": "li:4100000002", "fonte": "linkedin", "titulo": "Desenvolvedor Backend Java Junior", "empresa": "B", "url": "u2", "local": "Brasil"}]
+d.FONTES["linkedin"] = lambda c, t: [dict(v) for v in vs]
+checadas = []; d.motivo_descricao = lambda c, v: checadas.append(v["id"]) or None
+with contextlib.redirect_stdout(io.StringIO()):
+    d.coletar(ctx, force=True)
+assert checadas == ["li:4100000002"], checadas   # best score first, only 1 page fetched
+json.dump({"fontes": ["linkedin"], "tempo_max_s": -1}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
+ctx = d.Ctx(); json.dump({"vagas": {}}, open(ctx.fila_path, "w"))
+with contextlib.redirect_stdout(io.StringIO()):
+    d.coletar(ctx, force=True)
+f = json.load(open(ctx.fila_path))
+assert "linkedin:prazo" in f["stats"]["erros"] and f.get("ultima_coleta"), f.get("stats")
+PYSNIP
+run_snippet && relata 0 "coleta: triagem pelo maior score; prazo estourado grava a fila" || relata 1 "coleta: triagem pelo maior score; prazo estourado grava a fila"
 
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0
