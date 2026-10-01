@@ -28,6 +28,9 @@ _notificar = d.notificar
 def checar(ctx=None, termo=None):
     """List of failure descriptions ([] = every enabled parser produced usable data)."""
     ctx = ctx or d.Ctx()
+    # Gupy gets its own short terms: a long LinkedIn-style term ("desenvolvedor java spring boot") can
+    # legitimately return 0 jobs there, and that was a false "parser broken" alert (01/10).
+    termo_gupy = termo or (ctx.gupy_termos[0] if ctx.gupy_termos else ctx.termos[0])
     termo = termo or ctx.termos[0]
     falhas = []
     if "linkedin" in ctx.cfg["fontes"]:
@@ -49,7 +52,7 @@ def checar(ctx=None, termo=None):
                 falhas.append(f"LinkedIn vaga: {type(e).__name__}")
     if "gupy" in ctx.cfg["fontes"]:
         try:
-            gp = [v for v in d.gupy(ctx, termo) if v.get("titulo") and v.get("url")]
+            gp = [v for v in d.gupy(ctx, termo_gupy) if v.get("titulo") and v.get("url")]
             if not gp:
                 falhas.append("Gupy busca: 0 vagas")
             elif not any((v.get("_descricao") or "").strip() for v in gp):
