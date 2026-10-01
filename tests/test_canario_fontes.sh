@@ -111,7 +111,7 @@ exec(open("$TMP/pre.py").read())
 c = carrega_canario()
 chamadas = []
 c.d.get = lambda url, timeout=20: chamadas.append(url) or rd("gupy_busca_desc.html")
-assert c.checar() == [] and "term=termo+curto+gupy" in chamadas[0], chamadas
+assert c.checar() == [] and "termo+curto+gupy" in chamadas[0], chamadas
 PYEOF
 relata $? "canario: Gupy busca com o termo curto do Gupy"
 echo '{"fontes": ["linkedin", "gupy"]}' > "$OV_DESCOBERTA_CONFIG"
