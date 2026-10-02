@@ -97,7 +97,22 @@ cat > "$SNIPPET" <<'PYSNIP'
 ids, blobs, pular = d.ids_conhecidos(os.environ["APLICADAS_FILE"])
 assert "li:6666666666" in ids and "gupy:9000003" in ids, ids
 assert pular == ["Empresa Bloqueada"], pular
-assert d.job_ids("indeed_x_1", {"url": "https://br.indeed.com/viewjob?jk=0123456789abcdef"}) == {"indeed:0123456789abcdef"}
+assert d.job_ids("indeed_x_1", {"url": "https://br.indeed.com/viewjob?jk=0123456789abcdef"}) == {"indeed:0123456789abcdef", "url:indeed.com/viewjob?jk=0123456789abcdef"}
+# canonical url (reposts under new ids): one job = one url; recruiter profiles / homes / t.me are not identities
+assert d.url_canon("https://vagas.example.com/vaga/AbC123/") == d.url_canon("https://www.vagas.example.com/vaga/AbC123") != ""
+assert d.url_canon("https://vagas.example.com/vaga/AbC123") != d.url_canon("https://vagas.example.com/vaga/XyZ789")
+assert d.url_canon("https://br.linkedin.com/in/fulana-") == "" and d.url_canon("https://t.me/canal/123") == ""
+assert d.url_canon("https://acme.com/") == "" and d.url_canon("") == "" and d.url_canon("mailto:x@y.z") == ""
+assert d.url_canon("https://www.linkedin.com/jobs/view/123/") == d.url_canon("https://br.linkedin.com/jobs/view/123") != ""
+assert d.url_canon("https://boards.greenhouse.io/acme/jobs/55?gh_src=x") == "url:boards.greenhouse.io/acme/jobs/55"
+# near-twin titles: reposts match, two real postings of one company do not (measured on 57 real records)
+A = lambda e, t: d._assinatura({"empresa": e, "titulo": t})
+assert d.gemea_de({"empresa": "Acme | Eng", "titulo": "Back End C++(17)"}, [A("Acme | Eng", "Back End C++(17)")])
+assert d.gemea_de({"empresa": "Beta", "titulo": "Desenvolvedor de Automacao e IA Jr (remoto)"}, [A("Beta (Oficial)", "Desenvolvedor de Automação e IA Jr")])
+assert not d.gemea_de({"empresa": "Gama", "titulo": "Backend Java Junior (Remoto, qualquer lugar)"}, [A("Gama", "Backend Java – Sustentação (Remoto, qualquer lugar)")])
+assert not d.gemea_de({"empresa": "Delta", "titulo": "Fullstack Backend Junior"}, [A("Delta", "Fullstack Backend - Trainee")])
+assert not d.gemea_de({"empresa": "Acme", "titulo": "Backend Junior"}, [A("Outra", "Backend Junior")])
+assert d.ja_registrada({"empresa": "XYZ", "titulo": "Software Engineer OpenText Exstream"}, ["xyz systems software engineer opentext exstream junior"])
 assert d.job_ids("gupy_acme_1234567", {}) == {"gupy:1234567"}
 PYSNIP
 run_snippet && relata 0 "ids_conhecidos e job_ids leem url/chave/bloqueados" || relata 1 "ids_conhecidos e job_ids leem url/chave/bloqueados"
