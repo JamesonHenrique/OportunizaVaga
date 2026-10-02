@@ -338,16 +338,42 @@ def job_ids(chave, rec):
     m = re.match(r"([a-z0-9]+)_.*?_(\d{5,})(?:_[a-z]+)?$", str(chave).lower())
     if m:
         ids.add(f"{m.group(1)}:{m.group(2)}")
+    if isinstance(rec, dict):
+        ids |= {u for u in (url_canon(rec.get(k)) for k in ("url", "url_vaga", "link")) if u}
     return ids
 
 
-def _tokens(t):
-    return {w for w in vf.norm(t).split() if len(w) >= 4}
+# Paths shared by DIFFERENT jobs (a recruiter profile posts many): never an identity.
+_URL_GENERICA = re.compile(r"^/(in|company|school|groups|feed|search|jobs/search|vagas|jobs|careers?|carreiras)?/?[^/]*$")
+
+
+def url_canon(u):
+    """'url:host/path' that names ONE job across boards/reposts (02/10: the same job came back under new
+    Telegram ids and was re-offered every round); '' for generic pages (profile, home, search)."""
+    p = urllib.parse.urlparse(str(u or "").strip())
+    if p.scheme not in ("http", "https") or not p.netloc:
+        return ""
+    host = re.sub(r"^(www\.|br\.|m\.)", "", p.netloc.lower())
+    path = re.sub(r"/+$", "", p.path)
+    if host.endswith("linkedin.com") and "/jobs/view/" not in path and "/posts/" not in path:
+        return ""
+    if host == "t.me" or _URL_GENERICA.match(path or "/") and not p.query:
+        return ""
+    q = urllib.parse.parse_qs(p.query)
+    chave = next((f"?{k}={q[k][0]}" for k in ("jk", "gh_jid", "jobId", "id", "vaga") if q.get(k)), "")
+    if not path and not chave:
+        return ""
+    return f"url:{host}{path.lower() if host.endswith('linkedin.com') else path}{chave}"
+
+
+def _tokens(t, minimo=4):
+    return {w for w in vf.norm(t).split() if len(w) >= minimo}
 
 
 def ja_registrada(v, blobs):
     """Same job seen on another board (other id): company + most title words already in a record."""
-    emp = [w for w in vf.norm(v.get("empresa")).split() if len(w) >= 4 and w not in ("carreiras", "brasil", "grupo", "oficial")]
+    # 02/10: >= 3 letters, so short company names (3 letters) are compared at all
+    emp = [w for w in vf.norm(v.get("empresa")).split() if len(w) >= 3 and w not in ("carreiras", "brasil", "grupo", "oficial", "none")]
     tit = _tokens(v.get("titulo")) - {"desenvolvedor", "desenvolvedora", "pessoa", "junior", "remoto", "vaga"}
     if not emp or len(tit) < 2:   # one word ("backend") is too weak to call two postings the same
         return False
@@ -379,6 +405,38 @@ def ids_conhecidos(aplicadas_path):
 
 def _gemea(v):
     return vf.norm(v.get("empresa")).strip() + "|" + vf.norm(v.get("titulo")).strip()
+
+
+# level words (junior/trainee/pleno) stay: they tell two postings of one company apart
+_TIT_VAZIO = {"desenvolvedor", "desenvolvedora", "pessoa", "remoto", "remota", "vaga", "nivel", "para", "com"}
+
+
+def _assinatura(v):
+    """(company key, title words) for near-twin matching; None when too weak to compare."""
+    emp = [w for w in vf.norm(v.get("empresa")).split() if len(w) >= 3 and w not in ("carreiras", "brasil", "grupo", "oficial", "none")]
+    tit = frozenset(_tokens(v.get("titulo"), 3) - _TIT_VAZIO)
+    return (emp[0], tit) if emp and tit else None
+
+
+def gemea_de(v, assinaturas):
+    """Same company and title words with Jaccard >= 0.8 (02/10: reposts of one job under new ids). Measured on the
+    57 real applications: 0.7-of-the-shorter merged 'Backend Java Junior' with 'Backend Java Sustentacao'."""
+    a = _assinatura(v)
+    if not a:
+        return False
+    for b in assinaturas:
+        if b[0] == a[0] and (a[1] == b[1] or len(a[1] & b[1]) >= max(2, 0.8 * len(a[1] | b[1]))):
+            return True
+    return False
+
+
+def assinaturas_da_fila(vagas):
+    """Every queue job that ever reached the model (nova, processada, expirada): a repost of any of them is not new."""
+    return [a for a in (_assinatura(v) for v in vagas.values() if v.get("status") in ("nova", "processada", "expirada")) if a]
+
+
+def urls_da_fila(vagas):
+    return {u for u in (url_canon(v.get("url")) for v in vagas.values()) if u}
 
 
 def notificar(msg):
@@ -433,6 +491,8 @@ def coletar(ctx, force=False, fontes=None):
     filtro = {}
     por_fonte = {}   # fonte -> [searches, errors, jobs read]
     gemeas = {_gemea(v) for v in vagas.values() if v.get("empresa") and v.get("status") in ("nova", "processada")}
+    assin = assinaturas_da_fila(vagas)
+    conhecidos |= urls_da_fila(vagas)
     fontes = fontes or ctx.cfg["fontes"]
     buscas = []
     if "linkedin" in fontes:
@@ -459,7 +519,7 @@ def coletar(ctx, force=False, fontes=None):
         pf[2] += len(achadas)
         for v in achadas:
             stats["lidas"] += 1
-            if v["id"] in vagas or v["id"] in conhecidos or v["id"] in vistas_agora:
+            if v["id"] in vagas or v["id"] in conhecidos or v["id"] in vistas_agora or url_canon(v.get("url")) in conhecidos:
                 continue
             vistas_agora.add(v["id"])
             if ja_registrada(v, blobs):
@@ -486,7 +546,7 @@ def coletar(ctx, force=False, fontes=None):
                 filtro["descricao"] = filtro.get("descricao", 0) + 1
                 vagas[v["id"]] = {"status": "filtrada", "motivo": md, "titulo": v["titulo"][:80], "visto_em": _stamp()}
                 continue
-        if _gemea(v) in gemeas:   # same company + title under another id (after the real filters)
+        if _gemea(v) in gemeas or gemea_de(v, assin):   # same company + title under another id (after the real filters)
             filtro["duplicada"] = filtro.get("duplicada", 0) + 1
             vagas[v["id"]] = {"status": "filtrada", "motivo": "duplicada", "visto_em": _stamp()}
             continue
@@ -494,6 +554,7 @@ def coletar(ctx, force=False, fontes=None):
         v.update(status="nova", ofertas=0, visto_em=_stamp())
         vagas[v["id"]] = v
         gemeas.add(_gemea(v))
+        assin.append(_assinatura(v) or ("", frozenset()))
         stats["novas"] += 1
     # Forget filtered/closed ids after 21 days so the file does not grow forever.
     limite = (agora() - timedelta(days=21)).isoformat()
@@ -624,7 +685,7 @@ def marcar(ctx, log=None):
             if motivo and registrar_descarte(ctx, v, motivo):
                 v["status"], v["motivo"], descartadas = "processada", "descartada: " + motivo, descartadas + 1
                 continue
-        if k in conhecidos or ja_registrada(v, blobs):
+        if k in conhecidos or url_canon(v.get("url")) in conhecidos or ja_registrada(v, blobs):
             v["status"], fechadas = "processada", fechadas + 1
         elif int(v.get("ofertas", 0)) >= int(ctx.cfg["max_ofertas"]) or \
                 int(v.get("mostrada", 0)) >= int(ctx.cfg["max_mostrada"]):
