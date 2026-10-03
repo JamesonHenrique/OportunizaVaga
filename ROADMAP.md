@@ -53,7 +53,9 @@ Discussions do repositório.
       logística, educação, industrial e comercial.
 - [ ] **Relatório de funil** exportável (aplicadas → convites → entrevistas).
 - [x] Cobertura de testes dos adaptadores (URL montada por `site_url_busca`).
-- [ ] Testes Pester para `Expand-PerfilPlaceholders` (`loop.ps1`) e o filtro de sites do `dry-run.ps1`.
+- [x] Testes Pester para `Expand-PerfilPlaceholders` (`loop.ps1`) e o filtro de sites do `dry-run.ps1`
+      ([`tests/loop.Tests.ps1`](tests/loop.Tests.ps1) e [`tests/sites.Tests.ps1`](tests/sites.Tests.ps1),
+      31 testes; o segundo roda o bash de verdade e compara a URL dos dois espelhos).
 - [x] **`bot/loop.ps1`**: watchdog de stall/early-abort mid-rodada portado do `loop.sh`
       (`Get-ProviderError` + poll do log da rodada em `Invoke-ModelRound`); a leitura do log
       interno do opencode é fail-open (sem log, só age o critério de stall).
