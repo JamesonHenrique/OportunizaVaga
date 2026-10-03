@@ -1,0 +1,27 @@
+{
+  "_COMO_USAR": "Exemplo de perfil. Copie para bot/perfil.json e ajuste niveis/area/termos/pular_tipos ao SEU caso. Este arquivo de exemplo NUNCA vai ao git com dados reais.",
+  "nome_perfil": "pleno-dados-exemplo",
+  "niveis": [
+    "pleno",
+    "senior"
+  ],
+  "area": "tecnologia (dados e BI)",
+  "modelos": [
+    "remoto"
+  ],
+  "experiencia_max_anos": 6,
+  "termos": [
+    "cientista de dados pleno remoto",
+    "engenheiro de dados pleno remoto",
+    "analista de dados pleno remoto",
+    "analista de bi remoto",
+    "data analyst pleno home office"
+  ],
+  "pular_tipos": [
+    "engenharia de software",
+    "infraestrutura",
+    "devops",
+    "estatística acadêmica",
+    "exclusiva PCD"
+  ]
+}

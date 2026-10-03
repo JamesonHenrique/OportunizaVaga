@@ -179,7 +179,19 @@ b) RODÍZIO DE SITES: veja rodizio.proximo no RESUMO DO ESTADO. Use EXATAMENTE 1
    - remotar: https://remotar.com.br
 <!--/se-->
 <!--se:site=infojobs-->
-   - infojobs: https://www.infojobs.com.br/empregos.aspx?palabra=TERMO (aplique o FILTRO DE MODELO)
+   - infojobs: https://www.infojobs.com.br/vagas-de-emprego-TERMO (o .aspx é o path canônico; a busca
+     não tem filtro de remoto — só aceite vaga que diga Remoto/Teletrabalho no card ou na página)
+<!--/se-->
+<!--se:site=catho-->
+   - catho: https://www.catho.com.br/vagas/TERMO/ (termo com hífens; o filtro Home Office fica na
+     tela, em Modalidade — a URL não muda, então marque a caixa e confira o selo no card)
+<!--/se-->
+<!--se:site=solides-->
+   - solides: https://vagas.solides.com.br/vagas/TERMO (termo com hífens; modal no card/descrição)
+<!--/se-->
+<!--se:site=trampos-->
+   - trampos: https://trampos.co/oportunidades/?tr=TERMO (o domínio antigo .com.br está fora;
+     selo Home office no card, sem filtro de remoto na URL)
 <!--/se-->
 <!--se:site=vagas-->
    - vagas: https://www.vagas.com.br/vagas-de-TERMO (termo com hífens; aplique o FILTRO DE MODELO)

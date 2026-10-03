@@ -32,25 +32,30 @@ assert doc.get('candidaturas_enviadas') == 0, 'candidaturas_enviadas != 0'
 PYEOF
 }
 
-# 1 — dry-run global: 6 sites, estado default e nenhuma escrita.
+# 1 — dry-run global: um site por adaptador, estado default e nenhuma escrita.
+# O numero vem da arvore, nunca fixo: um adaptador novo tem que entrar no plano sem
+# ninguem editar este teste (foi assim que os 4 generalistas novos quebraram o "6").
+N_SITES=$(find bot/sites -maxdepth 1 -name '*.sh' ! -name '_template.sh' ! -name 'lib.sh' | wc -l)
 TMP1="$(mktemp)"
 if ./bot/dry-run.sh --json >"$TMP1" 2>&1; then
-  if check_json "$TMP1" && python3 - "$TMP1" <<'PYEOF'
+  if check_json "$TMP1" && python3 - "$TMP1" "$N_SITES" <<'PYEOF'
 import json, sys
 doc = json.load(open(sys.argv[1], encoding='utf-8'))
+esperado = int(sys.argv[2])
 assert doc.get('global') is True, 'global != true'
-assert doc.get('site_count') == 6, 'site_count != 6'
+assert doc.get('site_count') == esperado, f"site_count != {esperado}"
+assert len(doc.get('sites', [])) == esperado, f"sites != {esperado}"
 assert doc.get('perfil', {}).get('slug') == 'default', 'perfil.slug != default'
 assert doc.get('estado', {}).get('isolado') is False, 'estado.isolado != false'
 PYEOF
   then
-    relata 0 "dry-run global lista 6 sites sem browser"
+    relata 0 "dry-run global lista $N_SITES sites sem browser"
   else
-    relata 1 "dry-run global lista 6 sites sem browser"
+    relata 1 "dry-run global lista $N_SITES sites sem browser"
   fi
 else
   cat "$TMP1" >&2
-  relata 1 "dry-run global lista 6 sites sem browser"
+  relata 1 "dry-run global lista $N_SITES sites sem browser"
 fi
 rm -f "$TMP1"
 

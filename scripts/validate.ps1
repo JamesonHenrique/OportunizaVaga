@@ -11,19 +11,30 @@ $ErrorActionPreference = 'Stop'
 $BOT_ROOT = Split-Path -Parent $PSScriptRoot
 Set-Location $BOT_ROOT
 
+# Separador de diretorio: o espelho tambem roda em pwsh do Linux (dev e CI local),
+# entao converte os caminhos escritos com \ para a barra nativa do host.
+$SEP = [System.IO.Path]::DirectorySeparatorChar
+function P {
+    param([string]$Path)
+    if ($SEP -eq '\') { return $Path }
+    return $Path.Replace('\', $SEP)
+}
+
 $pairs = @(
-    @('examples\dados_candidato.example.json', 'config\dados_candidato.schema.json', $true),
-    @('examples\aplicadas.example.json', 'config\aplicadas.schema.json', $true),
-    @('bot\dados_candidato.json', 'config\dados_candidato.schema.json', $false),
-    @('bot\aplicadas.json', 'config\aplicadas.schema.json', $false),
-    @('bot\perfil.json', 'config\perfil.schema.json', $false)
+    @((P 'examples\dados_candidato.example.json'), (P 'config\dados_candidato.schema.json'), $true),
+    @((P 'examples\aplicadas.example.json'), (P 'config\aplicadas.schema.json'), $true),
+    @((P 'bot\dados_candidato.json'), (P 'config\dados_candidato.schema.json'), $false),
+    @((P 'bot\aplicadas.json'), (P 'config\aplicadas.schema.json'), $false),
+    @((P 'bot\perfil.json'), (P 'config\perfil.schema.json'), $false)
 )
 
-foreach ($perfil in (Get-ChildItem (Join-Path $BOT_ROOT 'config\perfis') -Filter '*.example.json' -ErrorAction SilentlyContinue)) {
-    $pairs += ,@(("config\perfis\{0}" -f $perfil.Name), 'config\perfil.schema.json', $true)
+$perfisDir = Join-Path $BOT_ROOT (P 'config\perfis')
+foreach ($perfil in (Get-ChildItem $perfisDir -Filter '*.example.json' -ErrorAction SilentlyContinue)) {
+    $pairs += ,@((P ("config\perfis\{0}" -f $perfil.Name)), (P 'config\perfil.schema.json'), $true)
 }
-foreach ($estado in (Get-ChildItem (Join-Path $BOT_ROOT 'bot\state') -Filter 'aplicadas.json' -Recurse -ErrorAction SilentlyContinue)) {
-    $pairs += ,@($estado.FullName, 'config\aplicadas.schema.json', $false)
+$stateDir = Join-Path $BOT_ROOT (P 'bot\state')
+foreach ($estado in (Get-ChildItem $stateDir -Filter 'aplicadas.json' -Recurse -ErrorAction SilentlyContinue)) {
+    $pairs += ,@($estado.FullName, (P 'config\aplicadas.schema.json'), $false)
 }
 
 $check = @()

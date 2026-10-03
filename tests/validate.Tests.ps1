@@ -64,9 +64,13 @@ Describe 'dry-run.ps1' {
         $obj.ok | Should -Be $true
         $obj.dry_run | Should -Be $true
         $obj.global | Should -Be $true
-        $obj.site_count | Should -Be 6
         $obj.perfil.slug | Should -Be 'default'
         $obj.estado.isolado | Should -Be $false
+        # Nao fixar o numero: contar a arvore e o que garante que um adapter novo entre no plano.
+        $adaptadores = @(Get-ChildItem (Join-Path $RepoRoot 'bot\sites') -Filter '*.sh' |
+            Where-Object { $_.Name -notin @('_template.sh', 'lib.sh') })
+        $adaptadores.Count | Should -BeGreaterThan 0
+        $obj.site_count | Should -Be $adaptadores.Count
     }
 
     It '-Profile cria slug e estado isolado a partir do nome do perfil' {
@@ -85,7 +89,8 @@ Describe 'dry-run.ps1' {
             $obj = ($saida | Out-String) | ConvertFrom-Json
             $obj.perfil.slug | Should -Be 'frontend-teste'
             $obj.estado.isolado | Should -Be $true
-            $obj.estado.diretorio | Should -BeLike '*state\frontend-teste'
+            # Separador agnostico: o mesmo arquivo roda no CI Windows e no Linux/pwsh de dev.
+            $obj.estado.diretorio | Should -Match 'state[\\/]frontend-teste$'
         }
         finally {
             Remove-Item $tmp -Force -ErrorAction SilentlyContinue

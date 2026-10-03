@@ -14,14 +14,14 @@
 # sem tentar reconverter fuso no Windows.
 #
 # Diferencas assumidas vs loop.sh (simplificacoes documentadas):
-# - Watchdog simplificado: Start-Job + Wait-Job com timeout por modelo
-#   (RUN_TIMEOUT). O .sh inspeciona o log interno do opencode para matar rodada
-#   travada em quota antes do timeout (early-abort) E tambem aborta se a saida
-#   ficar parada por WATCHDOG_STALL segundos no MEIO da rodada (quota que bate
-#   depois de ja ter comecado); aqui nao ha OC_LOG_DIR no Windows e o Start-Job
-#   atual so espera o job inteiro (sem poll incremental do log), entao rodada
-#   presa em retry silencioso morre no timeout cheio nos dois casos. GAP
-#   documentado (nao portado): watchdog de stall/early-abort mid-rodada.
+# - Watchdog de stall/early-abort mid-rodada PORTADO (Get-ProviderError + poll em
+#   Invoke-ModelRound): aborta cedo quando ha erro do provider e a rodada nao produziu saida
+#   (ainda no comeco, ou parada ha WATCHDOG_STALL s), e quando a saida some por WATCHDOG_HANG s
+#   (ferramenta travada, que o loop repete no mesmo modelo uma vez). O loop.sh le o log interno
+#   do opencode; aqui a leitura e espelhada em Get-ProviderError, com fallback para
+#   %LOCALAPPDATA%\opencode\log e $env:OC_LOG_DIR, fail-open (sem log, so o criterio de stall age).
+#   O job grava a saida incremental no log da rodada (StreamWriter com AutoFlush) para que o poll
+#   veja o arquivo crescer; antes o log so era escrito no fim e o stall no meio era invisivel.
 # - Lock via arquivo .lock com tentativa exclusiva ([IO.File]::Open,
 #   FileShare::None) em vez de flock(1). Segunda instancia sai calada (exit 0),
 #   como no .sh.
@@ -34,8 +34,7 @@
 # - Tambem espelhados: teto do backoff de rodada vazia (OV_VAZIA_MAX), impressao
 #   digital por chaves, filtro de modelos que o opencode nao lista mais, sessao
 #   morta apos erro de ferramenta, descoberta deterministica (OV_DESCOBRIR=1),
-#   modelo pago opt-in, validate-rodada apos a rodada. NAO portado (so Linux): o
-#   filtro do log interno do opencode por diretorio (parte do watchdog acima).
+#   modelo pago opt-in, validate-rodada apos a rodada.
 
 [CmdletBinding()]
 param()
@@ -92,8 +91,18 @@ if (Test-Path $CronEnv) {
 
 # Ritmo (pacing) — configuravel por env (defaults preservam o comportamento).
 # Ver docs/USO-ETICO.md e config/pacing.example.env.
-function EnvInt($name, $def) { if ($env:$name) { return [int]$env:$name } else { return $def } }
+function EnvInt($name, $def) { $v = [Environment]::GetEnvironmentVariable($name); if ($v) { return [int]$v } else { return $def } }
 $RUN_TIMEOUT_SEC = EnvInt 'OV_RUN_TIMEOUT_SEC' 1200   # 20m, igual ao RUN_TIMEOUT do loop.sh
+# Watchdog de stall/early-abort (espelho de WATCHDOG_* no loop.sh).
+# Em rate limit o opencode trava calado e a rodada so morreria no timeout de 20min.
+# Aborta cedo em tres casos: (1) erro do provider e a rodada nao produziu nada ainda;
+# (2) erro do provider no MEIO da rodada com a saida parada ha WATCHDOG_STALL s;
+# (3) nenhuma saida por WATCHDOG_HANG s (ferramenta travada, ex.: upload que nunca volta).
+$WATCHDOG_MIN_WAIT = EnvInt 'OV_WATCHDOG_MIN_WAIT' 45  # antes disso nao aborta: rodada boa demora a produzir saida
+$WATCHDOG_STALL = EnvInt 'OV_WATCHDOG_STALL' 90        # erro do provider + saida parada ha Ns -> aborta e cascateia
+$WATCHDOG_MIN_BYTES = EnvInt 'OV_WATCHDOG_MIN_BYTES' 800  # rodada que produziu menos que isso nao comecou
+$WATCHDOG_HANG = EnvInt 'OV_WATCHDOG_HANG' 360         # 6min sem nenhuma saida = ferramenta travada -> aborta
+$WATCHDOG_STEP = 15                                      # checagem de 15 em 15s, como no loop.sh
 $RETRY_BASE = EnvInt 'OV_RETRY_BASE' 300              # backoff exponencial: 5min, 10min, 20min, teto 30min
 $RETRY_MAX = EnvInt 'OV_RETRY_MAX' 1800
 $QUOTA_STEPS = @(900, 1800, 3600)  # quota: 15min -> 30min -> 1h, reseta ao dar certo
@@ -321,6 +330,71 @@ function Test-BrokenSession([string]$file) {
     return ($null -ne $hit)
 }
 
+# Erro do provider no log interno do opencode: 'quota' | 'transitorio' | '' (vazio = nada).
+# Espelho de bot/lib/opencode-erros.sh (erro_opencode_log). O opencode NAO imprime rate limit no
+# stdout quando entra em retry silencioso: o erro so existe no log interno. Sem essa leitura, um
+# 503 punha o melhor modelo em resfriamento de 1h e a cascata caia para modelos mais fracos.
+# O log e compartilhado por todo agente da maquina: so contam as linhas cujo run nasceu em $Dir.
+# Fail-open: sem log (path diferente, versao nova do opencode) devolve '' e o watchdog so age
+# pelo criterio de stall, que nao depende deste log.
+function Get-ProviderError([datetime]$since, [string]$dir) {
+    $logDir = $env:OC_LOG_DIR
+    if ([string]::IsNullOrWhiteSpace($logDir)) {
+        $cands = @(
+            (Join-Path $env:LOCALAPPDATA 'opencode\log'),
+            (Join-Path $env:USERPROFILE '.local\share\opencode\log')
+        )
+        $logDir = $cands | Where-Object { Test-Path $_ } | Select-Object -First 1
+    }
+    if ([string]::IsNullOrWhiteSpace($logDir) -or -not (Test-Path $logDir)) { return '' }
+    try {
+        $f = Get-ChildItem -Path $logDir -Filter '*.log' -File -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if (-not $f) { return '' }
+        # ultimos 8MB do log, como o tail -c 8000000 do .sh
+        $fs = [System.IO.File]::Open($f.FullName, 'Open', 'Read', 'ReadWrite')
+        try {
+            $take = [Math]::Min(8000000, $fs.Length)
+            $null = $fs.Seek(-$take, 'End')
+            $buf = New-Object byte[] $take
+            $null = $fs.Read($buf, 0, $take)
+            $text = [System.Text.Encoding]::UTF8.GetString($buf)
+        } finally { $fs.Close() }
+    } catch { return '' }
+
+    $quota = $false
+    $transitorio = $false
+    $meusRuns = New-Object System.Collections.ArrayList
+    foreach ($line in ($text -split "`r?`n")) {
+        if ($line -match 'message="creating instance"') {
+            $run = $null
+            if ($line -match 'run=([0-9a-f]+)') { $run = $Matches[1] }
+            # directory=<dir> sem barra logo depois: evita casar com subpasta
+            if ($run -and $line -match ('directory=' + [regex]::Escape($dir) + '(?!\\)')) {
+                [void]$meusRuns.Add($run)
+            }
+            continue
+        }
+        if ($line -notmatch 'level=ERROR') { continue }
+        if ($line -notmatch 'run=([0-9a-f]+)') { continue }
+        $run = $Matches[1]
+        if (-not $meusRuns.Contains($run)) { continue }
+        if ($line -notmatch 'timestamp=([0-9T:.\-]+Z)') { continue }
+        $ts = [datetime]::MinValue
+        if (-not [datetime]::TryParse($Matches[1], [ref]$ts)) { continue }
+        if ($ts.ToUniversalTime() -lt $since.ToUniversalTime()) { continue }
+        if ($line -match 'Rate limit exceeded|[Tt]oo [Mm]any [Rr]equests|429|[Qq]uota|[Ee]xhausted|RateLimitError') {
+            $quota = $true
+        }
+        elseif ($line -match 'Service Unavailable|Bad Gateway|Gateway Timeout|Internal Server Error|50[0234]|[Oo]verloaded|HeaderTimeout|ETIMEDOUT|ECONNRESET|socket hang up') {
+            $transitorio = $true
+        }
+    }
+    if ($quota) { return 'quota' }
+    if ($transitorio) { return 'transitorio' }
+    return ''
+}
+
 # Impressao digital do estado: hash de toda CHAVE de vaga registrada (aplicadas, bloqueados,
 # quase_la, aguardando_login). Descartes de listagem NAO contam como novidade.
 function Get-DictKeys($obj) {
@@ -503,15 +577,18 @@ function Render-Prompt {
     return $text
 }
 
-# Roda o opencode com timeout (watchdog simplificado via Start-Job + Wait-Job).
-# Retorna hashtable @{ Status = <int>; TimedOut = <bool> }.
+# Roda o opencode com timeout e watchdog de stall (espelho de loop.sh).
+# O job grava a saida em $roundLog de forma incremental (Out-File -Append dentro do job), e aqui
+# o laco principal faz poll do arquivo a cada $WATCHDOG_STEP s. Antes o Start-Job so escrevia o
+# log no fim, entao nao dava para saber se a rodada travava no meio.
+# Retorna @{ Status = <int>; TimedOut = <bool>; Travou = <int> } (Travou = segundos parado, 0 se nao travou).
 function Invoke-ModelRound([string]$modelo, [string]$prompt, [string]$roundLog) {
     $title = 'candidaturas-{0}' -f (Get-Date).ToString('yyyy-MM-dd-HHmm')
     # Protocolo unico do Chrome compartilhado (bot/chrome-lock.ps1, espelho de chrome-lock.sh):
     # espera ate 900s; cede a vez a job prioritario (flag). Ambos viram 75 = "Chrome ocupado".
     $env:CHROME_LOCK_FILE = $BROWSER_LOCK
     $chromeLock = Enter-ChromeLock -Name 'loop' -Prio 'normal' -WaitSeconds 900
-    if ($chromeLock.Status -ne 0) { return @{ Status = 75; TimedOut = $false } }
+    if ($chromeLock.Status -ne 0) { return @{ Status = 75; TimedOut = $false; Travou = 0 } }
     # Config enxuta: OV_OPENCODE_CONFIG_CONTENT (explicito) > bot/opencode-enxuto.py (le a SUA config do opencode;
     # OV_OPENCODE_ENXUTO=1 liga (desligado por padrão)) > nada. Fail-open: sem saida = config do opencode intacta.
     $ocCfg = $OV_OPENCODE_CONFIG_CONTENT
@@ -519,24 +596,61 @@ function Invoke-ModelRound([string]$modelo, [string]$prompt, [string]$roundLog) 
         try { $ocCfg = (& $Py (Join-Path $BOT_ROOT 'bot\opencode-enxuto.py') 2>$null) -join '' } catch { $ocCfg = '' }
     }
     try {
+Remove-Item $roundLog -ErrorAction SilentlyContinue
         $job = Start-Job -ScriptBlock {
-            param($bin, $mod, $ttl, $pr, $cfg)
+            param($bin, $mod, $ttl, $pr, $cfg, $log)
             if ($cfg) { $env:OPENCODE_CONFIG_CONTENT = $cfg }
-            & $bin run -m $mod --title $ttl $pr 2>&1
-        } -ArgumentList $OpencodeBin, $modelo, $title, $prompt, $ocCfg
-        $done = Wait-Job -Job $job -Timeout $RUN_TIMEOUT_SEC
-        if ($done) {
-            $out = Receive-Job -Job $job
-            $out | Out-File -FilePath $roundLog -Encoding utf8
-            Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
-            if ($job.State -eq 'Failed') { return @{ Status = 1; TimedOut = $false } }
-            return @{ Status = 0; TimedOut = $false }
-        } else {
-            Stop-Job -Job $job -ErrorAction SilentlyContinue
-            Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
-            Add-Content -Path $roundLog -Value ("rodada excedeu o timeout de {0}s e foi abortada" -f $RUN_TIMEOUT_SEC)
-            return @{ Status = 124; TimedOut = $true }
+            # StreamWriter com AutoFlush: o poll do watchdog ve o arquivo crescer enquanto a rodada
+            # roda. Add-Content por linha abriria/fecharia o arquivo a cada linha.
+            $sw = New-Object System.IO.StreamWriter($log, $false, [System.Text.Encoding]::UTF8)
+            $sw.AutoFlush = $true
+            try {
+                & $bin run -m $mod --title $ttl $pr 2>&1 | ForEach-Object {
+                    $sw.WriteLine("{0}" -f $_)
+                }
+            } finally {
+                $sw.Close()
+            }
+        } -ArgumentList $OpencodeBin, $modelo, $title, $prompt, $ocCfg, $roundLog
+
+        $roundStart = (Get-Date).ToUniversalTime()
+        $esperado = 0
+        $ultimoTam = 0
+        $parado = 0
+        while ($true) {
+            if (Wait-Job -Job $job -Timeout $WATCHDOG_STEP) { break }
+            $esperado += $WATCHDOG_STEP
+            if ($esperado -ge $RUN_TIMEOUT_SEC) {
+                Stop-Job -Job $job -ErrorAction SilentlyContinue
+                Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+                Add-Content -Path $roundLog -Value ("rodada excedeu o timeout de {0}s e foi abortada" -f $RUN_TIMEOUT_SEC) -Encoding utf8
+                return @{ Status = 124; TimedOut = $true; Travou = 0 }
+            }
+            $tam = 0
+            if (Test-Path $roundLog) { $tam = (Get-Item $roundLog).Length }
+            if ($tam -eq $ultimoTam) { $parado += $WATCHDOG_STEP } else { $parado = 0; $ultimoTam = $tam }
+            if ($esperado -lt $WATCHDOG_MIN_WAIT) { continue }
+            # qualquer erro do provider (cota OU transitorio) + sem saida = travado: aborta e cascateia
+            $erroProv = Get-ProviderError -since $roundStart -dir (Get-Location).Path
+            if ($erroProv -and ($tam -lt $WATCHDOG_MIN_BYTES -or $parado -ge $WATCHDOG_STALL)) {
+                Add-Content -Path $roundLog -Value ("watchdog: erro do provider ($erroProv) com a saida parada ha {0}s, rodada abortada" -f $parado) -Encoding utf8
+                Stop-Job -Job $job -ErrorAction SilentlyContinue
+                Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+                return @{ Status = 1; TimedOut = $false; Travou = 0 }
+            }
+            # nenhuma saida por WATCHDOG_HANG s e sem erro do provider = ferramenta travada
+            if ($parado -ge $WATCHDOG_HANG) {
+                Add-Content -Path $roundLog -Value ("watchdog: nenhuma saida por {0}s (ferramenta travada), rodada abortada" -f $parado) -Encoding utf8
+                Stop-Job -Job $job -ErrorAction SilentlyContinue
+                Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+                return @{ Status = 1; TimedOut = $false; Travou = $parado }
+            }
         }
+        $null = Receive-Job -Job $job   # escoa a saida que sobrou no job (o log ja foi escrito no append)
+        $failed = ($job.State -eq 'Failed')
+        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+        if ($failed) { return @{ Status = 1; TimedOut = $false; Travou = 0 } }
+        return @{ Status = 0; TimedOut = $false; Travou = 0 }
     } finally {
         Exit-ChromeLock $chromeLock
     }
@@ -649,9 +763,18 @@ while ($true) {
         Write-LoopLog ("cascata sem {0} modelo(s) em resfriamento" -f ($modelosOrd.Count - $cascata.Count))
     }
 
+    # Espelho de loop.sh: $REPETIU garante UMA repeticao do MESMO modelo (erro transitorio do
+    # provider ou rodada travada) sem poder entrar em laco com o mesmo modelo.
+    $REPETIU = ''
     foreach ($MODELO in $cascata) {
         $res = Invoke-ModelRound $MODELO $prompt $ROUND_LOG
         $STATUS = $res.Status
+        # Rodada travada (ferramenta que nunca volta): repete o MESMO modelo uma vez, sem resfriamento.
+        if ($res.Travou -gt 0 -and $REPETIU -ne $MODELO -and $STATUS -ne 75) {
+            $REPETIU = $MODELO
+            Write-LoopLog ("modelo {0}: rodada sem saida por {1}s (ferramenta travada), repetindo com o mesmo modelo" -f $MODELO, $res.Travou)
+            continue
+        }
         if (Test-IsQuota $ROUND_LOG) {
             Write-LoopLog ("modelo {0} no limite, cascateando para o proximo" -f $MODELO)
             try {

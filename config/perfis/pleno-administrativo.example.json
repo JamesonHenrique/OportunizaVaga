@@ -1,0 +1,28 @@
+{
+  "_COMO_USAR": "Exemplo de perfil. Copie para bot/perfil.json e ajuste niveis/area/termos/pular_tipos ao SEU caso. Este arquivo de exemplo NUNCA vai ao git com dados reais.",
+  "nome_perfil": "pleno-administrativo-exemplo",
+  "niveis": [
+    "pleno"
+  ],
+  "area": "administrativo e financeiro",
+  "modelos": [
+    "remoto",
+    "hibrido"
+  ],
+  "cidades": [
+    "Natal/RN"
+  ],
+  "termos": [
+    "assistente administrativo pleno remoto",
+    "analista administrativo pleno",
+    "analista de contas a pagar remoto",
+    "analista de cobrança remoto",
+    "auxiliar administrativo home office"
+  ],
+  "pular_tipos": [
+    "telemarketing",
+    "cobrança comissionada",
+    "call center",
+    "exclusiva PCD"
+  ]
+}

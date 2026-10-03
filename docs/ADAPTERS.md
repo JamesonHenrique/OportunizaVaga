@@ -27,12 +27,20 @@ Base para copiar: [`bot/sites/_template.sh`](../bot/sites/_template.sh).
 | `SITE_LABEL` | — | nome amigável para logs/monitor |
 | `SITE_HOME` | — | home do portal (só documentação, nunca aberta sozinha) |
 | `SITE_REMOTE_HINT` | — | como o portal expõe "remoto"/"home office" |
+| `SEARCH_ENCODING` | — | como o termo entra na URL: `hifen` (slug de path) ou `pct20` (query, padrão) |
 | `site_url_busca TERMO` | ✅ | imprime a URL de busca com o termo aplicado |
 | `site_buscar_termos [PROMPT]` | ✅ | imprime, um por linha, os termos do site no `prompt_loop.md` |
 
 O `lib.sh` injeta uma implementação padrão de `site_buscar_termos`: cada
 adaptador só precisa declarar as variáveis do contrato; se quiser um parser
 próprio, pode sobrescrever a função depois do `source`.
+
+`SEARCH_ENCODING` existe só porque o espelho Windows ([`bot/dry-run.ps1`](../bot/dry-run.ps1))
+não tem bash para chamar `site_url_busca` e reconstrói a URL lendo o `.sh`. Sem a
+variável ele assume `pct20`. Declare **sempre que o portal não aceitar `%20`**:
+os slugs de path (`catho`, `solides`, `vagas`) usam `hifen`. Manter a variável e
+a função em sintonia é obrigatório — [`tests/test_sites.sh`](../tests/test_sites.sh)
+compara a URL montada com a tabela do fim deste arquivo.
 
 ### Regras (o CI cobra)
 
@@ -53,8 +61,8 @@ $EDITOR bot/sites/meuportal.sh          # ajuste SITE_ID, SEARCH_URL_TEMPLATE, d
 2. **`SEARCH_URL_TEMPLATE`**: abra o portal, faça uma busca com filtro **remoto** e
    ordenação por **mais recentes**, e copie a URL trocando seu termo por `SEU_TERMO`.
 3. **`site_url_busca`**: já vem pronto no template (troca espaços por `%20`); se o
-   portal usa hífen no path (como Vagas.com.br), troque por `-` — veja
-   [`bot/sites/vagas.sh`](../bot/sites/vagas.sh).
+   portal usa hífen no path (como Vagas.com.br), troque por `-` **e** declare
+   `SEARCH_ENCODING="hifen"` — veja [`bot/sites/vagas.sh`](../bot/sites/vagas.sh).
 4. **Termos**: por padrão o portal usa os `termos[]` do perfil. Só se o site precisar de termos
    próprios, adicione um bloco `- meuportal:` com termos entre aspas no `bot/prompt_loop.md`, dentro de
    `<!--se:site=meuportal-->…<!--/se-->` (o `render_prompt` só mantém o bloco do site da rodada; ver `docs/PROMPTS.md`).
@@ -86,6 +94,15 @@ site_buscar_termos                                   # confere os termos lidos d
 | [`programathor.sh`](../bot/sites/programathor.sh) | Programathor | só vagas de tech |
 | [`geekhunter.sh`](../bot/sites/geekhunter.sh) | GeekHunter | exige perfil; fluxo parcial manual |
 | [`vagas.sh`](../bot/sites/vagas.sh) | Vagas.com.br | termo com hífen no path |
+| [`catho.sh`](../bot/sites/catho.sh) | Catho | termo com hífen; Home Office é caixa de seleção na tela |
+| [`infojobs.sh`](../bot/sites/infojobs.sh) | InfoJobs | path `.aspx`; a busca **não** tem facet de remoto |
+| [`solides.sh`](../bot/sites/solides.sh) | Sólides Vagas | portal em `vagas.solides.com.br` (o `www` é institucional) |
+| [`trampos.sh`](../bot/sites/trampos.sh) | Trampos | `trampos.co` — o `.com.br` antigo saiu do ar |
 
-Quer outro portal (Catho, Trampos, Revelo, InfoJobs, Solides…)? Copie o template,
-abra um PR e ganhe seu lugar nesta tabela. Veja [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+O contrato de cada um é testado em [`tests/test_sites.sh`](../tests/test_sites.sh), que
+compara a URL montada com a tabela acima: adapter com placeholder trocado ou path errado
+quebra o CI.
+
+Quer outro portal (Revelo, 99jobs, Trabalhabrasil, Catho→InfoJobs extras…)? Copie o
+template, abra um PR e ganhe seu lugar nesta tabela. Veja
+[`CONTRIBUTING.md`](../CONTRIBUTING.md).

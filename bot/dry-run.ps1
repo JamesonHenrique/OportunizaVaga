@@ -130,9 +130,14 @@ foreach ($file in (Get-ChildItem $adapterDir -Filter '*.sh' | Sort-Object Name))
     $siteHome = [regex]::Match($text, 'SITE_HOME="([^"]+)"').Groups[1].Value
     $template = [regex]::Match($text, 'SEARCH_URL_TEMPLATE="([^"]+)"').Groups[1].Value
     if ([string]::IsNullOrWhiteSpace($template)) { throw "adaptador invalido: $siteId (sem SEARCH_URL_TEMPLATE)" }
+    if ($template -notlike '*SEU_TERMO*') { throw "adaptador invalido: $siteId (SEARCH_URL_TEMPLATE sem marcador SEU_TERMO)" }
     $term = [string]@($PerfilDoc.termos)[0]
-    $encoded = if ($template -like '*vagas-de-*') { $term.Replace(' ', '-') } else { $term.Replace(' ', '%20') }
-    $url = $template.Replace('SEU_TERMO', $encoded)
+    # Como o termo entra na URL. Chamar site_url_busca exigiria bash (ausente no Windows), entao
+    # lemos SEARCH_ENCODING do adaptador (contrato em docs/ADAPTERS.md). Sem a declaracao cai em %20,
+    # que e o que a maioria dos portais aceita. O .sh continua sendo o canonico da URL.
+    $encoding = [regex]::Match($text, 'SEARCH_ENCODING="([^"]+)"').Groups[1].Value
+    $url = if ($encoding -eq 'hifen') { $template.Replace('SEU_TERMO', $term.Replace(' ', '-')) }
+           else { $template.Replace('SEU_TERMO', $term.Replace(' ', '%20')) }
     [void]$Sites.Add([ordered]@{
         pulado_pelo_perfil = ($SitesPular -contains $siteId)
         site_id = $siteId
