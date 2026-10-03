@@ -1,3 +1,4 @@
+#!/bin/bash
 # bot/lib/opencode-erros.sh — provider error of ONE robot's opencode runs: "quota", "transitorio" or nothing.
 #   erro_opencode_log SINCE_ISO [DIR]   DIR = working directory of the runs to consider (default $BASE)
 # The opencode log is shared by every agent on the machine: only runs whose instance started in DIR count.
