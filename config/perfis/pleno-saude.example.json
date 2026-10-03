@@ -1,0 +1,29 @@
+{
+  "_COMO_USAR": "Exemplo de perfil. Copie para bot/perfil.json e ajuste niveis/area/termos/pular_tipos ao SEU caso. Este arquivo de exemplo NUNCA vai ao git com dados reais.",
+  "nome_perfil": "pleno-saude-exemplo",
+  "niveis": [
+    "pleno",
+    "especialista"
+  ],
+  "area": "saúde (enfermagem, nutrição e fisioterapia)",
+  "modelos": [
+    "remoto",
+    "hibrido"
+  ],
+  "cidades": [
+    "Natal/RN"
+  ],
+  "termos": [
+    "enfermeiro pleno remoto",
+    "fisioterapeuta pleno remoto",
+    "nutricionista pleno remoto",
+    "psicólogo pleno remoto",
+    "analista de qualidade em saúde"
+  ],
+  "pular_tipos": [
+    "plantão presencial obrigatório",
+    "registro profissional em outro estado",
+    "exclusiva PCD",
+    "comissão por atendimento"
+  ]
+}

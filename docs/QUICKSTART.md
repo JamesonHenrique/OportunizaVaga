@@ -11,9 +11,10 @@
   Linux dentro do WSL. O Chrome pode ficar no Windows (CDP em `:9222`) ou no WSL.
 - **Windows — opção B, PowerShell nativo (alternativo):** use os espelhos `.ps1`
   (mesma lógica dos `.sh`) + Task Scheduler (`config/TaskScheduler.md`).
-  Limitações conhecidas: watchdog simplificado (sem inspeção do log interno do
-  opencode) e carimbos em hora local com offset -03:00 documentado (o Node no
-  Windows ignora TZ IANA). Detalhes no cabeçalho de `bot/loop.ps1`.
+  Limitações conhecidas: carimbos em hora local com offset -03:00 documentado (o Node no
+  Windows ignora TZ IANA). O watchdog de stall/early-abort é espelhado, mas a leitura do log
+  interno do opencode é fail-open (sem log, só vale o critério de stall). Detalhes no cabeçalho
+  de `bot/loop.ps1`.
 
 ## 1. Clone e setup
 
@@ -58,9 +59,14 @@ Exemplos em `config/perfis/` para níveis e áreas diferentes:
 | Arquivo | Níveis | Área |
 |---|---|---|
 | `junior-backend.example.json` | trainee, júnior | tecnologia (backend) |
-| `estagio-qa.example.json` | estágio, trainee | tecnologia (QA) |
+| `pleno-frontend.example.json` | pleno | tecnologia (frontend) |
+| `pleno-dados.example.json` | pleno, sênior | tecnologia (dados e BI) |
 | `senior-techlead.example.json` | sênior, especialista, líder | tecnologia (liderança técnica) |
+| `estagio-qa.example.json` | estágio, trainee | tecnologia (QA) |
 | `pleno-marketing.example.json` | pleno, sênior | marketing digital |
+| `pleno-vendas.example.json` | pleno, especialista | vendas e comercial |
+| `pleno-saude.example.json` | pleno, especialista | saúde (enfermagem, nutrição, fisioterapia) |
+| `pleno-administrativo.example.json` | pleno | administrativo e financeiro |
 | `estagio-direito.example.json` | estágio | jurídico |
 
 Estrutura: `nome_perfil`, `niveis[]`, `area`, `termos[]`, `pular_tipos[]` e, opcionais,

@@ -9,25 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: bash -n (scripts intocados + espelhos não quebram nada)
+      # Glob por git ls-files: lista escrita à mão desatualiza e o job passa a
+      # aceitar arquivo novo sem checar. Nada de hardcode aqui — a lista cresce junto.
+      - name: bash -n (toda a arvore .sh versionada)
         run: |
-          bash -n bot/loop.sh
-          bash -n bot/dry-run.sh
-          bash -n bot/guardiao.sh
-          bash -n bot/vigia-vida.sh
-          bash -n bot/followup.sh
-          bash -n bot/tg-garimpo.sh
-          bash -n scripts/validate-rodada.sh
-          bash -n bot/sites/lib.sh
-          for f in bot/sites/*.sh; do bash -n "$f"; done
-          bash -n scripts/monitor-keepalive.sh
-          bash -n scripts/pull-monitor.sh
-          bash -n scripts/setup.sh
-          bash -n scripts/sanitize.sh
-          bash -n scripts/digest.sh
-          bash -n scripts/notificar.sh
-          bash -n scripts/backup-jsons.sh
-          bash -n browser/chrome-real.sh
+          mapfile -t files < <(git ls-files '*.sh')
+          ((${#files[@]})) || { echo 'nenhum .sh versionado'; exit 1; }
+          for f in "${files[@]}"; do bash -n "$f"; done
+          echo "bash -n OK: ${#files[@]} arquivos"
       - name: shellcheck
         uses: ludeeus/action-shellcheck@2.0.0
         with:
@@ -39,63 +28,26 @@ jobs:
       - name: node --check (monitor/*.mjs)
         run: |
           for f in monitor/*.mjs; do node --check "$f"; done
-      - name: JSON válido
+      - name: JSON válido (todo .json versionado, menos lockfile)
         run: |
-          python3 -m json.tool config/sites_permitidos.json > /dev/null
-          python3 -m json.tool monitor/package.json > /dev/null
-          python3 -m json.tool monitor/vercel.json > /dev/null
-          python3 -m json.tool examples/dados_candidato.example.json > /dev/null
-          python3 -m json.tool examples/aplicadas.example.json > /dev/null
-          python3 -m json.tool config/aplicadas.schema.json > /dev/null
-      - name: python compile (bot/*.py)
+          mapfile -t files < <(git ls-files '*.json' | grep -v 'package-lock\.json$')
+          ((${#files[@]})) || { echo 'nenhum .json versionado'; exit 1; }
+          for f in "${files[@]}"; do python3 -m json.tool "$f" > /dev/null; done
+          echo "JSON OK: ${#files[@]} arquivos"
+      - name: python compile (todo .py versionado)
         run: |
-          python3 -m py_compile bot/estado.py
-          python3 -m py_compile bot/arquivar-logs-rodada.py
-          python3 -m py_compile bot/rodizio-saude.py
-          python3 -m py_compile bot/perfil_render.py
-          python3 -m py_compile bot/jsonlock.py
-          python3 -m py_compile bot/prompt_cond.py
-          python3 -m py_compile bot/redact-logs.py
-          python3 -m py_compile bot/podar-sessoes.py
-          python3 -m py_compile bot/vaga_check.py
-          python3 -m py_compile bot/modelos-saude.py
-          python3 -m py_compile bot/opencode-enxuto.py
-          python3 -m py_compile bot/canario-fontes.py
-          python3 -m py_compile bot/descobrir.py
-          python3 -m py_compile bot/gupy-status.py
-          python3 -m py_compile bot/tempo-rodada.py
-          python3 -m py_compile bot/cdp.py
-          python3 -m py_compile bot/sonda-sites.py
-          python3 -m py_compile bot/rodada-portao.py
-      - name: validate (schemas + novos .sh)
-        run: |
-          bash -n bot/dry-run.sh
-          bash -n bot/doctor.sh
-          bash -n scripts/validate.sh
-          bash -n bot/chrome-lock.sh
-          bash scripts/validate.sh
+          mapfile -t files < <(git ls-files '*.py')
+          ((${#files[@]})) || { echo 'nenhum .py versionado'; exit 1; }
+          for f in "${files[@]}"; do python3 -m py_compile "$f"; done
+          echo "py_compile OK: ${#files[@]} arquivos"
+      - name: validate (schemas)
+        run: bash scripts/validate.sh
       - name: suite bash (TAP)
         run: |
-          bash tests/test_validate.sh
-          bash tests/test_dry_run.sh
-          bash tests/test_estado.sh
-          bash tests/test_rodizio_saude.sh
-          bash tests/test_opencode_erros.sh
-          bash tests/test_perfil_render.sh
-          bash tests/test_jsonlock.sh
-          bash tests/test_prompt_cond.sh
-          bash tests/test_chrome_lock.sh
-          bash tests/test_redact_logs.sh
-          bash tests/test_podar_sessoes.sh
-          bash tests/test_ctl.sh
-          bash tests/test_descobrir.sh
-          bash tests/test_vaga_check.sh
-          bash tests/test_modelos_saude.sh
-          bash tests/test_opencode_enxuto.sh
-          bash tests/test_vigia_vida.sh
-          bash tests/test_canario_fontes.sh
-          bash tests/test_portao.sh
-          bash tests/test_gupy_status.sh
+          mapfile -t files < <(git ls-files 'tests/test_*.sh')
+          ((${#files[@]})) || { echo 'nenhum tests/test_*.sh versionado'; exit 1; }
+          for t in "${files[@]}"; do echo "== $t"; bash "$t"; done
+          echo "suite bash OK: ${#files[@]} arquivos"
       - name: node --test monitor/
         run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)
@@ -130,11 +82,20 @@ jobs:
         shell: pwsh
         run: |
           .\scripts\validate.ps1
-      - name: Pester (tests/validate.Tests.ps1)
+      - name: Pester (tests/*.Tests.ps1)
         shell: pwsh
         run: |
-          $r = Invoke-Pester -Path ./tests/validate.Tests.ps1 -PassThru
-          if ($r.FailedCount -gt 0) { exit 1 }
+          # Glob por Get-ChildItem: suite nova entra sozinha, sem editar o workflow.
+          $suites = Get-ChildItem tests/*.Tests.ps1
+          if (-not $suites) { Write-Error 'nenhum tests/*.Tests.ps1'; exit 1 }
+          $falhou = $false
+          foreach ($s in $suites) {
+            Write-Host "== $($s.Name)"
+            $r = Invoke-Pester -Path $s.FullName -PassThru
+            if ($r.FailedCount -gt 0) { $falhou = $true }
+          }
+          if ($falhou) { exit 1 }
+          Write-Host "Pester OK: $($suites.Count) suítes"
       - name: sanitize via git-bash
         shell: bash
         run: ./scripts/sanitize.sh

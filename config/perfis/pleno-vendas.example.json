@@ -1,0 +1,30 @@
+{
+  "_COMO_USAR": "Exemplo de perfil. Copie para bot/perfil.json e ajuste niveis/area/termos/pular_tipos ao SEU caso. Este arquivo de exemplo NUNCA vai ao git com dados reais.",
+  "nome_perfil": "pleno-vendas-exemplo",
+  "niveis": [
+    "pleno",
+    "especialista"
+  ],
+  "area": "vendas e comercial",
+  "modelos": [
+    "remoto",
+    "hibrido"
+  ],
+  "cidades": [
+    "Natal/RN"
+  ],
+  "termos": [
+    "analista de vendas pleno remoto",
+    "consultor de vendas pleno remoto",
+    "executivo de contas pleno remoto",
+    "pre sales pleno remoto",
+    "vendas b2b remoto"
+  ],
+  "pular_tipos": [
+    "venda porta a porta",
+    "telemarketing",
+    "comissão sem fixo",
+    "comissão por venda",
+    "exclusiva PCD"
+  ]
+}

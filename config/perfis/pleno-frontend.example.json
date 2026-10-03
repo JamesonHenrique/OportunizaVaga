@@ -1,0 +1,26 @@
+{
+  "_COMO_USAR": "Exemplo de perfil. Copie para bot/perfil.json e ajuste niveis/area/termos/pular_tipos ao SEU caso. Este arquivo de exemplo NUNCA vai ao git com dados reais.",
+  "nome_perfil": "pleno-frontend-exemplo",
+  "niveis": [
+    "pleno"
+  ],
+  "area": "tecnologia (desenvolvimento frontend)",
+  "modelos": [
+    "remoto"
+  ],
+  "experiencia_max_anos": 6,
+  "termos": [
+    "desenvolvedor frontend pleno remoto",
+    "engenheiro frontend pleno remoto",
+    "react developer pleno remoto",
+    "desenvolvedor web pleno home office"
+  ],
+  "pular_tipos": [
+    "back-end",
+    "devops",
+    "infraestrutura",
+    "dados/BI",
+    "mobile nativo",
+    "exclusiva PCD"
+  ]
+}

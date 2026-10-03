@@ -42,18 +42,21 @@ Discussions do repositório.
 
 ## Próximo
 
-- [ ] **Mais adaptadores de portal**, com prioridade para os generalistas (Catho, InfoJobs, Solides,
-      Trampos) que atendem perfis fora de tech — `good first issue`, ver [`docs/ADAPTERS.md`](docs/ADAPTERS.md).
+- [ ] **Mais adaptadores de portal**, com prioridade para os generalistas que atendem perfis fora de tech —
+      `good first issue`, ver [`docs/ADAPTERS.md`](docs/ADAPTERS.md). **Feitos: Catho, InfoJobs, Sólides e
+      Trampos** (o `trampos.com.br` antigo saiu do ar; a plataforma é `trampos.co`). Faltam Trabalhabrasil,
+      99jobs, Netvagas, Jooble, Empregos.com.br e Revelo.
 - [x] **Demo animada** no topo do README (GIF/asciinema de 1 rodada + monitor).
 - [x] **Demo ao vivo** do monitor com dados fake, linkada no README.
-- [ ] **Mais perfis prontos** em `config/perfis/` (já há backend, QA, tech lead, marketing e direito;
-      faltam frontend, dados, saúde, administrativo, vendas…).
+- [ ] **Mais perfis prontos** em `config/perfis/`. Já há: backend, QA, tech lead, marketing, direito,
+      frontend, dados, saúde, administrativo e vendas. Faltam: suporte, financeiro/contábil,
+      logística, educação, industrial e comercial.
 - [ ] **Relatório de funil** exportável (aplicadas → convites → entrevistas).
 - [x] Cobertura de testes dos adaptadores (URL montada por `site_url_busca`).
 - [ ] Testes Pester para `Expand-PerfilPlaceholders` (`loop.ps1`) e o filtro de sites do `dry-run.ps1`.
-- [ ] **`bot/loop.ps1`**: portar o watchdog de stall/early-abort mid-rodada do
-      `loop.sh` (hoje o espelho Windows só aborta no timeout cheio — ver o
-      comentário de gaps no topo do arquivo).
+- [x] **`bot/loop.ps1`**: watchdog de stall/early-abort mid-rodada portado do `loop.sh`
+      (`Get-ProviderError` + poll do log da rodada em `Invoke-ModelRound`); a leitura do log
+      interno do opencode é fail-open (sem log, só age o critério de stall).
 
 ## Depois / ideias
 
