@@ -111,6 +111,7 @@ oportunizavaga/
 │   ├── digest.sh / .ps1             # resumo diário + alertas de anomalia no loop.log
 │   ├── notificar.sh / .ps1          # push genérico ao Telegram (dedupe 6h)
 │   ├── ctl.sh / .ps1                # status/rodada/chrome em poucas linhas (só leitura)
+│   ├── funnel.sh / .ps1             # funil vistas→aplicadas→convites→entrevistas (CSV/Markdown)
 │   └── backup-jsons.sh / .ps1       # cópia rotativa (14x) dos JSONs de estado
 ├── examples/
 │   ├── dados_candidato.example.json  # COPIE p/ bot/dados_candidato.json e preencha
@@ -146,10 +147,25 @@ powershell -ExecutionPolicy Bypass -File bot\loop.ps1             # teste 1 roda
 ```
 
 > **Windows:** WSL2 com o guia Linux é o caminho recomendado. O PowerShell nativo
-> funciona via espelhos `.ps1` (mesma lógica), com watchdog simplificado e carimbos
-> em hora local (-03:00 documentado) — veja `bot/loop.ps1` e `config/TaskScheduler.md`.
+> funciona via espelhos `.ps1` (mesma lógica), com carimbos em hora local (-03:00
+> documentado) — veja `bot/loop.ps1` e `config/TaskScheduler.md`.
 
 Guia completo: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
+
+## Funil — o que deu certo (ou não)
+
+```bash
+./scripts/funnel.sh                 # vistas → aplicadas → respondidas → convites → entrevistas
+./scripts/funnel.sh --csv           # exporta CSV (pra planilha / relatório)
+./scripts/funnel.sh --markdown      # exporta tabela Markdown
+```
+
+As etapas são cumulativas: quem chegou em entrevista também conta como convidado e
+como respondida, então cada taxa é contra a etapa imediatamente anterior. "Respondeu"
+significa que o status saiu de `enviada` — `sem_resposta` é ausência de resposta e não
+entra. `encerrada` e `sem_retorno_verificavel` ficam de fora (não dá para saber se o
+retorno existiu) e aparecem como diagnóstico. A regra de contagem vive em
+[`bot/funil.py`](bot/funil.py) e vale para Linux e Windows.
 
 ## Segurança — LEIA ANTES DE COMMITAR
 
