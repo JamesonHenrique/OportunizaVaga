@@ -51,7 +51,8 @@ Discussions do repositório.
 - [ ] **Mais perfis prontos** em `config/perfis/`. Já há: backend, QA, tech lead, marketing, direito,
       frontend, dados, saúde, administrativo e vendas. Faltam: suporte, financeiro/contábil,
       logística, educação, industrial e comercial.
-- [ ] **Relatório de funil** exportável (aplicadas → convites → entrevistas).
+- [x] **Relatório de funil** exportável (vistas → aplicadas → respondidas → convites → entrevistas),
+      em CSV e Markdown: [`bot/funil.py`](bot/funil.py), casca em `scripts/funnel.{sh,ps1}`.
 - [x] Cobertura de testes dos adaptadores (URL montada por `site_url_busca`).
 - [x] Testes Pester para `Expand-PerfilPlaceholders` (`loop.ps1`) e o filtro de sites do `dry-run.ps1`
       ([`tests/loop.Tests.ps1`](tests/loop.Tests.ps1) e [`tests/sites.Tests.ps1`](tests/sites.Tests.ps1),

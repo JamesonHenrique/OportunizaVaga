@@ -209,6 +209,33 @@ Windows (PowerShell nativo):
 powershell -ExecutionPolicy Bypass -File bot\doctor.ps1
 ```
 
+## Acompanhando o resultado (funil)
+
+Depois de algumas rodadas, veja em que etapa as candidaturas estão:
+
+```bash
+./scripts/funnel.sh                 # vistas → aplicadas → respondidas → convites → entrevistas
+./scripts/funnel.sh --csv           # exporta CSV (planilha / relatório)
+./scripts/funnel.sh --markdown      # exporta tabela Markdown
+./scripts/funnel.sh --json          # saída máquina (contagens, taxas e diagnósticos)
+```
+
+As etapas são cumulativas (entrevista ⊆ convites ⊆ respondidas ⊆ aplicadas) e a taxa
+de cada uma é contra a etapa imediatamente anterior. "Respondeu" = o status saiu de
+`enviada`; `sem_resposta` é ausência de resposta e não entra. `encerrada` e
+`sem_retorno_verificavel` ficam de fora (não dá para saber se houve retorno) e saem
+como diagnóstico, junto com os status desconhecidos.
+
+Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\funnel.ps1
+powershell -ExecutionPolicy Bypass -File scripts\funnel.ps1 -Csv funil.csv
+```
+
+A regra de contagem vive em [`bot/funil.py`](../bot/funil.py) — os dois espelhos
+`.sh`/`.ps1` só repassam flags, então não divergem.
+
 Exit 0 = essencial ok (`[??]` são só avisos); exit 1 = falta algo essencial
 (veja os itens `[FALHA]`). Validação fina dos JSONs contra os schemas em
 `config/`: `bash scripts/validate.sh` (ou `scripts\validate.ps1`).
