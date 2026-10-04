@@ -44,10 +44,19 @@ MESES_PT = {m: i for i, m in enumerate(("jan", "fev", "mar", "abr", "mai", "jun"
 
 
 def load(p, padrao):
+    """Reads p, and says WHY when it could not.
+
+    04/10 (cap 121 D1): missing file and corrupted JSON returned the same `padrao`, so "0 aviso(s)"
+    meant both "there is nothing to do" and "I could not look". It printed that 88 times while never
+    sending a kit, and nothing in the log told anyone to look twice. Fail-open is a policy; fail-open
+    indistinguishable is a bug. The reason now travels with the value.
+    """
     try:
-        return json.load(open(p, encoding="utf-8"))
-    except (OSError, ValueError):
-        return padrao
+        return json.load(open(p, encoding="utf-8")), None
+    except FileNotFoundError:
+        return padrao, f"nao existe: {p}"
+    except (OSError, ValueError) as e:
+        return padrao, f"ilegivel ({type(e).__name__}): {p}"
 
 
 def data_evento(trecho, hoje):
@@ -101,10 +110,16 @@ def main(dry=False, hoje=None, agora_h=None):
     hoje = hoje or date.today()
     agora_h = datetime.now().hour if agora_h is None else agora_h
     trechos = {}
-    for f in load(GMAIL, {}).get("achados", []):
+    cegas = []
+    achados, mot1 = load(GMAIL, {})
+    aplicadas, mot2 = load(APLICADAS, {})
+    for m in (mot1, mot2):
+        if m:
+            cegas.append(m)
+    for f in achados.get("achados", []):
         trechos.setdefault(f.get("chave"), []).append(f.get("trecho"))
     n = 0
-    for a in load(APLICADAS, {}).get("aplicadas", []):
+    for a in aplicadas.get("aplicadas", []):
         if not isinstance(a, dict) or a.get("status") not in ATIVO:
             continue
         if a.get(ATIVO[a["status"]][1]):
@@ -121,6 +136,13 @@ def main(dry=False, hoje=None, agora_h=None):
                    f"Horário no convite do Gmail.", dry)
             marcar(a["chave"], "lembrete_em", evento, dry)
             n += 1
+    # "0 aviso(s)" with no source is a sentence that lies: it reads as "checked, nothing to do" when it
+    # may mean "could not check". When a source was blind, say so AND exit non-zero, so the cron's log
+    # shows it and a human reading 88 zeros is told to look for the one that was not blind.
+    if cegas:
+        print(f"kit-entrevista: {n} aviso(s){' (dry)' if dry else ''} — MAS {len(cegas)} fonte(s) cega(s): "
+              + "; ".join(cegas) + " (nada foi verificado nelas)", file=sys.stderr)
+        return 3
     print(f"kit-entrevista: {n} aviso(s){' (dry)' if dry else ''}")
     return 0
 
