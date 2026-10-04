@@ -10,6 +10,7 @@ Only moves status forward (enviada/em_analise -> entrevista/encerrada), never ba
 overwrites a status set by hand. Saves only the matches (company, class, subject excerpt) in
 state/gmail_status.json — never the mailbox content.
 """
+import importlib.util
 import json
 import os
 import re
@@ -24,12 +25,12 @@ from datetime import datetime, timedelta
 BOT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOT_DIR = os.path.join(BOT_ROOT, "bot")
 NODE = os.environ.get("NODE_BIN") or shutil.which("node") or "node"
-LOCK = os.environ.get("CHROME_LOCK_FILE") or os.path.join(tempfile.gettempdir(), "agent-chrome-9222.lock")   # same file loop.sh/loop.ps1 lock
-FLAG_DIR = os.environ.get("CHROME_LOCK_DIR") or tempfile.gettempdir()   # priority flags (bot/chrome-lock.sh protocol)
+CHROME_LOCK = os.environ.get("CHROME_LOCK_SH") or os.path.join(BOT_DIR, "chrome-lock.sh")   # single owner of the Chrome lock protocol
+ESTADO = os.environ.get("OV_ESTADO_PY") or os.path.join(BOT_DIR, "estado.py")
 DADOS = os.environ.get("DADOS_FILE", os.path.join(BOT_DIR, "dados_candidato.json"))
 APLICADAS = os.environ.get("APLICADAS_FILE", os.path.join(BOT_DIR, "aplicadas.json"))
-SAIDA = os.path.join(BOT_DIR, "state", "gmail_status.json")
-NOTIFICAR = os.path.join(BOT_ROOT, "scripts", "notificar.ps1" if os.name == "nt" else "notificar.sh")
+SAIDA = os.environ.get("OV_GMAIL_STATUS") or os.path.join(BOT_DIR, "state", "gmail_status.json")
+NOTIFICAR = os.environ.get("OV_NOTIFY") or os.path.join(BOT_ROOT, "scripts", "notificar.ps1" if os.name == "nt" else "notificar.sh")
 QUERY = ("newer_than:30d (candidatura OR candidato OR \"processo seletivo\" OR vaga OR entrevista "
          "OR gupy OR inhire OR recrutamento OR selecao)")
 
@@ -48,8 +49,22 @@ CLASSES = [
     ("em_analise", re.compile(r"recebemos (a |sua )?candidatura|candidatura (foi )?(recebida|realizada|enviada|confirmada)|"
                               r"obrigad[oa] por (se candidatar|sua candidatura|participar)|inscri[cç][aã]o (recebida|confirmada)")),
 ]
-ORDEM = {"enviada": 0, "sem_resposta": 0, "sem_retorno_verificavel": 0, "em_analise": 1, "proxima_etapa": 2,
-         "etapa_teste": 2, "entrevista": 3, "encerrada": 4}
+# The monotonic order comes from the WRITER, not from a copy kept here. 04/10 (cap 121 A1/F2): this
+# dict and gupy-status.py each carried one while estado.py status accepted any value, so the fossil
+# "entrevista -> etapa_teste" got written and nothing complained. The writer refuses the downgrade now;
+# importing the table here just avoids spawning a subprocess per application. None disables the
+# early-out and says so out loud. That matters: the empty dict this replaced was the opposite of what
+# its comment claimed -- with {}, ORDEM.get(x, 0) <= ORDEM.get(y, 0) is 0 <= 0 for EVERY pair, so every
+# match hit `continue` and this script silently stopped advancing any status at all.
+try:
+    _st = importlib.util.spec_from_file_location("estado_ordem", ESTADO)
+    _est = importlib.util.module_from_spec(_st)
+    _st.loader.exec_module(_est)
+    ORDEM = _est.ORDEM
+except Exception as _e2:
+    ORDEM = None
+    print(f"gmail-status: estado.py nao importavel ({_e2.__class__.__name__}); sem early-out, "
+          "a monotonicidade fica so no escritor", file=sys.stderr)
 sys.path.insert(0, BOT_DIR)
 import meses   # single owner of the month tables; 04/10 (cap 121 C3/F3)
 MESES, MESES_EN = meses.PT, meses.EN
@@ -97,72 +112,21 @@ def contas():
     return list(dict.fromkeys(e for e in (c.get("email"), c.get("email_contas")) if e))
 
 
-class browser_lock:
-    """Portable exclusive lock on the shared Chrome lock file (flock on POSIX, msvcrt on Windows).
-    Waits up to `wait` seconds; `acquired` tells whether it got the lock.
-
-    Same protocol as bot/chrome-lock.sh with PRIO=alta: while waiting/holding, the flag file
-    agent-chrome-9222.prio.NAME makes the application loop yield its next round instead of
-    making this short job wait behind it. A flag that already existed is the parent's: kept."""
-
-    def __init__(self, wait=900, name="gmail"):
-        self.wait, self.fh, self.acquired = wait, None, False
-        self.flag, self.flag_criada = os.path.join(FLAG_DIR, f"agent-chrome-9222.prio.{name}"), False
-
-    def _try(self):
-        if os.name == "nt":
-            import msvcrt
-            self.fh.seek(0)
-            msvcrt.locking(self.fh.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(self.fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
-
-    def __enter__(self):
-        try:
-            self.flag_criada = not os.path.exists(self.flag)
-            with open(self.flag, "a"):
-                os.utime(self.flag, None)
-        except OSError:
-            self.flag_criada = False
-        deadline = time.time() + self.wait
-        while True:
-            try:
-                if self.fh is None:
-                    self.fh = open(LOCK, "a+")
-                self._try()
-                self.acquired = True
-                return self
-            except OSError:   # busy (BlockingIOError / PermissionError on Windows)
-                if time.time() >= deadline:
-                    return self
-                time.sleep(2)
-
-    def __exit__(self, *exc):
-        if self.flag_criada:
-            try:
-                os.unlink(self.flag)
-            except OSError:
-                pass
-        if self.fh:
-            try:
-                if self.acquired and os.name == "nt":
-                    import msvcrt
-                    self.fh.seek(0)
-                    msvcrt.locking(self.fh.fileno(), msvcrt.LK_UNLCK, 1)
-            finally:
-                self.fh.close()
-
-
 def extrair_conta(conta):
-    with browser_lock() as lk:
-        if not lk.acquired:
-            return {"ok": False, "erro": "Chrome ocupado (lock)", "linhas": []}
-        try:
-            r = subprocess.run([NODE, os.path.join(BOT_DIR, "gmail-extrair.mjs"), QUERY, conta],
-                               capture_output=True, text=True, timeout=300)
-        except (OSError, subprocess.TimeoutExpired) as e:
-            return {"ok": False, "erro": str(e)[:300], "linhas": []}
+    # The Chrome lock has ONE owner: bot/chrome-lock.sh. 04/10: this used to be a 57-line Python
+    # reimplementation (class browser_lock) living inside this file. Two copies of one protocol is
+    # how loop.sh ended up with its own copy of quota detection on 30/09 -- a fix to the .sh never
+    # reaches the .py, and nobody remembers the .py exists. So this shells out to the same script the
+    # loop uses, with PRIO=alta: while waiting or holding, the flag agent-chrome-9222.prio.gmail makes
+    # the loop yield its next round instead of making this short job wait behind it.
+    cmd = [CHROME_LOCK, "gmail", "alta", "1500", "--", NODE,
+           os.path.join(BOT_DIR, "gmail-extrair.mjs"), QUERY, conta]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"ok": False, "erro": str(e)[:300], "linhas": []}
+    if r.returncode == 75:      # chrome-lock.sh: waited past WAIT and never got the lock
+        return {"ok": False, "erro": "Chrome ocupado por mais de 1500s (rc 75)", "linhas": []}
     try:
         return json.loads(r.stdout.strip().splitlines()[-1])
     except Exception:
@@ -180,6 +144,11 @@ def extrair():
             erros.append(f"{conta}: {res.get('erro')}")
     for e in erros:
         print(f"gmail-status: aviso {e}")
+    # The LOGIN inbox (codes, verification links) must be logged in; the contact inbox is optional.
+    _c = json.load(open(DADOS, encoding="utf-8"))
+    login = _c.get("email_contas") or _c.get("email")
+    if any(e.startswith(f"{login}:") and ("nao logada" in e or "deslogado" in e) for e in erros):
+        notificar(f"🔒 Gmail {login} deslogado no Chrome do robo — codigos e respostas param de chegar")
     if len(erros) == len(contas()):
         return {"ok": False, "erro": "; ".join(erros), "linhas": []}
     return {"ok": True, "linhas": list(dict.fromkeys(linhas))}
@@ -210,9 +179,21 @@ def main(dry):
         for texto_n, texto in zip(linhas, res["linhas"]):
             if re.search(rf"\b{re.escape(k)}\b", texto_n):
                 cls = next((c for c, rx in CLASSES if rx.search(texto_n)), None)
+                quando = data_email(texto_n)
+                # 02/10: a mail dated before this application was sent is about an older process (or a
+                # misread date: 30/09 stored 2025-10-01). Never moves this record.
+                if cls and quando and quando < str(a.get("enviada_em") or a.get("data") or "")[:10]:
+                    cls = None
                 if cls:
+                    # 04/10 (cap 121 E3): the 140-char budget was set here for the monitor benefit and PAID FOR
+                    # by kit-entrevista.py, whose data_evento() reads the calendar date out of the
+                    # subject. A real Outlook subject is ~220 chars and the date sits past 168, so
+                    # with 140 the invite date was never found, evento_em stayed 0 in every record
+                    # and the HOJE reminder could never fire. This file writes a FIELD another
+                    # program parses: a budget chosen for one reader is a bug for the other. 320
+                    # holds the subject and still bounds the file (5 achados x 320 = 1.6 KB).
                     achados.append({"chave": a.get("chave"), "empresa": a.get("empresa"), "classe": cls,
-                                    "trecho": texto[:140], "email_data": data_email(texto_n)})
+                                    "trecho": texto[:320], "email_data": quando})
                 break
     mudou = []
     for f in achados:
@@ -222,7 +203,7 @@ def main(dry):
             continue
         mudou.append(f)
         if not dry:
-            subprocess.run([sys.executable, os.path.join(BOT_DIR, "estado.py"), "--file", APLICADAS, "status",
+            subprocess.run([sys.executable, ESTADO, "--file", APLICADAS, "status",
                             f["chave"], f["classe"], "", f.get("email_data") or ""], check=False)
             quando = f" (e-mail de {f['email_data'][8:]}/{f['email_data'][5:7]})" if f.get("email_data") else ""
             aviso = {"entrevista": f"🎉 {f['empresa']}: e-mail fala em ENTREVISTA{quando} — confira o Gmail",
