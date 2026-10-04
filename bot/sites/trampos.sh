@@ -10,11 +10,6 @@ SEARCH_URL_TEMPLATE="https://trampos.co/oportunidades/?tr=SEU_TERMO"
 SITE_REMOTE_HINT="selo Home office no card; a URL nao tem filtro de remoto"
 SEARCH_ENCODING="pct20"
 
-site_url_busca() {
-  local termo="${1:-}"
-  printf '%s\n' "${SEARCH_URL_TEMPLATE//SEU_TERMO/${termo// /%20}}"
-}
-
 site_buscar_termos() {
   local prompt="${1:-${BOT_ROOT:-$(site_adapter_root)}/bot/prompt_loop.md}"
   awk -v id="$SITE_ID" '

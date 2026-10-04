@@ -28,10 +28,32 @@ site_adapter_source() {
   local file
   file="$(site_adapter_file "$id" "$root")"
   [ -r "$file" ] || return 1
+  # Each adapter starts clean. Without this, an adapter that declares nothing inherits the previous
+  # one's value: sourcing catho.sh (SEARCH_ENCODING="hifen") then infojobs.sh (declares nothing) left
+  # "hifen" set, and infojobs silently built hyphenated URLs. tests/test_sites.sh caught this.
+  unset SITE_ID SITE_LABEL SITE_HOME SEARCH_URL_TEMPLATE SEARCH_ENCODING SITE_TERM_ENCODING SITE_REMOTE_HINT
   BOT_ROOT="$root" source "$file"
   [ -n "${SITE_ID:-}" ] || return 1
   [ -n "${SEARCH_URL_TEMPLATE:-}" ] || return 1
-  declare -F site_url_busca >/dev/null || return 1
+  # An adapter is DATA. Both functions used to live in every sites/*.sh, byte-identical in all 11, and
+  # site_buscar_termos was then overwritten right here — so one of the two copies never ran at all.
+  # They are generated here now. A site that still defines its own keeps it (declare -F || define).
+  if ! declare -F site_url_busca >/dev/null; then
+    site_url_busca() {
+      local termo="${1:-}"
+      local encoded
+      # A term in a PATH segment must not carry a literal space: catho, solides and vagas declare
+      # "hifen" and their own copies of this function used it. The other 8 declare nothing and always
+      # used %20. Both spellings return 200 where they were checked, but the declared intent wins:
+      # a URL that depends on the server being lenient is not a URL to keep.
+      case "${SEARCH_ENCODING:-${SITE_TERM_ENCODING:-pct20}}" in
+        hifen|hyphen) encoded="${termo// /-}" ;;
+        plus)         encoded="${termo// /+}" ;;
+        *)            encoded="${termo// /%20}" ;;
+      esac
+      printf '%s\n' "${SEARCH_URL_TEMPLATE//SEU_TERMO/$encoded}"
+    }
+  fi
   site_buscar_termos() {
     local prompt="${1:-${BOT_ROOT:-$(site_adapter_root)}/bot/prompt_loop.md}"
     python3 - "$prompt" "$SITE_ID" <<'PY'
