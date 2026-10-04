@@ -169,6 +169,14 @@ def ja_visto(d, empresa, titulo=""):
 STATUS_OK = {"enviada", "em_analise", "etapa_teste", "proxima_etapa", "entrevista", "encerrada",
              "respondida", "sem_resposta", "sem_retorno_verificavel", "followup"}
 
+# Status levels, in the WRITER. 04/10 (cap 121 A1/F2): gmail-status.py and gupy-status.py each carried
+# their own copy of this ranking, and `status` accepted any value in STATUS_OK, so the fossil
+# `construmarket-dev-jr-gupy-12212597` really did go entrevista -> etapa_teste. Two copies drift; one copy
+# next to the data cannot. "respondida" is an alias of "em_analise" (rank 1): a reply means the process
+# started, never that it ended.
+ORDEM = {"enviada": 0, "sem_resposta": 0, "sem_retorno_verificavel": 0, "em_analise": 1, "respondida": 1,
+         "proxima_etapa": 2, "etapa_teste": 2, "entrevista": 3, "followup": 3, "encerrada": 4}
+
 # Candidate digest for the prompt: the model used to read the whole dados_candidato.json (~10 KB) in about half
 # of the sessions and kept it in context for every later call. Anything outside the digest: `estado.py dado CAMPO`.
 RESUMO_CAMPOS = ["nome", "email", "email_contas", "regra_emails", "telefone", "linkedin", "github", "local", "endereco",
@@ -222,7 +230,20 @@ def main(argv):
     if not argv:
         print(__doc__)
         return 2
+    forcar = False
+    while argv and argv[0].startswith("--"):
+        if argv[0] == "--forcar":
+            forcar = True
+        argv = argv[1:]
+    if not argv:
+        print(__doc__)
+        return 2
     cmd, args = argv[0], argv[1:]
+    # A refusal message that teaches a flag nobody can type is a trap: the flag is accepted in any
+    # position, including after the record and the status, because that is where a reader puts it.
+    if "--forcar" in args:
+        forcar = True
+        args = [a for a in args if a != "--forcar"]
     if cmd in ("dado", "resumo-candidato"):   # read-only, candidate data (not the state file)
         dados = json.load(open(arquivo_dados(), encoding="utf-8"))
         if cmd == "resumo-candidato":
@@ -334,6 +355,16 @@ def main(argv):
         if rec is None:
             print(f"nao existe em aplicadas: {k}")
             return 1
+        # Monotonicity, in the writer (see ORDEM). Callers still check first -- this is the backstop for
+        # the next caller, which is exactly the one that caused the fossil. status_manual is the per-record
+        # override; --forcar is the per-call one.
+        atual = rec.get("status") or "enviada"
+        if (not forcar and not rec.get("status_manual")
+                and ORDEM.get(st, 0) < ORDEM.get(atual, 0)):
+            print(f"status nao regragiu: {k} esta em '{atual}' (nivel {ORDEM.get(atual, 0)}) e "
+                  f"'{st}' e nivel {ORDEM.get(st, 0)} -- recuo nao gravado. "
+                  f"use --forcar se a empresa reabriu o processo, ou marque status_manual.")
+            return 3
         if rec.get("status") != st:
             h = {"de": rec.get("status"), "para": st, "em": datetime.now().astimezone().isoformat(timespec="seconds")}
             if len(args) > 3 and args[3]:
