@@ -50,8 +50,9 @@ CLASSES = [
 ]
 ORDEM = {"enviada": 0, "sem_resposta": 0, "sem_retorno_verificavel": 0, "em_analise": 1, "proxima_etapa": 2,
          "etapa_teste": 2, "entrevista": 3, "encerrada": 4}
-MESES = {m: i for i, m in enumerate(("jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"), 1)}
-MESES_EN = {m: i for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
+sys.path.insert(0, BOT_DIR)
+import meses   # single owner of the month tables; 04/10 (cap 121 C3/F3)
+MESES, MESES_EN = meses.PT, meses.EN
 
 
 def data_email(texto_n, hoje=None):
