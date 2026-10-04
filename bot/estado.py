@@ -96,6 +96,22 @@ def short(v, n=70):
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
+def vencidos(d, hoje=None):
+    """[(chave, rec)] of bloqueados with a due "retentar" (02/10). The prompt used to make the model walk all ~200
+    bloqueados every round looking for text patterns; 13 matched and every round re-rejected all 13. Only an
+    explicit retentar (date <= today, or no date) brings a block back now.
+
+    Ported 04/10 (cap 121 H2) so prompt_cond.py can evaluate <!--se:vencidos--> from the public writer too. It lived
+    only in the private copy, so the public block condition had no way to ask the question at all."""
+    hoje = hoje or datetime.now().strftime("%Y-%m-%d")
+    out = []
+    for k, rec in (d.get("bloqueados") or {}).items():
+        r = rec.get("retentar") if isinstance(rec, dict) else None
+        if r and not (re.match(r"\d{4}-\d\d-\d\d", str(r)) and str(r)[:10] > hoje):
+            out.append((k, rec))
+    return out
+
+
 def resumo(d):
     out = []
     rod = d.get("rodizio", {})

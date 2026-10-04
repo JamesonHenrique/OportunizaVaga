@@ -574,7 +574,11 @@ def coletar(ctx, force=False, fontes=None):
         vagas.pop(k)
     fila["li_cursor"] = {t: c for t, c in ctx.li_cursor.items() if t in ctx.termos}
     fila["ultima_coleta"] = agora().isoformat(timespec="seconds")
-    fila["stats"] = {**stats, "filtradas": filtro, "termos": escolhidos + gupy_termos}
+    # Merge, never replace: tg-garimpo.py writes its own stats.telegram into this SAME fila
+    # (D4), so the previous `fila["stats"] = ...` wiped the Telegram stamp on every collection
+    # here — the dashboard then had no "last harvest" to show even with a healthy session.
+    fila["stats"] = {**(fila.get("stats") or {}), **stats,
+                     "filtradas": filtro, "termos": escolhidos + gupy_termos}
     tot = fila.setdefault("totais", {})
     for k, n in filtro.items():
         tot[k] = tot.get(k, 0) + n
