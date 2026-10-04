@@ -6,9 +6,17 @@ Conditional blocks in bot/prompt_loop*.md:
   <!--se:site=indeed-->  ...text...  <!--/se-->   kept only when rodizio.proximo == "indeed"
   <!--se:telegram-->     ...text...  <!--/se-->   kept only with a fresh <state>/telegram_vagas.json that still has a
                                                   harvested job offered fewer than OFERTAS_MAX times
+  <!--se:aguardando-->   ...text...  <!--/se-->   kept only when aplicadas.json has a non-empty aguardando_login
+  <!--se:quase_la-->      ...text...  <!--/se-->   kept only when there is a quase_la record
+  <!--se:vencidos-->      ...text...  <!--/se-->   kept only when estado.py.vencidos() returns something (02/10: a
+                                                  due "retentar"; the summary lists which)
 
 Fail-open: an unknown condition keeps its text, and if the site of the round is unknown (or has no
-block at all) every site block is kept - a rule is never lost because of a lookup failure.
+block at all) every site block is kept - a rule is never lost because of a lookup failure. Every
+fallback here now says WHICH fallback it took (04/10, cap 121 H2/D4): this file used to return True for
+an unknown condition in total silence, and the private loop.sh had its own copy of the same decision
+knowing three conditions this one did not. Two evaluators, each blind to half the vocabulary, is how
+three rules silently turn into always-on.
 
   prompt_cond.py aplicar IN OUT APLICADAS_FILE     evaluate the blocks, append "SITE DESTA RODADA"
   prompt_cond.py cercar FONTE                      stdin -> stdout, wrapped as external DATA
@@ -28,6 +36,9 @@ TELEGRAM_MAX_AGE_S = 6 * 3600
 OFERTAS_MAX = 2            # a harvested Telegram job stops justifying the block after this many prompts
 OFERTAS_GUARDADAS = 500    # ids remembered in <state>/telegram_oferecidas.json
 _BLOCO = re.compile(r"<!--se:([^>]+?)-->\n?(.*?)<!--/se-->\n?", re.S)
+# Block name -> key in aplicadas.json. The two names are not the same, and that is not a detail:
+# aguardando reads aguardando_login because "aguardando" on its own is ambiguous with anything queued.
+CHAVE_ESTADO = {"aguardando": "aguardando_login", "quase_la": "quase_la"}
 
 
 def site_da_rodada(aplicadas):
@@ -89,20 +100,67 @@ def telegram_para_prompt(state_dir):
     return True
 
 
-def aplicar(text, site, tg_fresco):
-    """Evaluate the <!--se:...--> blocks of `text` and append the SITE DESTA RODADA line."""
+def _avisar(msg):
+    """Every fallback names itself. stdout is the rendered prompt; stderr is the round log."""
+    print("prompt_cond: " + msg, file=sys.stderr, flush=True)
+
+
+def _vencidos(d):
+    """estado.py.vencidos(d), the writer loaded as a sibling module (same directory as this file).
+
+    Returns None when the writer cannot be reached, which is NOT the same as "nothing is due": the
+    caller then keeps the block and says so. The private loop.sh used to import the writer by
+    absolute path; here the sibling is enough, because both live in the same directory.
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import estado
+        return bool(estado.vencidos(d))
+    except Exception as e:
+        _avisar("<!--se:vencidos--> nao pôde avaliar estado.py.vencidos (%s: %s) — regra mantida"
+                % (e.__class__.__name__, str(e)[:80]))
+        return None
+
+
+def avaliar(cond, site, tg_fresco, estado, tem_bloco_site):
+    """One condition -> keep the text or drop it. Returns (bool, motivo) so callers can log it."""
+    if cond.startswith("site="):
+        # A rotation site with no block of its own keeps ALL of them: better every URL than none
+        # (without a block the model had no search URL at all).
+        return (not tem_bloco_site) or cond[5:] == site, "site"
+    if cond == "telegram":
+        return bool(tg_fresco), "telegram"
+    if cond in ("aguardando", "quase_la", "vencidos"):
+        if not estado:
+            _avisar("bloco <!--se:%s--> entrou SEM estado (json ilegivel ou vazio) — regra mantida" % cond)
+            return True, cond + "/sem-estado"
+        if cond == "vencidos":
+            v = _vencidos(estado)
+            if v is None:
+                return True, cond + "/sem-escritor"
+            return v, cond
+        # The block is named <!--se:aguardando--> but the state key is aguardando_login. The mapping is a
+        # table, not a guess: with estado.get(cond) the QUASE_LA block was off every round while the state
+        # held two records, and nothing said so. Written once, above, so a fifth condition has to be declared.
+        return bool(estado.get(CHAVE_ESTADO[cond])), cond
+    _avisar("condicao desconhecida <!--se:%s--> — texto mantido" % cond)
+    return True, "unknown"
+
+
+def aplicar(text, site, tg_fresco, estado=None, linha_site=True):
+    """Evaluate the <!--se:...--> blocks of `text` and append the SITE DESTA RODADA line.
+
+    `estado` is the already-parsed aplicadas.json. Left None, the three state conditions fall open
+    with a warning — which is what loop.ps1 and the CLI pass today, and it is safe only because the
+    OSS prompt_loop*.md has no such block. The private prompt does, and passes it.
+
+    `linha_site=False` for callers that append the SITE DESTA RODADA line themselves at a different
+    point of the pipeline (the private loop.sh does, after the so_fila cut). Same bytes either way.
+    """
     com_bloco = {m.group(1).strip()[5:] for m in _BLOCO.finditer(text) if m.group(1).strip().startswith("site=")}
-    site_conhecido = site in com_bloco   # no block for this site -> keep all (fail open)
-
-    def manter(cond):
-        if cond.startswith("site="):
-            return (not site_conhecido) or cond[5:] == site
-        if cond == "telegram":
-            return bool(tg_fresco)
-        return True   # unknown condition: keep the text
-
-    text = _BLOCO.sub(lambda m: m.group(2) if manter(m.group(1).strip()) else "", text)
-    if site:
+    text = _BLOCO.sub(lambda m: m.group(2) if avaliar(m.group(1).strip(), site, tg_fresco,
+                                                     estado, site in com_bloco)[0] else "", text)
+    if site and linha_site:
         text += "\n\nSITE DESTA RODADA (rodizio.proximo): " + site + "\n"
     return text
 
