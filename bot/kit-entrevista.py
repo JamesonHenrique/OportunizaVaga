@@ -32,7 +32,13 @@ APLICADAS = os.environ.get("APLICADAS_FILE") or _aplicadas_padrao()
 GMAIL = os.environ.get("OV_GMAIL_STATUS") or os.path.join(BOT_DIR, "state", "gmail_status.json")
 NOTIFY = os.environ.get("NOTIFY") or os.path.join(os.path.dirname(BOT_DIR), "scripts", "notificar.sh")
 ESTADO = os.environ.get("OV_ESTADO_PY") or os.path.join(BOT_DIR, "estado.py")
-ATIVO = {"etapa_teste": "📝 TESTE", "entrevista": "🎤 ENTREVISTA", "proxima_etapa": "👀 PRÓXIMA ETAPA"}
+# status -> (label, which "done" marker closes it). 04/10 (cap 121 A2): the guard used to be
+# `acao_feita_em or teste_feito_em`, a disjunction ACROSS statuses. A record that reached "entrevista",
+# got its acao_feita_em marked, and then advanced to "etapa_teste" kept the old marker and was skipped
+# forever — 88 runs, 0 kits sent. The marker is per status, so the map is per status.
+ATIVO = {"etapa_teste": ("📝 TESTE", "teste_feito_em"),
+         "entrevista": ("🎤 ENTREVISTA", "acao_feita_em"),
+         "proxima_etapa": ("👀 PRÓXIMA ETAPA", "acao_feita_em")}
 MESES_EN = {m: i for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
 MESES_PT = {m: i for i, m in enumerate(("jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"), 1)}
 
@@ -65,7 +71,7 @@ def data_evento(trecho, hoje):
 
 
 def kit(a, evento):
-    linhas = [f"🧰 {ATIVO[a['status']]} — {a.get('empresa')}",
+    linhas = [f"🧰 {ATIVO[a['status']][0]} — {a.get('empresa')}",
               f"Vaga: {a.get('vaga') or '?'}"]
     if evento:
         linhas.append(f"Quando: {evento[8:]}/{evento[5:7]} (veja o horário no convite do Gmail)")
@@ -99,8 +105,10 @@ def main(dry=False, hoje=None, agora_h=None):
         trechos.setdefault(f.get("chave"), []).append(f.get("trecho"))
     n = 0
     for a in load(APLICADAS, {}).get("aplicadas", []):
-        if not isinstance(a, dict) or a.get("status") not in ATIVO or a.get("acao_feita_em") or a.get("teste_feito_em"):
+        if not isinstance(a, dict) or a.get("status") not in ATIVO:
             continue
+        if a.get(ATIVO[a["status"]][1]):
+            continue          # this status was already closed; a marker from another status does not close this one
         evento = a.get("evento_em") or next((e for e in (data_evento(t, hoje) for t in trechos.get(a.get("chave"), [])) if e), None)
         if evento and evento != a.get("evento_em"):
             marcar(a["chave"], "evento_em", evento, dry)
@@ -109,7 +117,7 @@ def main(dry=False, hoje=None, agora_h=None):
             marcar(a["chave"], "kit_status", a["status"], dry)
             n += 1
         if evento == hoje.isoformat() and a.get("lembrete_em") != evento and agora_h >= 7:
-            avisar(f"⏰ HOJE: {ATIVO[a['status']]} — {a.get('empresa')} ({a.get('vaga') or '?'}). "
+            avisar(f"⏰ HOJE: {ATIVO[a['status']][0]} — {a.get('empresa')} ({a.get('vaga') or '?'}). "
                    f"Horário no convite do Gmail.", dry)
             marcar(a["chave"], "lembrete_em", evento, dry)
             n += 1

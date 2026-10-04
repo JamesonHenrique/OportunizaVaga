@@ -134,6 +134,11 @@ def carregar_allowlist(dados, sections=None):
     return allow
 
 
+# Skills-column budget: the Habilidades section only fits 14 lines even at the 4th font size (estilos
+# falls back 10.0 -> 9.5 -> 9.0 -> 8.8). Not a data limit; a page limit.
+MAX_KW = 14
+
+
 def filtrar_kw(brutas, allow):
     mantidas, descartadas = [], []
     for kw in (brutas or []):
@@ -156,7 +161,15 @@ def filtrar_kw(brutas, allow):
             mantidas.append(alvo)
         else:
             descartadas.append(kw)
-    return mantidas[:14], descartadas
+    # 04/10 (cap 121 E2): the 14 was a magic number and the truncation was SILENT — a real spec asked for
+    # 18, got 14, and nobody could tell that 4 keywords never made it into the CV. It is a page-fit
+    # budget (the skills column only fits 14 lines even at the smallest font, see the loop in estilos()),
+    # so the cap stays; what changes is that it is named and that the cut is reported to stderr, which
+    # is where the model and the human both look when a CV comes out "missing something".
+    if len(mantidas) > MAX_KW:
+        print(f"gerar_cv: {len(mantidas) - MAX_KW} keyword(s) fora do orcamento de {MAX_KW} "
+              f"e NAO entraram no CV: {', '.join(mantidas[MAX_KW:])}", file=sys.stderr)
+    return mantidas[:MAX_KW], descartadas
 
 
 # ------------------------------------------------------------------ estilos

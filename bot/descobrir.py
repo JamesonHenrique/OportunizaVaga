@@ -544,7 +544,19 @@ def coletar(ctx, force=False, fontes=None):
                 time.sleep(random.uniform(1.5, 3))  # polite: one extra request per LinkedIn job
             if md:
                 filtro["descricao"] = filtro.get("descricao", 0) + 1
-                vagas[v["id"]] = {"status": "filtrada", "motivo": md, "titulo": v["titulo"][:80], "visto_em": _stamp()}
+                # 03/10 (cap 121 E7): this rebuilt a 4-key dict and threw away the two fields the
+                # description gate had just produced. Measured: 0 of 2.757 `filtrada` records carried
+                # `desc_checada` or `nivel_oficial`. The tag in prompt N was fine (it reads `nova`
+                # records, which keep the whole dict) — what was lost is the EVIDENCE on the rejections,
+                # and it is the only way to answer "how many of the level-rejections would also fail the
+                # description gate?" without re-fetching 2.757 LinkedIn pages.
+                # `nivel_oficial: ""` is meaningful, not empty: for Gupy the official-level gate is OFF
+                # (avaliar receives oficial=None), and that is exactly what must stay visible.
+                rec = {"status": "filtrada", "motivo": md, "titulo": v["titulo"][:80], "visto_em": _stamp()}
+                if v.get("desc_checada"):
+                    rec["desc_checada"] = True
+                    rec["nivel_oficial"] = v.get("nivel_oficial") or ""
+                vagas[v["id"]] = rec
                 continue
         if _gemea(v) in gemeas or gemea_de(v, assin):   # same company + title under another id (after the real filters)
             filtro["duplicada"] = filtro.get("duplicada", 0) + 1
