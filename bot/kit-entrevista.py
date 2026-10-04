@@ -16,6 +16,7 @@ import sys
 from datetime import date, datetime
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BOT_DIR)   # sibling modules: vagas_filtros, meses
 
 
 def _aplicadas_padrao():
@@ -39,8 +40,8 @@ ESTADO = os.environ.get("OV_ESTADO_PY") or os.path.join(BOT_DIR, "estado.py")
 ATIVO = {"etapa_teste": ("📝 TESTE", "teste_feito_em"),
          "entrevista": ("🎤 ENTREVISTA", "acao_feita_em"),
          "proxima_etapa": ("👀 PRÓXIMA ETAPA", "acao_feita_em")}
-MESES_EN = {m: i for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
-MESES_PT = {m: i for i, m in enumerate(("jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"), 1)}
+import meses   # single owner of the month tables; 04/10 (cap 121 C3/F3)
+MESES_EN, MESES_PT = meses.EN, meses.PT
 
 
 def load(p, padrao):
