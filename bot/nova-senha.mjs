@@ -5,7 +5,7 @@
 // Default selector: input[type=password] (fills password + confirmation). Prints only a count.
 // Do NOT run under the browser lock: the round that calls this already holds it.
 import { randomBytes } from 'node:crypto';
-import { appendFileSync, chmodSync, mkdirSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -58,8 +58,31 @@ try {
 if (!n) { console.log(`erro: nenhum campo visivel para "${SELECTOR}" na aba ${DOMAIN}; nada gravado`); process.exit(1); }
 
 // Kept OUTSIDE the repo by default. Best effort chmod: no-op on Windows (rely on the user profile ACL).
+// 04/10 (cap 121 G3): appendFileSync had no dedupe, so the same domain appeared twice with different
+// passwords — and trocar-senha.py, which reads this file to rotate, took the FIRST match and changed
+// the wrong one. A credential file keyed by domain has one row per domain: update, never append.
 const file = process.env.OV_CREDENTIALS_FILE || join(homedir(), '.config', 'oportunizavaga', 'credenciais.tsv');
 mkdirSync(dirname(file), { recursive: true });
-appendFileSync(file, `${DOMAIN}\t${EMAIL}\t${senha}\n`);
+let linhas = [];
+try { linhas = readFileSync(file, 'utf8').split('\n').filter(l => l.trim()); } catch {}
+const registro = `${DOMAIN}\t${EMAIL}\t${senha}`;
+const antes = linhas.filter(l => l.split('\t')[0] === DOMAIN).length;
+const i = linhas.findIndex(l => l.split('\t')[0] === DOMAIN);
+if (i >= 0) {
+  // Collapse EVERY row for this domain, not just the first: the file on disk had programathor.com.br
+  // twice with different passwords, and a lookup that takes the first match rotates the wrong one.
+  // Insert back at the ORIGINAL index — after filter() the positions moved, so `linhas[i] = ...` would
+  // land on whichever row happened to shift into slot i.
+  const restantes = linhas.filter(l => l.split('\t')[0] !== DOMAIN);
+  restantes.splice(Math.min(i, restantes.length), 0, registro);
+  writeFileSync(file, restantes.join('\n') + '\n');
+  console.log(antes > 1
+    ? `aviso: ${DOMAIN} estava em ${antes} linhas de credenciais.tsv; colapsadas em 1 (a senha nova e a que passa a valer localmente).`
+    : `aviso: ${DOMAIN} JA estava em credenciais.tsv; linha ${i + 1} ATUALIZADA (nao anexada). ` +
+      `Se a senha antiga ainda estiver valendo no site, o cadastro local deixou de bater com ele.`);
+} else {
+  linhas.push(registro);
+  writeFileSync(file, linhas.join('\n') + '\n');
+}
 try { chmodSync(file, 0o600); } catch {}
-console.log(`ok: senha nova gravada em credenciais.tsv e preenchida em ${n} campo(s) de ${DOMAIN}`);
+console.log(`ok: senha ${i >= 0 ? 'atualizada' : 'nova'} em credenciais.tsv e preenchida em ${n} campo(s) de ${DOMAIN}`);
