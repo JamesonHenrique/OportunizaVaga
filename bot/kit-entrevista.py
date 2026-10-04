@@ -53,7 +53,7 @@ def load(p, padrao):
 def data_evento(trecho, hoje):
     """Calendar invite subject: '... @ Thu Oct 1, 2026' or '... @ qui., 1 de out. de 2026' -> ISO date."""
     t = str(trecho or "").lower()
-    if m := re.search(r"@ [a-z]{3}\w* ([a-z]{3})\w* (\d{1,2})\b", t):
+    if m := re.search(r"@ [a-z]{3}\.?,? ([a-z]{3})\.?,? (\d{1,2})\b", t):
         mo, d = MESES_EN.get(m.group(1)), int(m.group(2))
     elif m := re.search(r"@ \w+\.?,? (\d{1,2}) de ([a-z]{3})", t):
         mo, d = MESES_PT.get(m.group(2)), int(m.group(1))
