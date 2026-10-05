@@ -321,5 +321,29 @@ assert "linkedin:prazo" in f["stats"]["erros"] and f.get("ultima_coleta"), f.get
 PYSNIP
 run_snippet && relata 0 "coleta: triagem pelo maior score; prazo estourado grava a fila" || relata 1 "coleta: triagem pelo maior score; prazo estourado grava a fila"
 
+# 15 — triar (05/10): link de perfil, vaga encerrada e descricao incompativel saem da fila antes da sessao; falha de rede nao corta.
+cat > "$SNIPPET" <<'PYSNIP'
+import io, contextlib
+json.dump({}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
+ctx = d.Ctx(); json.dump({"aplicadas": []}, open(ctx.paths["aplicadas"], "w"))
+nova = lambda i, url, fonte="telegram": {"id": i, "fonte": fonte, "titulo": "Desenvolvedor Java Junior", "empresa": "E" + i,
+                                         "url": url, "status": "nova", "score": 2}
+json.dump({"vagas": {"a": nova("a", "https://br.linkedin.com/in/recrutadora-123"), "b": nova("b", "https://x.com/vaga/fechada"),
+                     "c": nova("c", "https://x.com/vaga/ok"), "e": nova("e", "https://x.com/vaga/rede")}}, open(ctx.fila_path, "w"))
+corpo = "Vaga remota para desenvolvedor Java junior com Spring Boot e APIs REST. " * 8
+def fake(url, timeout=20):
+    if url.endswith("rede"): raise OSError("offline")
+    return ("Esta vaga foi encerrada " if url.endswith("fechada") else "") + "<p>" + corpo + "</p>"
+d.get = fake; d.time.sleep = lambda s: None
+with contextlib.redirect_stdout(io.StringIO()):
+    d.triar(ctx, 8)
+f = json.load(open(ctx.fila_path))["vagas"]
+assert f["a"]["status"] == "filtrada" and "url" in f["a"]["motivo"], f["a"]
+assert f["b"]["status"] == "filtrada" and "encerrada" in f["b"]["motivo"], f["b"]
+assert f["c"]["status"] == "nova" and f["c"].get("desc_checada"), f["c"]
+assert f["e"]["status"] == "nova" and f["e"].get("triagem_falhou"), f["e"]
+PYSNIP
+run_snippet && relata 0 "triar: perfil, encerrada e descricao ruim saem antes da sessao; rede fora nao corta" || relata 1 "triar: perfil, encerrada e descricao ruim saem antes da sessao; rede fora nao corta"
+
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0
