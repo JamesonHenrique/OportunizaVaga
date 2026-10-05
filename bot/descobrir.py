@@ -6,6 +6,7 @@ the best ones into the prompt, so the round spends its time applying instead of 
 
   descobrir.py coletar [--force]   fetch sources (time-gated: at most every intervalo_min)
   descobrir.py prompt N            print the top-N block for the prompt (counts one offer each)
+  descobrir.py triar [N]           pre-read the next N jobs by script (closed / description / official level)
   descobrir.py marcar              after a round: close jobs now registered / offered too often
   descobrir.py resumo              one-line counts (monitor/log)
 
@@ -37,6 +38,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import perfil_render  # noqa: E402
 import vaga_check  # noqa: E402
 import vagas_filtros as vf  # noqa: E402
+try:   # imported at load time: the private wrapper restores sys.path right after loading this module
+    import fontes_boards  # noqa: E402
+except ImportError:
+    fontes_boards = None
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
 DEFAULTS = {
@@ -63,6 +68,9 @@ DEFAULTS = {
     "prompt_registro": "",      # closing line of the prompt block (how to register each job); "" = default text
     "tempo_max_s": 150,         # collection deadline: no new search after it, what was collected is saved (callers time out at 180)
     "max_descricoes": 12,       # LinkedIn description fetches per collection (0 = description triage off; Gupy is free)
+    "boards": [],               # job boards collected by script (names in fontes_boards.BOARDS); [] = off
+    "board_termos": ["desenvolvedor junior"],  # one term per collection, rotated, for boards that support search
+    "boards_intervalo_min": 180,  # boards are hit at most this often (politeness; they are small sites)
 }
 STOP_TERMO = {"desenvolvedor", "desenvolvedora", "analista", "vaga", "remoto", "remota", "pessoa", "home", "office"}
 
@@ -239,6 +247,16 @@ def gupy(ctx, termo):
 FONTES = {"linkedin": linkedin, "gupy": gupy}
 
 
+def board(nome):
+    """Collector of a job board (fontes_boards.py, 05/10 idea 1): the model used to browse these boards in Chrome
+    and that browsing was ~70% of the robot's tool output. Missing module/board -> KeyError (counted as a
+    source error, never fatal)."""
+    if fontes_boards is None:
+        raise KeyError("fontes_boards ausente")
+    fn = fontes_boards.BOARDS[nome]
+    return lambda ctx, termo: fn(termo, get)
+
+
 def linkedin_detalhe(jid):
     """Public job page (no login): (description text, official "experience level" or None).
     Same guest endpoint family as the search; the label is localized by Accept-Language (pt-BR/en)."""
@@ -290,6 +308,11 @@ def motivo_filtro(ctx, v, pular_empresas, hoje=None):
     # hybrid/on-site by the model; located in the country ("Brasil") -> 16 jobs, 3 sends, 0 hybrid.
     if ctx.cfg["linkedin_cidade_fora"] and modelos == ["remoto"] and v.get("fonte") == "linkedin" \
             and CIDADE_LOCAL.search((v.get("local") or "").strip()) and not REMOTO_TXT.search(nt):
+        return "modelo"
+    # 05/10: board collectors (fontes_boards) set local="remoto" only when the board itself marks the job remote;
+    # anything else on a remote-only profile is an on-site/hybrid listing (trabalhabrasil "São Paulo/SP").
+    if modelos == ["remoto"] and fontes_boards and v.get("fonte") in fontes_boards.BOARDS \
+            and not REMOTO_TXT.search(vf.norm(v.get("local") or "") + " " + nt):
         return "modelo"
     if ctx.tipos and ctx.tipos.search(nt):
         return "tipo"
@@ -499,6 +522,15 @@ def coletar(ctx, force=False, fontes=None):
         buscas += [("linkedin", t) for t in escolhidos]
     if "gupy" in fontes:
         buscas += [("gupy", t) for t in gupy_termos]
+    ub = fila.get("boards_ultima")
+    if ctx.cfg["boards"] and (force or not ub or datetime.fromisoformat(ub) <=
+                              agora() - timedelta(minutes=int(ctx.cfg["boards_intervalo_min"]))):
+        bt = list(ctx.cfg["board_termos"]) or ["desenvolvedor junior"]
+        bi = int(fila.get("board_idx", 0))
+        # first: they are fast (~30 s for six) and must not be the ones the tempo_max_s deadline cuts
+        buscas = [("board:" + b, bt[bi % len(bt)]) for b in ctx.cfg["boards"]] + buscas
+        fila["board_idx"] = (bi + 1) % len(bt)
+        fila["boards_ultima"] = agora().isoformat(timespec="seconds")
     # Phase 1 — fetch + title filters. A deadline (tempo_max_s) keeps the whole collection inside the caller's
     # timeout (01/10: paging made it 113 s of 180; past the timeout nothing would be saved).
     t0, prazo = time.time(), float(ctx.cfg["tempo_max_s"])
@@ -511,7 +543,7 @@ def coletar(ctx, force=False, fontes=None):
         pf = por_fonte.setdefault(nome, [0, 0, 0])
         pf[0] += 1
         try:
-            achadas = FONTES[nome](ctx, termo)
+            achadas = (board(nome[6:]) if nome.startswith("board:") else FONTES[nome])(ctx, termo)
         except Exception as e:  # one source down never stops the others
             stats["erros"].append(f"{nome}:{type(e).__name__}")
             pf[1] += 1
@@ -625,6 +657,86 @@ def prompt(ctx, n):
     return 0
 
 
+ENCERRADA = re.compile(r"no longer accepting applications|n[aã]o (est[aá] )?aceita(ndo)? mais candidaturas|"
+                       r"vaga (foi )?encerrada|esta vaga (n[aã]o est[aá] mais dispon[ií]vel|expirou)", re.I)
+
+
+NAO_E_VAGA = re.compile(r"linkedin\.com/(in|company|posts|feed)/|/posts/", re.I)
+
+
+def texto_generico(url):
+    """Description of a non-LinkedIn posting: JSON-LD JobPosting when the page has one, else the visible text.
+    Returns (text, closed?)."""
+    p = get(url)
+    fechada = bool(ENCERRADA.search(p))
+    for bloco in re.findall(r'<script[^>]+application/ld\+json[^>]*>(.*?)</script>', p, re.S):
+        try:
+            d = json.loads(bloco)
+        except ValueError:
+            continue
+        for x in (d if isinstance(d, list) else d.get("@graph", [d]) if isinstance(d, dict) else []):
+            if isinstance(x, dict) and x.get("@type") == "JobPosting" and x.get("description"):
+                return html.unescape(re.sub(r"<[^>]+>", " ", x["description"])), fechada
+    corpo = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", p, flags=re.S | re.I)
+    return html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", corpo))), fechada
+
+
+def triar(ctx, n=8):
+    """Pre-read the next jobs the model would get (05/10, idea 3): description + official level + closed posting,
+    by script, BEFORE the gate decides whether a model session is worth it.
+
+    Why: the queue only checked descriptions for the top max_descricoes LinkedIn jobs at collection time; the
+    rest (and every Telegram/board job) reached the model unread, and the model spent a session opening a
+    posting to find "Sênior", "MID" or "no longer accepting applications" (05/10 14:48: 5 offered, 5 discarded).
+    Fail open: a fetch error leaves the job as it was."""
+    fila = vf.load_json(ctx.fila_path, {"vagas": {}})
+    vistos = cortados = 0
+    _, blobs, _ = ids_conhecidos(ctx.paths["aplicadas"])
+    for v in pendentes(fila):
+        if vistos >= n:
+            break
+        # 05/10 measured: Telegram posts whose link is a recruiter PROFILE, and jobs the model already
+        # registered, stayed "nova" and were offered again and again. Both are free to catch here.
+        if NAO_E_VAGA.search(v.get("url") or ""):
+            v.update(status="filtrada", motivo="url nao e vaga (triagem)", visto_em=_stamp())
+            cortados += 1
+            continue
+        if ja_registrada(v, blobs):
+            v.update(status="processada", motivo="ja registrada (triagem)", visto_em=_stamp())
+            cortados += 1
+            continue
+        if v.get("desc_checada") or v.get("triagem_falhou"):
+            continue
+        vistos += 1
+        try:
+            if v["fonte"] == "linkedin":
+                jid = v["id"].split(":", 1)[1]
+                pagina = get(f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{jid}")
+                fechada = bool(ENCERRADA.search(pagina))
+                texto, oficial = linkedin_detalhe(jid)
+            else:
+                (texto, fechada), oficial = texto_generico(v["url"]), None
+        except Exception:
+            v["triagem_falhou"] = _stamp()
+            continue
+        if fechada:
+            v.update(status="filtrada", motivo="encerrada (triagem)", visto_em=_stamp())
+            cortados += 1
+            continue
+        if len(texto.strip()) < 200:
+            v["triagem_falhou"] = _stamp()
+            continue
+        ok, motivo = vaga_check.avaliar(texto, v["titulo"], oficial, ctx.vaga_conf)
+        v["desc_checada"], v["nivel_oficial"] = True, oficial or ""
+        if not ok:
+            v.update(status="filtrada", motivo="desc:" + motivo, visto_em=_stamp())
+            cortados += 1
+        time.sleep(random.uniform(1.5, 3))   # polite
+    vf.save_json(ctx.fila_path, fila)
+    print(f"descobrir: triagem leu {vistos}, cortou {cortados} (encerrada/descricao)")
+    return 0
+
+
 def _tocada(v, texto):
     """Did the round's model deal with this job? Its numeric id or its (Gupy base64) URL token is in the log."""
     num = v["id"].split(":", 1)[-1]
@@ -725,12 +837,14 @@ def resumo(ctx):
 
 def main(argv):
     cmd = argv[1] if len(argv) > 1 else ""
-    if cmd not in ("coletar", "prompt", "marcar", "resumo"):
+    if cmd not in ("coletar", "triar", "prompt", "marcar", "resumo"):
         print(__doc__)
         return 2
     ctx = Ctx()
     if cmd == "coletar":
         return coletar(ctx, "--force" in argv)
+    if cmd == "triar":
+        return triar(ctx, int(argv[2]) if len(argv) > 2 else 8)
     if cmd == "prompt":
         return prompt(ctx, int(argv[2]) if len(argv) > 2 else 5)
     if cmd == "marcar":
