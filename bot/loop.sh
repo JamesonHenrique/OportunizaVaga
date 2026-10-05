@@ -252,13 +252,8 @@ ensure_monitor() {
     nohup "$NODE_BIN" "$BOT_ROOT/monitor/publish-status.mjs" >/tmp/oportunizavaga-monitor.log 2>&1 9>&- &
 }
 
-# Quota so conta quando vem de linha de erro do provider ou do sentinel do prompt.
-# Nunca varre o corpo da rodada (anuncio de vaga com "trial"/"credit" nao deve
-# mandar o loop dormir 1h).
-is_quota() {
-  grep -qE '^[[:space:]]*QUOTA_EXAUSTA|Error from provider.*([Rr]ate limit|[Qq]uota|429|[Ee]xhausted|[Tt]oo [Mm]any)|AI_RetryError|RateLimitError' "$1"
-}
-
+# Quota no log da rodada vem de is_quota(), em prompt_cond/../opencode-erros.sh: esta linha estava
+# copiada aqui e nos dois installs privados (04/10, cap 121 F4).
 # O opencode NAO imprime rate limit no stdout quando entra em retry silencioso: o erro so existe no log
 # interno. bot/lib/opencode-erros.sh separa COTA de erro TRANSITORIO (503, timeout de cabecalho, sobrecarga):
 # antes qualquer AI_APICallError contava como cota e punha o melhor modelo em resfriamento por um 503.
