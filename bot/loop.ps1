@@ -715,6 +715,19 @@ while ($true) {
             }
             Remove-Job -Job $dj -Force -ErrorAction SilentlyContinue
         } catch { Write-LoopLog 'descobrir: coleta falhou (segue sem fila)' }
+        # Pre-read the next jobs (closed posting, profile link, already registered, description/official level)
+        # BEFORE the round, so a queue the model would only discard is cut by script.
+        try {
+            $tj = Start-Job -ScriptBlock { param($py, $sc) & $py $sc triar 8 2>&1 } -ArgumentList $Py, (Join-Path $BOT_ROOT 'bot\descobrir.py')
+            if (Wait-Job -Job $tj -Timeout 120) {
+                $o = Receive-Job -Job $tj
+                if ($o) { Add-Content -Path 'loop.log' -Value $o }
+            } else {
+                Stop-Job -Job $tj -ErrorAction SilentlyContinue
+                Write-LoopLog 'descobrir: triagem falhou (segue sem ela)'
+            }
+            Remove-Job -Job $tj -Force -ErrorAction SilentlyContinue
+        } catch { Write-LoopLog 'descobrir: triagem falhou (segue sem ela)' }
     }
     $prompt = Render-Prompt
 

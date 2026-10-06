@@ -431,6 +431,9 @@ while true; do
   # enche <estado>/vagas_fila.json, que o render_prompt injeta no prompt.
   if [ "$OV_DESCOBRIR" = "1" ]; then
     timeout 180 python3 "$BOT_ROOT/bot/descobrir.py" coletar >> loop.log 2>&1 || log "descobrir: coleta falhou (segue sem fila)"
+    # Pre-read the next jobs (closed posting, profile link, already registered, description/official level)
+    # BEFORE the gate, so a queue the model would only discard opens no session.
+    timeout 120 python3 "$BOT_ROOT/bot/descobrir.py" triar 8 >> loop.log 2>&1 || log "descobrir: triagem falhou (segue sem ela)"
   fi
   # Round gate (opt-in OV_PORTAO=1, bot/rodada-portao.py): no model session when there is nothing to do;
   # queue-only round (no site scan) when no site is due. Fail-open: an error means a normal round.

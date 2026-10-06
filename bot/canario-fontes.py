@@ -10,6 +10,7 @@ checks OFFLINE against the fixtures in tests/fixtures/):
   - linkedin search   -> >= 1 job with id, titulo and url
   - linkedin job page -> non-empty description AND the official experience level
   - gupy search API   -> >= 1 job with id, titulo and url, and a description
+  - each job board in descoberta.json "boards" -> >= 1 job with titulo and url (robots.txt honoured)
 The fixtures are SYNTHETIC: they pin the markup this project assumes, so a green offline test does not prove the
 portal still serves it. Only this live canary detects drift. It costs 2-3 requests a day (see docs/USO-ETICO.md).
 The search term is the first of the active profile; env NOTIFY overrides the notifier (tests).
@@ -59,6 +60,16 @@ def checar(ctx=None, termo=None):
                 falhas.append("Gupy busca: sem descricao")
         except Exception as e:
             falhas.append(f"Gupy busca: {type(e).__name__}")
+    # 05/10: job boards collected by script (descoberta.json "boards", bot/fontes_boards.py) — HTML/Next.js parsers
+    # break on any redesign; 1-3 requests per board a day.
+    bt = (ctx.cfg.get("board_termos") or ["desenvolvedor junior"])[0]
+    for b in ctx.cfg.get("boards") or []:
+        try:
+            vs = [v for v in d.board(b)(ctx, bt) if v.get("titulo") and v.get("url")]
+            if not vs:
+                falhas.append(f"{b}: 0 vagas")
+        except Exception as e:
+            falhas.append(f"{b}: {type(e).__name__}")
     return falhas
 
 

@@ -247,6 +247,27 @@ def gupy(ctx, termo):
 FONTES = {"linkedin": linkedin, "gupy": gupy}
 
 
+_ROBOTS = {}
+
+
+def get_robots(url, timeout=20):
+    """get() that honours the site's robots.txt (05/10: boards are third-party sites and this code is public).
+    One robots.txt read per host per run; unreadable robots.txt = allowed (the RFC 9309 default for 4xx)."""
+    import urllib.robotparser
+    host = "/".join(url.split("/")[:3])
+    rp = _ROBOTS.get(host)
+    if rp is None:
+        rp = urllib.robotparser.RobotFileParser()
+        try:
+            rp.parse(get(host + "/robots.txt", timeout=timeout).splitlines())
+        except Exception:
+            rp.parse([])
+        _ROBOTS[host] = rp
+    if not rp.can_fetch("OportunizaVagaBot", url):
+        raise PermissionError(f"robots.txt proibe {url}")
+    return get(url, timeout=timeout)
+
+
 def board(nome):
     """Collector of a job board (fontes_boards.py, 05/10 idea 1): the model used to browse these boards in Chrome
     and that browsing was ~70% of the robot's tool output. Missing module/board -> KeyError (counted as a
@@ -254,7 +275,7 @@ def board(nome):
     if fontes_boards is None:
         raise KeyError("fontes_boards ausente")
     fn = fontes_boards.BOARDS[nome]
-    return lambda ctx, termo: fn(termo, get)
+    return lambda ctx, termo: fn(termo, get_robots)
 
 
 def linkedin_detalhe(jid):
