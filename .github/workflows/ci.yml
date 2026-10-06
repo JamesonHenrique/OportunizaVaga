@@ -48,6 +48,11 @@ jobs:
           ((${#files[@]})) || { echo 'nenhum tests/test_*.sh versionado'; exit 1; }
           for t in "${files[@]}"; do echo "== $t"; bash "$t"; done
           echo "suite bash OK: ${#files[@]} arquivos"
+      - name: suite python (tests/test_*.py)
+        run: |
+          mapfile -t files < <(git ls-files 'tests/test_*.py')
+          for t in "${files[@]}"; do echo "== $t"; python3 "$t"; done
+          echo "suite python OK: ${#files[@]} arquivos"
       - name: node --test monitor/
         run: node --test monitor/*.test.mjs
       - name: sanitize (sem segredos/dados pessoais)

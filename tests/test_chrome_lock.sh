@@ -67,21 +67,23 @@ DT=$(( $(date +%s) - T0 ))
 [ "$RC" = "75" ] && [ ! -s "$T/out" ] && [ "$DT" -le 3 ] && grep -q "timed out" "$CHROME_LOCK_LOG"; relata $? "lock ocupado -> timeout rc 75 em ${DT}s"
 wait
 
-# 9 — gmail-status.py (Python, portable) follows the same priority-flag protocol.
+# 9 — gmail-status.py has no lock of its own (04/10): it shells out to chrome-lock.sh with priority alta, and
+# rc 75 (waited past WAIT) is reported as "Chrome ocupado", not as a parse error.
 python3 - "$ROOT" "$T" <<'PYEOF'
-import importlib.util, os, sys
+import importlib.util, os, sys, types
 root, t = sys.argv[1], sys.argv[2]
 spec = importlib.util.spec_from_file_location("gs", os.path.join(root, "bot", "gmail-status.py"))
 gs = importlib.util.module_from_spec(spec); spec.loader.exec_module(gs)
-flag = os.path.join(t, "agent-chrome-9222.prio.gmail")
-with gs.browser_lock(wait=2) as lk:
-    assert lk.acquired and os.path.exists(flag), "flag missing while holding"
-assert not os.path.exists(flag), "flag not removed"
-open(flag, "w").close()
-with gs.browser_lock(wait=2) as lk:
-    pass
-assert os.path.exists(flag), "parent-owned flag was removed"
+visto = {}
+def falso(cmd, **kw):
+    visto["cmd"] = cmd
+    return types.SimpleNamespace(returncode=75, stdout="", stderr="")
+gs.subprocess.run = falso
+r = gs.extrair_conta("conta@exemplo.invalid")
+c = visto["cmd"]
+assert c[0] == gs.CHROME_LOCK and c[0].endswith("chrome-lock.sh") and c[1:3] == ["gmail", "alta"] and "--" in c, c
+assert r["ok"] is False and "rc 75" in r["erro"], r
 PYEOF
-relata $? "gmail-status.browser_lock cria/remove a flag alta (e preserva a do pai)"
+relata $? "gmail-status usa o chrome-lock.sh com prioridade alta e trata rc 75"
 
 if [ "$FAIL" -eq 0 ]; then echo "# verde: $N/$TOTAL"; exit 0; else echo "# FALHAS: $FAIL/$TOTAL"; exit 1; fi
