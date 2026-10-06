@@ -794,20 +794,41 @@ def registrar_descarte(ctx, v, motivo):
     return r.returncode == 0
 
 
-def carimbar_caminho(ctx, ofertadas):
-    """caminho=fila|rodizio on the records written by this round (env OV_RODADA, stamped by estado.py as "rodada"),
-    so the funnel can tell whether the queue or the site scan sends more applications."""
+RE_SITE_RESULTADO = re.compile(r"RESULTADO\b[^\n]*?\bsite=([\w.-]+)")
+
+
+def descoberta(v, site=""):
+    """Where a sent job was FOUND: "<fonte>:<termo>" for a queue offer (LinkedIn/Gupy search term, Telegram
+    channel, board), "rodizio:<site>" for the model's own scan. The queue's termo already carries its fonte for
+    Telegram ("telegram:canal")."""
+    if v is None:
+        return "rodizio" + (f":{site}" if site and site != "fila" else "")
+    fonte, termo = str(v.get("fonte") or "?"), str(v.get("termo") or "")
+    if not termo:
+        return fonte
+    return termo if termo.startswith(fonte + ":") else f"{fonte}:{termo}"
+
+
+def carimbar_caminho(ctx, ofertadas, texto=""):
+    """caminho=fila|rodizio and descoberta=<fonte>:<termo> on the records written by this round (env OV_RODADA,
+    stamped by estado.py as "rodada"). 06/10: caminho alone could not tell WHICH term, channel or site found the
+    jobs that were sent, so LinkedIn terms and Telegram channels were pruned blind. The scanned site comes from the
+    round's RESULTADO line (texto = the round log)."""
     rodada = os.environ.get("OV_RODADA")
     if not rodada:
         return
+    sites = RE_SITE_RESULTADO.findall(texto or "")
+    site = sites[-1] if sites else ""
     for a in vf.load_json(ctx.paths["aplicadas"], {}).get("aplicadas", []):
         if not isinstance(a, dict) or a.get("rodada") != rodada or a.get("caminho"):
             continue
         ids = job_ids(a.get("chave"), a)
         blob = [vf.norm(f"{a.get('chave')} {a.get('empresa')} {a.get('vaga')}").replace("_", " ")]
-        da_fila = any(k in ids or ja_registrada(v, blob) for k, v in ofertadas.items())
-        subprocess.run([sys.executable, estado_py(), "--file", ctx.paths["aplicadas"], "set-campo", a["chave"], "caminho",
-                        "fila" if da_fila else "rodizio"], check=False, capture_output=True, timeout=30)
+        oferta = next((v for k, v in ofertadas.items() if k in ids or ja_registrada(v, blob)), None)
+        for campo, valor in (("descoberta", descoberta(oferta, site)), ("caminho", "fila" if oferta else "rodizio")):
+            # caminho last: it is the "already stamped" mark checked above
+            subprocess.run([sys.executable, estado_py(), "--file", ctx.paths["aplicadas"], "set-campo", a["chave"],
+                            campo, valor], check=False, capture_output=True, timeout=30)
 
 
 def marcar(ctx, log=None):
@@ -845,7 +866,7 @@ def marcar(ctx, log=None):
                 int(v.get("mostrada", 0)) >= int(ctx.cfg["max_mostrada"]):
             v["status"], expiradas = "expirada", expiradas + 1
     vf.save_json(ctx.fila_path, fila)
-    carimbar_caminho(ctx, ofertadas)
+    carimbar_caminho(ctx, ofertadas, texto)
     print(f"descobrir: {fechadas} processadas pelo robo, {descartadas} descartes do modelo registrados, "
           f"{expiradas} expiradas, {len(pendentes(fila))} pendentes")
     return 0

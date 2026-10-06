@@ -28,11 +28,13 @@ python3 - "$ROOT" <<'PY'
 import sys, importlib.util, datetime as D
 s = importlib.util.spec_from_file_location("f", sys.argv[1] + "/bot/funil-fontes.py"); f = importlib.util.module_from_spec(s); s.loader.exec_module(f)
 ap = [{"como": "Gupy", "status": "encerrada", "data": "2026-09-01"}, {"como": "Gupy", "status": "entrevista", "data": "2026-09-20"},
-      {"url": "https://www.linkedin.com/jobs/view/1/", "status": "enviada", "data": "2026-09-01", "caminho": "fila"}]
+      {"url": "https://www.linkedin.com/jobs/view/1/", "status": "enviada", "data": "2026-09-01", "caminho": "fila",
+       "descoberta": "linkedin:java junior"}]
 p = f.funil(ap, D.date(2026, 10, 1))
 assert p[("fonte", "gupy")] == {"envios": 2, "respostas": 2, "avancos": 1, "sem_resposta": 0}, p
 assert p[("fonte", "linkedin")]["sem_resposta"] == 1 and p[("caminho", "fila")]["envios"] == 1, p
+assert p[("descoberta", "linkedin:java junior")]["envios"] == 1 and ("descoberta", None) not in p, p
 PY
-relata $? "funil-fontes: retorno, avanco e sem resposta >21d por fonte e caminho"
+relata $? "funil-fontes: retorno, avanco e sem resposta >21d por fonte, caminho e descoberta"
 
 [ "$FAIL" -eq 0 ] && { echo "# verde: $N/$TOTAL"; exit 0; } || { echo "# FALHAS: $FAIL/$TOTAL"; exit 1; }
