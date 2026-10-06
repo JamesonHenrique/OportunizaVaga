@@ -67,7 +67,11 @@ Describe 'dry-run.ps1: filtro de sites' {
                     Where-Object { $_.Name -notin @('_template.sh', 'lib.sh') })
                 $obj.site_count | Should -Be $adaptadores.Count
                 $ids = @($obj.sites | ForEach-Object { $_.site_id }) | Sort-Object
-                foreach ($a in $adaptadores) { $ids | Should -Contain ([System.IO.Path]::GetFileNameWithoutExtension($a.Name)) }
+                # o plano usa o SITE_ID declarado no arquivo (eu-dev-br.sh -> "eu.dev.br"), nao o nome do arquivo
+                foreach ($a in $adaptadores) {
+                    $sid = [regex]::Match((Get-Content $a.FullName -Raw), 'SITE_ID="([^"]+)"').Groups[1].Value
+                    $ids | Should -Contain $sid
+                }
             }
             finally { Remove-Item $prof -Force -ErrorAction SilentlyContinue }
         }
