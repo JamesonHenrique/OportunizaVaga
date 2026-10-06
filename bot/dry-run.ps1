@@ -130,7 +130,8 @@ foreach ($file in (Get-ChildItem $adapterDir -Filter '*.sh' | Sort-Object Name))
     $siteHome = [regex]::Match($text, 'SITE_HOME="([^"]+)"').Groups[1].Value
     $template = [regex]::Match($text, 'SEARCH_URL_TEMPLATE="([^"]+)"').Groups[1].Value
     if ([string]::IsNullOrWhiteSpace($template)) { throw "adaptador invalido: $siteId (sem SEARCH_URL_TEMPLATE)" }
-    if ($template -notlike '*SEU_TERMO*') { throw "adaptador invalido: $siteId (SEARCH_URL_TEMPLATE sem marcador SEU_TERMO)" }
+    # Sem SEU_TERMO = site sem busca por termo (abler, netvagas, remotar...): a URL e o proprio template,
+    # como no site_url_busca do lib.sh (o throw daqui derrubava o dry-run inteiro no Windows).
     $term = [string]@($PerfilDoc.termos)[0]
     # Como o termo entra na URL. Chamar site_url_busca exigiria bash (ausente no Windows), entao
     # lemos SEARCH_ENCODING do adaptador (contrato em docs/ADAPTERS.md). Sem a declaracao cai em %20,

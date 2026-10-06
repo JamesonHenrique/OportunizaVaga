@@ -21,7 +21,14 @@ BeforeAll {
         @{ Id = 'catho';      Url = 'https://www.catho.com.br/vagas/analista-financeiro/' },
         @{ Id = 'infojobs';   Url = 'https://www.infojobs.com.br/vagas-de-emprego-analista%20financeiro.aspx' },
         @{ Id = 'solides';    Url = 'https://vagas.solides.com.br/vagas/analista-financeiro' },
-        @{ Id = 'trampos';    Url = 'https://trampos.co/oportunidades/?tr=analista%20financeiro' }
+        @{ Id = 'trampos';    Url = 'https://trampos.co/oportunidades/?tr=analista%20financeiro' },
+        # sites sem busca por termo: a URL e o template (bash: site_url_busca devolve o template)
+        @{ Id = 'abler';      Url = 'https://candidatos.abler.com.br/vagas' },
+        @{ Id = 'eu-dev-br';  SiteId = 'eu.dev.br'; Url = 'https://eu.dev.br/vagas/' },
+        @{ Id = 'jooble';     Url = 'https://br.jooble.org/empregos' },
+        @{ Id = 'netvagas';   Url = 'https://www.netvagas.com.br/empresa/anuncios/cargo/desenvolvedor/' },
+        @{ Id = 'remotar';    Url = 'https://remotar.com.br/search/jobs' },
+        @{ Id = 'trabalhabrasil'; Url = 'https://www.trabalhabrasil.com.br/vagas-de-emprego' }
     )
 
     function New-TestProfile {
@@ -112,8 +119,10 @@ Describe 'dry-run.ps1: filtro de sites' {
 
                 foreach ($caso in $Casos) {
                     $esperado = (& $bash.Source -c "cd '$RepoRoot'; source bot/sites/lib.sh; site_adapter_source '$($caso.Id)' '$RepoRoot'; site_url_busca 'analista financeiro'").Trim()
-                    $porId.ContainsKey($caso.Id) | Should -Be $true -Because "$($caso.Id) tem que entrar no plano"
-                    $porId[$caso.Id] | Should -Be $esperado -Because "URL do $($caso.Id) divergiu entre dry-run.ps1 e site_url_busca"
+                    # arquivo (Id) e SITE_ID podem diferir: eu-dev-br.sh declara SITE_ID="eu.dev.br"
+                    $sid = if ($caso.SiteId) { $caso.SiteId } else { $caso.Id }
+                    $porId.ContainsKey($sid) | Should -Be $true -Because "$sid tem que entrar no plano"
+                    $porId[$sid] | Should -Be $esperado -Because "URL do $sid divergiu entre dry-run.ps1 e site_url_busca"
                 }
             }
             finally { Remove-Item $prof -Force -ErrorAction SilentlyContinue }
