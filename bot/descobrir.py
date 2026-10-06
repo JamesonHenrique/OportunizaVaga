@@ -772,6 +772,8 @@ def descarte(v, texto):
     """The model's own discard line for this job (models often write DESCARTADA without add-bloqueado): reason or None."""
     num = v["id"].split(":", 1)[-1]
     for linha in texto.splitlines():
+        if "add-bloqueado" in linha:
+            continue   # the model's own estado.py call echoed in the log: already recorded, under the model's key
         m = DESCARTE.search(linha)
         if m and num in linha:
             return re.sub(r"\s+", " ", m.group(1)).strip(" :|-…")[:200] or "descartada pelo modelo"
@@ -828,13 +830,16 @@ def marcar(ctx, log=None):
             continue
         if v.get("oferta_aberta"):
             ofertadas[k] = v
+        registrada = k in conhecidos or url_canon(v.get("url")) in conhecidos or ja_registrada(v, blobs)
         if v.pop("oferta_aberta", False) and (not log or _tocada(v, texto)):
             v["ofertas"] = int(v.get("ofertas", 0)) + 1
-            motivo = descarte(v, texto) if log else None
+            # 06/10: only a discard the model did NOT record itself. Matching "DESCARTADA" in the echo of its own
+            # add-bloqueado stored the job twice (model key + queue id), the second with JSON/shell residue as motivo.
+            motivo = descarte(v, texto) if log and not registrada else None
             if motivo and registrar_descarte(ctx, v, motivo):
                 v["status"], v["motivo"], descartadas = "processada", "descartada: " + motivo, descartadas + 1
                 continue
-        if k in conhecidos or url_canon(v.get("url")) in conhecidos or ja_registrada(v, blobs):
+        if registrada:
             v["status"], fechadas = "processada", fechadas + 1
         elif int(v.get("ofertas", 0)) >= int(ctx.cfg["max_ofertas"]) or \
                 int(v.get("mostrada", 0)) >= int(ctx.cfg["max_mostrada"]):

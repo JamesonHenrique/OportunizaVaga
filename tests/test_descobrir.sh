@@ -181,6 +181,8 @@ a = json.load(open(ctx.paths["aplicadas"], encoding="utf-8"))
 assert f["li:111"]["status"] == "processada" and "li_111" in a["bloqueados"], f["li:111"]
 assert f["li:222"]["ofertas"] == 1 and f["li:333"]["ofertas"] == 0 and "oferta_aberta" not in f["li:333"], f
 assert d.descarte({"id": "li:9"}, "9 | x | NAO DESCARTADA, aplicar") is None
+# the echo of the model's own add-bloqueado is not a text discard (it would store the job twice)
+assert d.descarte({"id": "li:4300000444"}, "$ python3 estado.py add-bloqueado g_4300000444 '{\"motivo\":\"DESCARTADA\"}'") is None
 assert d._gemea({"empresa": "LINA ", "titulo": "Backend Júnior"}) == d._gemea({"empresa": "lina", "titulo": "Backend Junior"})
 PYSNIP
 run_snippet && relata 0 "marcar LOG: oferta so conta se aberta, descarte em texto registrado, duplicada" || relata 1 "marcar LOG: oferta so conta se aberta, descarte em texto registrado, duplicada"
