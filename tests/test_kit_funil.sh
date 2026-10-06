@@ -15,7 +15,8 @@ msgs = []; k.avisar = lambda m, dry: msgs.append(m); k.marcar = lambda c, campo,
 json.dump({"achados": [{"chave": "acme_dev_1", "trecho": "Invitation: Entrevista - Acme @ Thu Oct 1, 202"}]}, open(os.environ["OV_GMAIL_STATUS"], "w"))
 AP = [{"chave": "acme_dev_1", "empresa": "Acme", "vaga": "Dev Jr", "status": "entrevista"},
       {"chave": "beta_dev_2", "empresa": "Beta", "vaga": "Dev", "status": "etapa_teste", "teste_feito_em": "2026-09-30"}]
-k.load = lambda p, d: {"aplicadas": AP} if p == k.APLICADAS else json.load(open(p))
+# load() returns (data, reason) since ea5e9e1 ("0 aviso(s)" must tell "nothing to do" from "could not see")
+k.load = lambda p, d: ({"aplicadas": AP} if p == k.APLICADAS else json.load(open(p)), None)
 k.main(hoje=D.date(2026, 9, 30), agora_h=9)
 assert len(msgs) == 1 and "Acme" in msgs[0] and "01/10" in msgs[0] and "set-campo acme_dev_1" in msgs[0], msgs
 k.main(hoje=D.date(2026, 10, 1), agora_h=9); assert len(msgs) == 2 and msgs[1].startswith("⏰ HOJE"), msgs
