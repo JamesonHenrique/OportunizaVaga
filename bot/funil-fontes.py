@@ -33,7 +33,7 @@ def funil(ap, hoje=None):
         if not isinstance(a, dict):
             continue
         st = a.get("status") or "enviada"
-        for chave in (("fonte", fonte(a)), ("caminho", a.get("caminho"))):
+        for chave in (("fonte", fonte(a)), ("caminho", a.get("caminho")), ("descoberta", a.get("descoberta"))):
             if chave[1] is None:
                 continue
             c = por.setdefault(chave, {"envios": 0, "respostas": 0, "avancos": 0, "sem_resposta": 0})
@@ -67,6 +67,11 @@ def main():
     if cam:
         print("caminho (desde 01/10): " + ", ".join(f"{k} {v['envios']} envios/{v['respostas']} respostas"
                                                    for k, v in sorted(cam.items())))
+    # 06/10: which search term / Telegram channel / scanned site found the jobs that were sent (descobrir.py)
+    desc = sorted(((k[1], v) for k, v in por.items() if k[0] == "descoberta"), key=lambda x: (-x[1]["envios"], x[0]))
+    if desc:
+        print("descoberta (desde 06/10): " + ", ".join(f"{k} {v['envios']}/{v['respostas']}" for k, v in desc[:8])
+              + " (envios/respostas)")
     return 0
 
 

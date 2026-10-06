@@ -223,10 +223,19 @@ rec = lambda c, u: {"chave": c, "empresa": "Acme", "vaga": "Dev", "status": "env
 json.dump({"aplicadas": [rec("acme_a_4000000001", "https://www.linkedin.com/jobs/view/4000000001/"),
                          rec("acme_b_4000000002", "https://www.linkedin.com/jobs/view/4000000002/")],
            "bloqueados": {}}, open(ctx.paths["aplicadas"], "w"))
+json.dump({"vagas": {"li:4000000001": {"status": "nova", "score": 2, "titulo": "Dev", "empresa": "Acme", "fonte": "linkedin",
+                                      "id": "li:4000000001", "termo": "java junior", "ofertas": 1, "oferta_aberta": True,
+                                      "url": "https://www.linkedin.com/jobs/view/4000000001/"}}}, open(ctx.fila_path, "w"))
+open(T + "/rodada.log", "w").write("browser_navigate https://www.linkedin.com/jobs/view/4000000001/\n... RESULTADO enviadas=2 avaliadas=3 bloqueadas=0 quase_la=0 site=netvagas obs=x\n")
 with contextlib.redirect_stdout(io.StringIO()):
-    d.marcar(ctx)
-cam = {c[5]: c[7] for c in chamadas if "set-campo" in c}
-assert all(c[1] == "/privado/estado.py" for c in chamadas) and cam == {"acme_a_4000000001": "fila", "acme_b_4000000002": "rodizio"}, chamadas
+    d.marcar(ctx, T + "/rodada.log")
+cam = {(c[5], c[6]): c[7] for c in chamadas if "set-campo" in c}
+assert all(c[1] == "/privado/estado.py" for c in chamadas), chamadas
+assert cam == {("acme_a_4000000001", "caminho"): "fila", ("acme_b_4000000002", "caminho"): "rodizio",
+               ("acme_a_4000000001", "descoberta"): "linkedin:java junior",
+               ("acme_b_4000000002", "descoberta"): "rodizio:netvagas"}, cam
+assert d.descoberta({"fonte": "telegram", "termo": "telegram:devsvagas"}) == "telegram:devsvagas"
+assert d.descoberta({"fonte": "gupy"}) == "gupy" and d.descoberta(None, "fila") == "rodizio"
 PYSNIP
 run_snippet && relata 0 "instalacao privada: termos_arquivo, score_palavras, prompt_registro, OV_ESTADO_PY, caminho" || relata 1 "instalacao privada: termos_arquivo, score_palavras, prompt_registro, OV_ESTADO_PY, caminho"
 
