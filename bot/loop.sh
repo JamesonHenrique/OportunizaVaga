@@ -426,7 +426,6 @@ while true; do
   ROUND_LOG="logs/rodada-$(date '+%Y%m%d-%H%M%S').log"
   # Round id: estado.py stamps it as "rodada" on records; descobrir.py marcar uses it for "caminho" (fila|rodizio).
   OV_RODADA=$(basename "$ROUND_LOG" .log); OV_RODADA=${OV_RODADA#rodada-}; export OV_RODADA
-  python3 "$BOT_ROOT/bot/rodizio-saude.py" pre "$APLICADAS_FILE" --perfil "$PERFIL_FILE" >> loop.log 2>&1 || true
   # Descoberta deterministica (opt-in, sem LLM; a coleta respeita o intervalo dentro do script):
   # enche <estado>/vagas_fila.json, que o render_prompt injeta no prompt.
   if [ "$OV_DESCOBRIR" = "1" ]; then
@@ -447,6 +446,9 @@ while true; do
     esac
   fi
   export OV_SO_FILA
+  # Rotation snapshot AFTER the gate: when the gate moves the rotation to the site that is due, `pos` must credit
+  # that site (ultima_varredura) — taken before, it credited the old one and the scanned site stayed "due".
+  python3 "$BOT_ROOT/bot/rodizio-saude.py" pre "$APLICADAS_FILE" --perfil "$PERFIL_FILE" >> loop.log 2>&1 || true
   render_prompt
   FP_ANTES=$(fingerprint "$APLICADAS_FILE")
   log "rodada iniciada (perfil ${PERFIL_NOME}, rodadas vazias seguidas: ${VAZIAS})"
