@@ -345,5 +345,24 @@ assert f["e"]["status"] == "nova" and f["e"].get("triagem_falhou"), f["e"]
 PYSNIP
 run_snippet && relata 0 "triar: perfil, encerrada e descricao ruim saem antes da sessao; rede fora nao corta" || relata 1 "triar: perfil, encerrada e descricao ruim saem antes da sessao; rede fora nao corta"
 
+# 16 — boards respeitam robots.txt (05/10): caminho proibido nao e baixado; robots ilegivel = permitido.
+cat > "$SNIPPET" <<'PYSNIP'
+pedidos = []
+def fake(url, timeout=20):
+    pedidos.append(url)
+    if url == "https://a.example/robots.txt": return "User-agent: *\nDisallow: /privado\n"
+    if url == "https://b.example/robots.txt": raise OSError("404")
+    return "ok"
+d.get = fake; d._ROBOTS.clear()
+assert d.get_robots("https://a.example/vagas") == "ok"
+try:
+    d.get_robots("https://a.example/privado/x"); raise AssertionError("baixou caminho proibido")
+except PermissionError:
+    pass
+assert "https://a.example/privado/x" not in pedidos and pedidos.count("https://a.example/robots.txt") == 1, pedidos
+assert d.get_robots("https://b.example/qualquer") == "ok"
+PYSNIP
+run_snippet && relata 0 "boards: robots.txt respeitado (proibido nao baixa; ilegivel permite)" || relata 1 "boards: robots.txt respeitado (proibido nao baixa; ilegivel permite)"
+
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0

@@ -49,6 +49,11 @@ Além das buscas (poucas a cada ~90 min), a triagem pela descrição baixa **a p
 vagas do LinkedIn por coleta (padrão 12, com pausa aleatória de 1,5-3 s entre elas; `0` desliga) e o canário diário faz 2-3
 requisições. Tudo é público, sem login. Reduza `max_descricoes`/`termos_por_coleta` para um ritmo ainda mais baixo.
 
+**Boards de vagas** (`descoberta.json → boards`, padrão vazio = desligado; `bot/fontes_boards.py`): no máximo a cada
+`boards_intervalo_min` (padrão 180 min), 1-3 requisições por board e 1 termo por coleta. Toda requisição passa pelo
+`robots.txt` do site (`get_robots`): caminho proibido não é baixado e a fonte para sozinha se o site mudar a regra.
+`triar` baixa ainda a página pública das próximas 8 vagas da fila, com pausa de 1,5-3 s entre elas.
+
 ## Privacidade
 
 Rodar o modelo **100% local com Ollama** faz seus dados e CV nunca saírem da máquina.
