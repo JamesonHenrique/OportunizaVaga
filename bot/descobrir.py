@@ -22,6 +22,7 @@ Sources (public, no login; endpoints as observed in 2026, they may change withou
 Indeed is left out on purpose: it sits behind Cloudflare.
 Be polite: a handful of requests every ~90 min. See docs/USO-ETICO.md.
 """
+import copy
 import html
 import json
 import os
@@ -518,6 +519,7 @@ def avisar_fontes(fila, por_fonte, erros):
 
 def coletar(ctx, force=False, fontes=None):
     fila = vf.load_json(ctx.fila_path, {"vagas": {}, "stats": {}})
+    base_fila = copy.deepcopy(fila)   # salvar_fila applies only this run's changes
     ult = fila.get("ultima_coleta")
     if not force and ult and datetime.fromisoformat(ult) > agora() - timedelta(minutes=int(ctx.cfg["intervalo_min"])):
         print(f"descobrir: coleta recente ({ult}), pulando")
@@ -638,7 +640,7 @@ def coletar(ctx, force=False, fontes=None):
         tot[k] = tot.get(k, 0) + n
     tot["novas"] = tot.get("novas", 0) + stats["novas"]
     avisar_fontes(fila, por_fonte, stats["erros"])
-    vf.save_json(ctx.fila_path, fila)
+    vf.salvar_fila(ctx.fila_path, base_fila, fila)
     print(f"descobrir: {stats['lidas']} lidas, {stats['novas']} novas na fila, filtradas={filtro}"
           + (f", erros={stats['erros']}" if stats["erros"] else ""))
     return 0
@@ -673,6 +675,7 @@ def pendentes(fila, cfg=None, hoje=None):
 
 def prompt(ctx, n):
     fila = vf.load_json(ctx.fila_path, {"vagas": {}})
+    base_fila = copy.deepcopy(fila)   # salvar_fila applies only this run's changes
     top = pendentes(fila, ctx.cfg)[:n]
     if not top:
         return 0
@@ -690,7 +693,7 @@ def prompt(ctx, n):
     print("  " + (ctx.cfg["prompt_registro"] or "Registre CADA uma com o campo \"url\" acima: aplicou → estado.py "
                  "add-aplicada; incompatível ou exige login → estado.py add-bloqueado. Descarte sem registro faz a "
                  "vaga voltar na próxima rodada."))
-    vf.save_json(ctx.fila_path, fila)
+    vf.salvar_fila(ctx.fila_path, base_fila, fila)
     return 0
 
 
@@ -727,6 +730,7 @@ def triar(ctx, n=8):
     posting to find "Sênior", "MID" or "no longer accepting applications" (05/10 14:48: 5 offered, 5 discarded).
     Fail open: a fetch error leaves the job as it was."""
     fila = vf.load_json(ctx.fila_path, {"vagas": {}})
+    base_fila = copy.deepcopy(fila)   # salvar_fila applies only this run's changes
     vistos = cortados = 0
     _, blobs, _ = ids_conhecidos(ctx.paths["aplicadas"])
     for v in pendentes(fila, ctx.cfg):
@@ -769,7 +773,7 @@ def triar(ctx, n=8):
             v.update(status="filtrada", motivo="desc:" + motivo, visto_em=_stamp())
             cortados += 1
         time.sleep(random.uniform(1.5, 3))   # polite
-    vf.save_json(ctx.fila_path, fila)
+    vf.salvar_fila(ctx.fila_path, base_fila, fila)
     print(f"descobrir: triagem leu {vistos}, cortou {cortados} (encerrada/descricao)")
     return 0
 
@@ -852,6 +856,7 @@ def marcar(ctx, log=None):
     discarded in text (DESCARTADA) is recorded in bloqueados so it is not offered again. Without LOG: every
     offer counts (old behaviour)."""
     fila = vf.load_json(ctx.fila_path, {"vagas": {}})
+    base_fila = copy.deepcopy(fila)   # salvar_fila applies only this run's changes
     conhecidos, blobs, _ = ids_conhecidos(ctx.paths["aplicadas"])
     texto = ""
     if log:
@@ -881,7 +886,7 @@ def marcar(ctx, log=None):
         elif int(v.get("ofertas", 0)) >= int(ctx.cfg["max_ofertas"]) or \
                 int(v.get("mostrada", 0)) >= int(ctx.cfg["max_mostrada"]):
             v["status"], expiradas = "expirada", expiradas + 1
-    vf.save_json(ctx.fila_path, fila)
+    vf.salvar_fila(ctx.fila_path, base_fila, fila)
     carimbar_caminho(ctx, ofertadas, texto)
     print(f"descobrir: {fechadas} processadas pelo robo, {descartadas} descartes do modelo registrados, "
           f"{expiradas} expiradas, {len(pendentes(fila))} pendentes")
