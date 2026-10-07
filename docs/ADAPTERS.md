@@ -98,11 +98,17 @@ site_buscar_termos                                   # confere os termos lidos d
 | [`infojobs.sh`](../bot/sites/infojobs.sh) | InfoJobs | path `.aspx`; a busca **não** tem facet de remoto |
 | [`solides.sh`](../bot/sites/solides.sh) | Sólides Vagas | portal em `vagas.solides.com.br` (o `www` é institucional) |
 | [`trampos.sh`](../bot/sites/trampos.sh) | Trampos | `trampos.co` — o `.com.br` antigo saiu do ar |
+| [`abler.sh`](../bot/sites/abler.sh) | Abler | o card traz o tipo de contrato; aceite só Remoto/Home office |
+| [`eu-dev-br.sh`](../bot/sites/eu-dev-br.sh) | EU Dev (`eu.dev.br`) | empresa e link atrás de paywall nas primeiras 48 h: use `embargo_dias` no `descoberta.json` |
+| [`jooble.sh`](../bot/sites/jooble.sh) | Jooble | agregador com Cloudflare; se a sonda vir `bloqueado`, não gaste sessão |
+| [`netvagas.sh`](../bot/sites/netvagas.sh) | NetVagas | filtro Remoto na lateral; 403 no curl não é bloqueio do navegador logado |
+| [`remotar.sh`](../bot/sites/remotar.sh) | Remotar | 100% remoto; ainda confira o tipo de contrato na ficha |
+| [`trabalhabrasil.sh`](../bot/sites/trabalhabrasil.sh) | Trabalha Brasil | campo `remote` na busca; só aceite se a vaga disser remoto |
 
 O contrato de cada um é testado em [`tests/test_sites.sh`](../tests/test_sites.sh), que
 compara a URL montada com a tabela acima: adapter com placeholder trocado ou path errado
 quebra o CI.
 
-Quer outro portal (Revelo, 99jobs, Trabalhabrasil, Catho→InfoJobs extras…)? Copie o
+Quer outro portal (Revelo, 99jobs, Empregos.com.br…)? Copie o
 template, abra um PR e ganhe seu lugar nesta tabela. Veja
 [`CONTRIBUTING.md`](../CONTRIBUTING.md).
