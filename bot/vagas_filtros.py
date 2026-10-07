@@ -56,6 +56,36 @@ def save_json(path, data):
     os.replace(tmp, path)
 
 
+_AUSENTE = object()
+
+
+def mesclar(base, meu, atual):
+    """3-way merge of a JSON object: what THIS process changed since it read `base` wins; everything else keeps the
+    current file (`atual`), so a concurrent writer's additions survive. Dicts merge key by key, recursively."""
+    if not (isinstance(base, dict) and isinstance(meu, dict) and isinstance(atual, dict)):
+        return meu if meu != base else atual
+    out = dict(atual)
+    for k in set(base) | set(meu):
+        b, m = base.get(k, _AUSENTE), meu.get(k, _AUSENTE)
+        if m is _AUSENTE:                                   # this process deleted k
+            if k in out and out[k] == b:
+                del out[k]
+        elif b is _AUSENTE or m != b:                       # this process added or changed k
+            a = out.get(k, _AUSENTE)
+            out[k] = mesclar(b if b is not _AUSENTE else {}, m, a) if isinstance(m, dict) and isinstance(a, dict) else m
+    return out
+
+
+def salvar_fila(path, base, meu):
+    """06/10 (audit D3): descobrir.py and tg-garimpo.py both load the queue, spend minutes on the network and save
+    the whole file — the last one to save dropped the other's new jobs. Now the save takes the queue lock, re-reads
+    the file and applies only this process's own changes since `base` (a deep copy taken right after loading)."""
+    import jsonlock   # bot/jsonlock.py (same lock estado.py uses for aplicadas.json)
+    path = str(path)
+    with jsonlock.travado(path):
+        save_json(path, mesclar(base, meu, load_json(path, {})))
+
+
 def resolve_paths():
     """Profile, state dir and aplicadas.json, following the same rules as bot/loop.sh.
 

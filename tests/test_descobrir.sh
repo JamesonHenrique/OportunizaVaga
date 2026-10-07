@@ -394,5 +394,30 @@ assert len(d.pendentes(fila)) == 3                                        # sem 
 PYSNIP
 run_snippet && relata 0 "embargo_dias: fonte com paywall espera N dias na fila" || relata 1 "embargo_dias: fonte com paywall espera N dias na fila"
 
+# 18 — fila sem perda (06/10): descobrir e tg-garimpo gravavam a fila inteira; o ultimo apagava as vagas novas do
+# outro. salvar_fila relê sob trava e aplica so o que ESTE processo mudou desde que leu.
+cat > "$SNIPPET" <<'PYSNIP'
+import copy
+vf = d.vf
+base = {"vagas": {"a": {"status": "nova", "score": 2}}, "stats": {"telegram": {"em": "t0"}, "lidas": 1}, "termo_idx": 0}
+meu = copy.deepcopy(base)
+meu["vagas"]["a"]["status"] = "processada"; meu["vagas"]["b"] = {"status": "nova"}
+meu["stats"]["lidas"] = 9; meu["termo_idx"] = 4
+atual = copy.deepcopy(base)                                   # meanwhile tg-garimpo saved:
+atual["vagas"]["c"] = {"status": "nova", "fonte": "telegram"}; atual["stats"]["telegram"] = {"em": "t1"}
+out = vf.mesclar(base, meu, atual)
+assert set(out["vagas"]) == {"a", "b", "c"}, out                          # nobody's new job is lost
+assert out["vagas"]["a"]["status"] == "processada" and out["termo_idx"] == 4
+assert out["stats"] == {"telegram": {"em": "t1"}, "lidas": 9}, out["stats"]  # both stats changes survive
+sem_b = copy.deepcopy(meu); del sem_b["vagas"]["b"]; assert "b" not in vf.mesclar(base, sem_b, atual)["vagas"]
+apagada = copy.deepcopy(base); del apagada["vagas"]["a"]                 # this run deleted a, nobody touched it
+assert "a" not in vf.mesclar(base, apagada, copy.deepcopy(base))["vagas"]
+p = os.environ["STATE_DIR"] + "/fila_mescla.json"
+vf.save_json(p, atual)
+vf.salvar_fila(p, base, meu)
+assert set(vf.load_json(p, {})["vagas"]) == {"a", "b", "c"} and os.path.exists(p + ".lock")
+PYSNIP
+run_snippet && relata 0 "fila: salvar_fila mescla sob trava (nenhuma vaga nova se perde)" || relata 1 "fila: salvar_fila mescla sob trava (nenhuma vaga nova se perde)"
+
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0
