@@ -140,6 +140,10 @@ def extrair():
         res = extrair_conta(conta)
         if res.get("ok"):
             linhas += res.get("linhas", [])
+            # 06/10 (audit G1): Gmail lists 50 threads per page and only page 1 is read. Newest first, twice a day
+            # and status only goes up, so a fresh reply is never past it — unless the reader was down for days.
+            if len(res.get("linhas", [])) >= 50:
+                print(f"gmail-status: aviso {conta}: pagina cheia (50) — e-mails mais antigos da busca nao foram lidos")
         else:
             erros.append(f"{conta}: {res.get('erro')}")
     for e in erros:
