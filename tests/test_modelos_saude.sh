@@ -68,6 +68,22 @@ OUT="$("$PY" bot/modelos-saude.py ordenar x/um x/dois 2>/dev/null | tr '\n' ' ')
 [ "$OUT" = "x/um x/dois " ]
 relata $? "fail-open: estado corrompido nao perde a cascata"
 
+# 06/10: com 2 modelos, o inutil vai para a quarentena (MIN_ATIVOS=1) e o ultimo nunca sai; todo padrao de falha
+# dos loops conta (inclusive os do loop privado: indisponivel no provider / travado / imprimiu)
+"$PY" - <<'PYQ'
+import importlib.util, os
+from datetime import datetime
+s = importlib.util.spec_from_file_location("m", "bot/modelos-saude.py"); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+L = ["[2026-10-06 10:00:00] modelo a/x indisponivel no provider (503)"] * 4 + ["[2026-10-06 10:00:00] modelo a/x travado sem saida"] * 4 + \
+    ["[2026-10-06 10:00:00] modelo a/x imprimiu o prompt"] * 3 + ["[2026-10-06 10:00:00] rodada usou o modelo b/y"] * 2
+st = m.estatisticas(datetime(2026, 10, 6, 12), L)
+assert st["a/x"] == {"usou": 0, "limite": 0, "improdutiva": 3, "erro": 8}, st
+m.estatisticas = lambda agora, linhas=None: st
+e = m.recalcular(["a/x", "b/y"], datetime(2026, 10, 6, 12))
+assert "a/x" in e["quarentena"] and "b/y" not in e["quarentena"], e["quarentena"]
+PYQ
+relata $? "2 modelos: o inutil vai para a quarentena; padroes do loop privado contam"
+
 # nao tocou no estado real
 [ ! -e bot/state/modelos_saude.json ] || { echo "vazou para bot/state"; FAIL=1; }
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

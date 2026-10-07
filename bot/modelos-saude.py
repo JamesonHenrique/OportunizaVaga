@@ -29,12 +29,17 @@ SAUDE = (os.environ.get("MODELOS_SAUDE_FILE")
 JANELA_DIAS = 7
 QUARENTENA_DIAS = 7
 MIN_TENTATIVAS = 10
-MIN_ATIVOS = 2
+# 06/10: 2 -> 1 (env MODELOS_SAUDE_MIN_ATIVOS). With a 2-model cascade, 2 made quarantine impossible: a model with
+# 0 successes in 10+ tries kept its slot. 1 still never empties the cascade.
+MIN_ATIVOS = int(os.environ.get("MODELOS_SAUDE_MIN_ATIVOS") or 1)
 REFAZER_H = 6
 
 RE_USOU = re.compile(r"^\[(\d{4}-\d{2}-\d{2}) [\d:]+\] rodada usou o modelo (\S+)")
+# Every failure line the loops write (bot/loop.sh, bot/loop.ps1 and the private loop.sh of the maintainer).
 RE_FALHA = re.compile(r"^\[(\d{4}-\d{2}-\d{2}) [\d:]+\] modelo (\S+) (no limite|encerrou sem navegar|quebrou o formato|"
-                      r"morreu apos erro)")
+                      r"morreu apos erro|indisponivel no provider|travado|imprimiu)")
+TIPO = {"no limite": "limite", "encerrou sem navegar": "improdutiva", "quebrou o formato": "improdutiva",
+        "imprimiu": "improdutiva", "morreu apos erro": "erro", "indisponivel no provider": "erro", "travado": "erro"}
 
 
 def linhas_log():
@@ -58,7 +63,7 @@ def estatisticas(agora=None, linhas=None):
             m = RE_FALHA.match(l)
             if not m:
                 continue
-            tipo = {"no limite": "limite", "morreu apos erro": "erro"}.get(m.group(3), "improdutiva")
+            tipo = TIPO[m.group(3)]
         dia, modelo = m.group(1), m.group(2)
         if dia < corte or modelo.startswith("$"):
             continue
