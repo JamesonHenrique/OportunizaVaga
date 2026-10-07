@@ -375,5 +375,24 @@ assert d.get_robots("https://b.example/qualquer") == "ok"
 PYSNIP
 run_snippet && relata 0 "boards: robots.txt respeitado (proibido nao baixa; ilegivel permite)" || relata 1 "boards: robots.txt respeitado (proibido nao baixa; ilegivel permite)"
 
+# 17 — embargo_dias (06/10): eu.dev.br esconde descricao e link por 48 h atras de passe pago; a vaga fica na fila
+# ("nova") e so e oferecida/triada depois de publicada + N dias. Fonte sem embargo e vaga sem data nao esperam.
+cat > "$SNIPPET" <<'PYSNIP'
+from datetime import date
+cfg = {"embargo_dias": {"eu.dev.br": 2}}
+hoje = date(2026, 10, 6)
+nova = lambda f, pub: {"status": "nova", "fonte": f, "publicada": pub, "score": 3, "titulo": "Dev Jr", "id": f + pub}
+assert d.embargada(cfg, nova("eu.dev.br", "2026-10-05"), hoje)            # 1 dia: ainda no paywall
+assert not d.embargada(cfg, nova("eu.dev.br", "2026-10-04"), hoje)        # 2 dias: anuncio aberto
+assert not d.embargada(cfg, nova("linkedin", "2026-10-06"), hoje)         # fonte sem embargo
+assert not d.embargada(cfg, {"fonte": "eu.dev.br", "publicada": None}, hoje)
+assert not d.embargada({}, nova("eu.dev.br", "2026-10-06"), hoje)         # config sem a chave = comportamento antigo
+fila = {"vagas": {"a": nova("eu.dev.br", "2026-10-06"), "b": nova("eu.dev.br", "2026-10-01"), "c": nova("gupy", "2026-10-06")}}
+ids = sorted(v["id"] for v in d.pendentes(fila, cfg, hoje))
+assert ids == ["eu.dev.br2026-10-01", "gupy2026-10-06"], ids
+assert len(d.pendentes(fila)) == 3                                        # sem cfg (contagem do marcar): todas
+PYSNIP
+run_snippet && relata 0 "embargo_dias: fonte com paywall espera N dias na fila" || relata 1 "embargo_dias: fonte com paywall espera N dias na fila"
+
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0
