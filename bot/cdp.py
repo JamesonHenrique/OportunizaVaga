@@ -50,8 +50,17 @@ class Chrome:
     def estado(self, sid):
         return self.js(sid, "location.href") or "", self.js(sid, "document.body ? document.body.innerText : ''") or ""
 
+    def frente(self, sid):
+        """Brings the tab to front. 06/10: tabs opened by abrir() are hidden (visibilityState=hidden, no focus), and a
+        site's "Google" sign-in button (Gupy) ignored the synthetic click there; in front, the same click works."""
+        try:
+            self.call("Page.bringToFront", {}, sid)
+        except Exception:
+            pass
+
     def clicar_iframe(self, sid, trecho_src):
         """Real click in the middle of the visible iframe whose src contains trecho_src (Google GSI button)."""
+        self.frente(sid)
         pos = self.js(sid, """(() => { const f = [...document.querySelectorAll('iframe')].find(x => (x.src||'').includes(%s)
             && x.getBoundingClientRect().width > 10); if (!f) return null; f.scrollIntoView({block: 'center'});
           const r = f.getBoundingClientRect(); return {x: r.x + r.width / 2, y: r.y + r.height / 2}; })()""" % json.dumps(trecho_src))
@@ -63,6 +72,7 @@ class Chrome:
 
     def clicar(self, sid, texto):
         """Real mouse click on the smallest visible element whose text/identifier matches."""
+        self.frente(sid)
         pos = self.js(sid, """(() => { const w = %s;
           const els = [...document.querySelectorAll('[data-identifier],button,[role=button],[role=link],a,li,div')]
             .filter(e => e.offsetParent !== null && ((e.getAttribute('data-identifier')||'') === w
