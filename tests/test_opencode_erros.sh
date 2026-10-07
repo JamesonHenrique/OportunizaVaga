@@ -22,4 +22,12 @@ echo 'timestamp=2026-09-30T13:40:00.000Z level=ERROR run=aa11 message="x" error.
 [ "$(eo 2026-09-30T13:35:00.000Z)" = quota ]; relata $? "429 = quota"
 [ "$(eo 2026-09-30T13:10:00.000Z)" = quota ]; relata $? "cota vence transitorio na mesma janela"
 grep -q 'lib/opencode-erros.sh' "$ROOT/bot/loop.sh"; relata $? "loop.sh usa a lib"
+# 06/10: is_quota existe na lib (o loop.sh chama; antes dava 127 = "nao e cota") e so le o que a rodada imprimiu
+printf 'tool ok\nQUOTA_EXAUSTA\n' > "$T/r1.log"; printf 'anuncio: trial credits, rate limit de vagas\n' > "$T/r2.log"
+printf 'Error from provider: Rate limit exceeded\n' > "$T/r3.log"
+bash -c ". '$ROOT/bot/lib/opencode-erros.sh'; is_quota '$T/r1.log' && ! is_quota '$T/r2.log' && is_quota '$T/r3.log'"
+relata $? "is_quota: sentinela e erro do provider contam; texto de vaga nao"
+for f in $(grep -o '\bis_quota\b\|\berro_opencode_log\b' "$ROOT/bot/loop.sh" | sort -u); do
+  grep -q "^$f()" "$ROOT/bot/lib/opencode-erros.sh" || { echo "loop.sh chama $f que a lib nao define"; false; }
+done; relata $? "toda funcao da lib que o loop.sh chama existe"
 [ "$FAIL" -eq 0 ]
