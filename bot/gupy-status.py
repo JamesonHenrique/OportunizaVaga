@@ -27,18 +27,24 @@ BASE = os.path.dirname(os.path.realpath(__file__))
 APLICADAS = os.environ.get("APLICADAS_FILE", os.path.join(BASE, "aplicadas.json"))
 URL = "https://portal.gupy.io/my/applications"
 ABAS = ["Em andamento", "Em banco de talentos", "Finalizadas"]
-ORDEM = {"enviada": 0, "sem_resposta": 0, "sem_retorno_verificavel": 0, "em_analise": 1, "proxima_etapa": 2,
-         "etapa_teste": 2, "entrevista": 3, "encerrada": 4}   # same as gmail-status.py
+# 06/10: the estado.py that OWNS aplicadas.json writes it (OV_ESTADO_PY in a private install, like descobrir.py).
+# This file used to call bot/estado.py with --file of the private state, and kept its own ORDEM copy without
+# "respondida"/"followup" — a private "followup" could be "upgraded" down to etapa_teste.
+ESTADO_PY = os.environ.get("OV_ESTADO_PY") or os.path.join(BASE, "estado.py")
+STATUS_FILE = os.environ.get("OV_GUPY_STATUS_FILE") or os.path.join(os.path.dirname(os.path.abspath(APLICADAS)),
+                                                                     "gupy_status.json")
 
 
-def _mod(nome, arquivo):
-    s = importlib.util.spec_from_file_location(nome, os.path.join(BASE, arquivo))
+def _mod(nome, caminho):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(caminho)))   # its own imports (jsonlock) resolve there
+    s = importlib.util.spec_from_file_location(nome, caminho)
     m = importlib.util.module_from_spec(s)
     s.loader.exec_module(m)
     return m
 
 
-estado = _mod("estado", "estado.py")
+estado = _mod("estado", ESTADO_PY)
+ORDEM = estado.ORDEM
 
 
 def classe(aba, progresso):
@@ -156,7 +162,7 @@ def aplicar(cartoes, dry, ch=None):
         det = f"Gupy: {c['aba'].lower()}" + (f", progresso {c['progresso']}" if c["progresso"] else "")
         mudou.append(f"{a['chave']}: {atual} -> {novo} ({det})")
         if not dry:
-            subprocess.run(["python3", os.path.join(BASE, "estado.py"), "--file", APLICADAS, "status", a["chave"], novo, det],
+            subprocess.run(["python3", ESTADO_PY, "--file", APLICADAS, "status", a["chave"], novo, det],
                            stdout=subprocess.DEVNULL, check=False)
     return mudou, iguais, sem_registro
 
@@ -167,7 +173,7 @@ def registrar_retroativo(c):
     rec = {"chave": f"gupy_{c['id']}", "empresa": c["empresa"], "vaga": c["vaga"][:160], "registro_retroativo": True,
            "como": "Gupy (feita fora do robo; registrada pelo gupy-status)", "url": c.get("app") or None,
            "status": classe(c["aba"], c["progresso"])}
-    subprocess.run(["python3", os.path.join(BASE, "estado.py"), "--file", APLICADAS, "add-aplicada", json.dumps(rec, ensure_ascii=False)],
+    subprocess.run(["python3", ESTADO_PY, "--file", APLICADAS, "add-aplicada", json.dumps(rec, ensure_ascii=False)],
                    stdout=subprocess.DEVNULL, check=False)
 
 
@@ -186,7 +192,7 @@ def main(argv):
     for m in mudou:
         print("  " + m)
     if not dry:
-        with open(os.path.join(os.path.dirname(os.path.abspath(APLICADAS)), "gupy_status.json"), "w") as f:
+        with open(STATUS_FILE, "w") as f:
             json.dump({"atualizado": datetime.now().astimezone().isoformat(timespec="seconds"), "cartoes": len(cartoes),
                        "mudancas": mudou, "sem_registro": sem}, f, ensure_ascii=False, indent=1)
     return 0
