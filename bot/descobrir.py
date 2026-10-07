@@ -52,6 +52,7 @@ DEFAULTS = {
     "max_ofertas": 2,           # a job the model OPENED in N rounds and never registered is dropped
     "max_mostrada": 6,          # safety net: shown in N prompts and never even opened -> dropped too
     "max_dias": 14,             # same recency rule as the prompt
+    "embargo_dias": {},         # {fonte: N}: a job of that source is offered/triaged only N days after "publicada"
     "linkedin_geo_id": "106057199",  # LinkedIn geoId for Brazil; location=Brasil alone returns US jobs
     "linkedin_dias": 7,
     "linkedin_paginas": 1,      # pages per term per collection (page 1 + N-1 from a cursor kept in the queue); 1 = old behaviour
@@ -643,8 +644,23 @@ def coletar(ctx, force=False, fontes=None):
     return 0
 
 
-def pendentes(fila):
-    vs = [v for v in fila.get("vagas", {}).values() if v.get("status") == "nova"]
+def embargada(cfg, v, hoje=None):
+    """06/10: eu.dev.br hides description, company and apply link behind a paid pass for the first 48 h; the model
+    opened those jobs, hit the paywall and blocked them (26 blocks, most for this). A job of a source listed in
+    embargo_dias waits in the queue, still "nova", until publicada + N days. Undated jobs never wait."""
+    dias = int(((cfg or {}).get("embargo_dias") or {}).get(v.get("fonte"), 0) or 0)
+    if dias <= 0:
+        return False
+    try:
+        pub = datetime.fromisoformat(v.get("publicada") or "").date()
+    except ValueError:
+        return False
+    return (hoje or agora().date()) < pub + timedelta(days=dias)
+
+
+def pendentes(fila, cfg=None, hoje=None):
+    """Jobs waiting for a round. With cfg, jobs under embargo_dias are left out (they stay in the queue)."""
+    vs = [v for v in fila.get("vagas", {}).values() if v.get("status") == "nova" and not embargada(cfg, v, hoje)]
 
     def dia(v):
         try:
@@ -657,7 +673,7 @@ def pendentes(fila):
 
 def prompt(ctx, n):
     fila = vf.load_json(ctx.fila_path, {"vagas": {}})
-    top = pendentes(fila)[:n]
+    top = pendentes(fila, ctx.cfg)[:n]
     if not top:
         return 0
     print("VAGAS PRÉ-FILTRADAS POR SCRIPT (nível/modelo/tipo conferidos pelo TÍTULO; [descrição ok] = descrição e "
@@ -713,7 +729,7 @@ def triar(ctx, n=8):
     fila = vf.load_json(ctx.fila_path, {"vagas": {}})
     vistos = cortados = 0
     _, blobs, _ = ids_conhecidos(ctx.paths["aplicadas"])
-    for v in pendentes(fila):
+    for v in pendentes(fila, ctx.cfg):
         if vistos >= n:
             break
         # 05/10 measured: Telegram posts whose link is a recruiter PROFILE, and jobs the model already
