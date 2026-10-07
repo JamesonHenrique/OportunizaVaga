@@ -39,13 +39,18 @@ Discussions do repositório.
       injetados nos prompts por [`bot/perfil_render.py`](bot/perfil_render.py).
 - [x] **Modelo de trabalho configurável**: `modelos` (remoto/híbrido/presencial) e `cidades` no perfil.
 - [x] Wizard gera também o `bot/perfil.json` (nível, área, modelo, termos).
+- [x] Portão da rodada sem LLM (`bot/rodada-portao.py`) e sonda de sites bloqueados (`bot/sonda-sites.py`).
+- [x] Fila de vagas por script (`bot/descobrir.py`: LinkedIn, Gupy e boards; `tg-garimpo.py`: Telegram)
+      com triagem da descrição, mescla sob trava e `embargo_dias` para fonte com paywall.
+- [x] Status sem LLM: Gmail (`gmail-status.py`), Gupy (`gupy-status.py`) e kit de entrevista.
+- [x] Funil por fonte (`funil-fontes.py`) com a `descoberta` de cada envio (termo, canal ou site).
 
 ## Próximo
 
 - [ ] **Mais adaptadores de portal**, com prioridade para os generalistas que atendem perfis fora de tech —
-      `good first issue`, ver [`docs/ADAPTERS.md`](docs/ADAPTERS.md). **Feitos: Catho, InfoJobs, Sólides e
-      Trampos** (o `trampos.com.br` antigo saiu do ar; a plataforma é `trampos.co`). Faltam Trabalhabrasil,
-      99jobs, Netvagas, Jooble, Empregos.com.br e Revelo.
+      `good first issue`, ver [`docs/ADAPTERS.md`](docs/ADAPTERS.md). **Feitos: Catho, InfoJobs, Sólides,
+      Trampos, Trabalha Brasil, NetVagas, Jooble, Abler, Remotar e EU Dev** (o `trampos.com.br` antigo saiu do ar;
+      a plataforma é `trampos.co`). Faltam 99jobs, Empregos.com.br e Revelo.
 - [x] **Demo animada** no topo do README (GIF/asciinema de 1 rodada + monitor).
 - [x] **Demo ao vivo** do monitor com dados fake, linkada no README.
 - [ ] **Mais perfis prontos** em `config/perfis/`. Já há: backend, QA, tech lead, marketing, direito,
@@ -65,7 +70,11 @@ Discussions do repositório.
 
 - [ ] Suporte a espanhol (LatAm) no prompt e nos filtros.
 - [ ] Painel de métricas históricas (opt-in, ainda sem banco).
-- [ ] Detecção de vaga duplicada entre portais.
+- [ ] Detecção de vaga duplicada entre portais (a fila já marca mesma empresa + título como `duplicada`;
+      falta cruzar com o que o modelo achou no rodízio).
+- [ ] `loop.sh` em Python (planejador de cascata, política de sono, eventos JSONL), com o bash só no
+      bootstrap; facilita a paridade com o `loop.ps1`.
+- [ ] Fonte única de filtros: `perfil.json` alimentando descobridor, `vaga_check`, portão e a regra do prompt.
 - [x] Modo "somente triagem" (lista e pontua, não aplica) — é o modo reconhecimento (`OV_RECONHECIMENTO=1`).
 
 ## Como ajudar

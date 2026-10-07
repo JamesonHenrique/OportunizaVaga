@@ -6,6 +6,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **Fila do descobridor perdia vaga nova (`bot/vagas_filtros.py salvar_fila`)**: `descobrir.py` lia a fila, trabalhava
+  minutos e gravava por cima — vaga que o `tg-garimpo` ou outra coleta anexou nesse meio-tempo sumia. Agora grava com
+  mescla de 3 vias (`mesclar(base, meu, atual)`) sob `jsonlock`. Teste em `tests/test_descobrir.sh`.
+- **Clique em aba oculta (`bot/cdp.py`)**: `Chrome.clicar` traz a aba para frente (`Page.bringToFront`) antes do
+  clique sintético; com a aba em segundo plano o botão "Entrar com Google" do Gupy ignorava o clique. `tests/test_cdp.py`.
+- **`bot/gmail-status.py`** avisa quando a busca enche a 1ª página (50 conversas): e-mails mais antigos não são lidos.
+- **`bot/gupy-status.py`** grava pelo `estado.py` dono do `aplicadas.json` (`OV_ESTADO_PY`, padrão `bot/estado.py`) e usa
+  o `ORDEM` dele (antes faltavam `respondida`/`followup`); `OV_GUPY_STATUS_FILE` escolhe onde fica o resumo.
+- **`is_quota` voltou a `bot/lib/opencode-erros.sh`**: o `loop.sh` chamava uma função que não existia (rc 127 lido como
+  "não é cota"). O teste confere que toda função da lib chamada pelo `loop.sh` existe.
+- **`bot/modelos-saude.py`**: quarentena possível com cascata de 2 modelos (`MODELOS_SAUDE_MIN_ATIVOS`, padrão 1) e
+  todos os padrões de falha da lib de erros contam. Teste em `tests/test_modelos_saude.sh`.
 - **Contagem de site's `bot/rodizio-saude.py`**: `pos` creditava ao site da rodada **toda** candidatura
   anexada durante ela, inclusive as que saíram pela fila em outro canal (Gupy/Inhire/Telegram). Um site de
   exploração chegou a `4 aplicadas` sem nenhuma candidatura registrada nele, e esse número falso entrava na
@@ -35,6 +47,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   improdutiva conta como falha do modelo na cascata.
 
 ### Added
+- **De onde veio cada envio (`descoberta`)**: `descobrir.py marcar` carimba `descoberta=<fonte>:<termo>` (termo do
+  LinkedIn/Gupy, canal do Telegram, board) ou `rodizio:<site>` em cada candidatura da rodada; `funil-fontes.py` mostra o
+  funil por termo/canal/site — base para podar termos e canais com dado, não no escuro. Testes `test_descobrir.sh`,
+  `test_kit_funil.sh`.
+- **`embargo_dias` (`config/descoberta.json`)**: `{fonte: N}` segura na fila, ainda `nova`, a vaga de fonte com paywall
+  nos primeiros N dias após `publicada` (ex.: eu.dev.br esconde empresa e link por 48 h). Vaga sem data não espera.
 - **Portão da rodada (`bot/rodada-portao.py`, opt-in `OV_PORTAO=1`)**: decide sem LLM se a rodada vale uma sessão de
   modelo — `completa` (site do rodízio vencido por `rodizio_intervalo_h`), `so_fila` (só fila/rechecagens, sem varrer
   site) ou `pular`. Site bloqueado (403/Cloudflare) é sondado por `bot/sonda-sites.py` e sai do rodízio por 12h.
