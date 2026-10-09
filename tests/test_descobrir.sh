@@ -8,7 +8,7 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
-TOTAL=14
+TOTAL=19
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -418,6 +418,46 @@ vf.salvar_fila(p, base, meu)
 assert set(vf.load_json(p, {})["vagas"]) == {"a", "b", "c"} and os.path.exists(p + ".lock")
 PYSNIP
 run_snippet && relata 0 "fila: salvar_fila mescla sob trava (nenhuma vaga nova se perde)" || relata 1 "fila: salvar_fila mescla sob trava (nenhuma vaga nova se perde)"
+
+# 15 — 09/10: perfil remoto + hibrido com "cidades": hibrida/cidade so dentro da lista; Gupy grava o local real.
+cat > "$SNIPPET" <<'PYSNIP'
+perfil = json.load(open(os.environ["BOT_PERFIL"]))
+perfil.update({"modelos": ["remoto", "hibrido"], "cidades": ["Paraná", "PR", "Curitiba", "Londrina"]})
+pf = os.environ["STATE_DIR"] + "/perfil_rn.json"; json.dump(perfil, open(pf, "w"))
+os.environ["BOT_PERFIL"] = pf
+json.dump({"linkedin_cidade_fora": True, "boards": []}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
+ctx = d.Ctx()
+v = lambda t, l, f="gupy": {"titulo": t, "local": l, "fonte": f, "empresa": "X", "publicada": "2026-09-28"}
+assert d.motivo_filtro(ctx, v("Dev Junior", "hibrido - São Paulo, São Paulo"), []) == "modelo"
+assert d.motivo_filtro(ctx, v("Dev Junior", "hibrido - Curitiba, Paraná"), []) is None
+assert d.motivo_filtro(ctx, v("Dev Junior", "hibrido - Londrina, PR"), []) is None
+assert d.motivo_filtro(ctx, v("Dev Junior", "presencial - Curitiba, Paraná"), []) == "modelo"
+assert d.motivo_filtro(ctx, v("Dev Junior", "remoto"), []) is None
+assert d.motivo_filtro(ctx, v("Dev Junior Hibrido (Campinas)", "Brasil", "linkedin"), []) == "modelo"
+assert d.motivo_filtro(ctx, v("Dev Junior", "São Paulo, SP", "linkedin"), []) == "modelo"
+assert d.motivo_filtro(ctx, v("Dev Junior", "Curitiba, PR", "linkedin"), []) is None
+assert d.motivo_filtro(ctx, v("Dev Junior (Remoto)", "São Paulo, SP", "linkedin"), []) is None
+assert d.motivo_filtro(ctx, v("Dev Junior", "Brasil", "linkedin"), []) is None
+assert d.motivo_filtro(ctx, v("Dev Junior Sprint", "Recife, PE", "linkedin"), []) == "modelo"   # "pr" only as a word
+g = lambda **k: d.parse_gupy([dict({"id": 1, "jobUrl": "u", "name": "Dev"}, **k)])[0]["local"]
+assert g(workplaceType="remote", city="", state="") == "remoto"
+assert g(workplaceType="hybrid", city="Curitiba", state="Paraná") == "hibrido - Curitiba, Paraná"
+assert g(workplaceType="on-site", city="Santos", state="São Paulo") == "presencial - Santos, São Paulo"
+assert g() == "remoto"
+assert d.gupy_buscas(ctx.info) == [{"workplaceType": "remote"}, {"workplaceType": "hybrid", "state": "Paraná"},
+                                  {"workplaceType": "hybrid", "city": "Curitiba"}, {"workplaceType": "hybrid", "city": "Londrina"}]
+assert d.gupy_buscas({"modelos": ["remoto"]}) == [{"workplaceType": "remote"}]
+assert d.gupy_buscas({"modelos": ["remoto", "hibrido"]}) == [{"workplaceType": "remote"}, {"workplaceType": "hybrid"}]
+assert d.gupy_buscas({"modelos": ["remoto", "presencial"]}) == [{}]
+urls = []
+job = lambda i: {"id": i, "name": "Dev Jr", "jobUrl": "https://x.gupy.io/job/%d" % i, "workplaceType": "remote"}
+d.get = lambda url, timeout=20: urls.append(url) or json.dumps({"data": [job(1), job(2)] if "remote" in url else [job(2)]})
+d.time.sleep = lambda s: None
+v = d.gupy(ctx, "dev jr")
+assert len(urls) == 4 and "workplaceType=hybrid&state=Paran%C3%A1" in urls[1] and "city=Curitiba" in urls[2], urls
+assert sorted(x["id"] for x in v) == ["gupy:1", "gupy:2"], v   # same job from two searches = one listing
+PYSNIP
+run_snippet && relata 0 "hibrido so nas cidades do perfil; Gupy grava o modelo e o local reais" || relata 1 "hibrido so nas cidades do perfil; Gupy grava o modelo e o local reais"
 
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0

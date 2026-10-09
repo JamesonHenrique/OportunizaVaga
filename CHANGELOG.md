@@ -6,6 +6,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **Híbrida de qualquer cidade entrava como remota (`bot/descobrir.py`)**: com `hibrido` em `modelos`, a busca do Gupy
+  deixa de filtrar `workplaceType=remote`, mas `parse_gupy` gravava `local="remoto"` em toda vaga. Agora o local vem de
+  `workplaceType`/`city`/`state`; híbrida/presencial fora de `cidades` do perfil vira `modelo`, e os filtros de card
+  com cidade (LinkedIn, boards) valem fora das cidades do perfil. `tests/test_descobrir.sh` (19).
+- **Gupy sem filtro com perfil remoto + híbrido (`bot/descobrir.py gupy_buscas`)**: a busca baixava o país inteiro
+  (maioria presencial) e estourava o tempo (`gupy:prazo`). Agora: uma busca `workplaceType=remote` + uma
+  `workplaceType=hybrid` por lugar de `cidades` (`state=` para nome de estado, `city=` para o resto), sem duplicar vaga.
+- **Coleta intercala LinkedIn e Gupy (`coletar`)**: com o LinkedIn em 8 termos × 8 páginas, o prazo `tempo_max_s` cortava
+  as buscas do Gupy, que vinham todas no fim. Agora o prazo corta as duas fontes por igual.
 - **Fila do descobridor perdia vaga nova (`bot/vagas_filtros.py salvar_fila`)**: `descobrir.py` lia a fila, trabalhava
   minutos e gravava por cima — vaga que o `tg-garimpo` ou outra coleta anexou nesse meio-tempo sumia. Agora grava com
   mescla de 3 vias (`mesclar(base, meu, atual)`) sob `jsonlock`. Teste em `tests/test_descobrir.sh`.
