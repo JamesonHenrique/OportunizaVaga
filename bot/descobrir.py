@@ -24,6 +24,7 @@ Be polite: a handful of requests every ~90 min. See docs/USO-ETICO.md.
 """
 import copy
 import html
+import itertools
 import json
 import os
 import random
@@ -97,6 +98,9 @@ class Ctx:
         cfg.update({k: v for k, v in vf.descoberta_config(p).items() if k in DEFAULTS})
         self.cfg = cfg
         self.bom, self.fora = vf.regex_niveis(self.info)
+        # 09/10: hybrid/on-site accepted only in these places (perfil "cidades"); None = no city list (any place)
+        cid = [vf.norm(c) for c in self.info.get("cidades") or [] if vf.norm(c)]
+        self.cidades = re.compile(r"\b(" + "|".join(map(re.escape, cid)) + r")\b") if cid else None
         self.vaga_conf = vaga_check.configurar(self.info, cfg)   # description triage (same profile + descoberta.json)
         self.tipos = vf.regex_tipos(self.info["pular_tipos"])
         self.stack_fora = vf.regex_lista(cfg["stack_evitar"])
@@ -152,6 +156,14 @@ def parse_linkedin(page):
     return out
 
 
+def gupy_local(j):
+    """Work model + place from the job object (workplaceType remote|hybrid|on-site, city, state). 09/10: it was
+    always "remoto", true only while the search asked workplaceType=remote (remote-only profile)."""
+    tipo = {"remote": "remoto", "hybrid": "hibrido", "on-site": "presencial"}.get(j.get("workplaceType") or "", "")
+    lugar = ", ".join(x for x in (j.get("city"), j.get("state")) if x)
+    return " - ".join(x for x in (tipo, lugar) if x) or "remoto"
+
+
 def parse_gupy(data):
     out = []
     for j in data or []:
@@ -161,7 +173,7 @@ def parse_gupy(data):
             continue
         out.append({"id": f"gupy:{j.get('id')}", "fonte": "gupy", "url": j.get("jobUrl"),
                     "titulo": j.get("name") or "", "empresa": j.get("careerPageName") or "",
-                    "local": "remoto", "publicada": (j.get("publishedDate") or "")[:10] or None,
+                    "local": gupy_local(j), "publicada": (j.get("publishedDate") or "")[:10] or None,
                     "_descricao": (j.get("description") or "") + " " + " ".join(str(x) for x in (j.get("skills") or []))})
     return out
 
@@ -217,31 +229,57 @@ def gupy_jobs_da_pagina(page):
     return (props.get("initialJobList") or {}).get("data") or []
 
 
+# Gupy's state= filter takes the full state name; any other place in perfil "cidades" goes as city= (checked live
+# 09/10: workplaceType=hybrid&state=Paraná and &city=Curitiba both return only Paraná).
+ESTADOS_BR = {vf.norm(e) for e in (
+    "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia", "Ceará", "Distrito Federal", "Espírito Santo", "Goiás",
+    "Maranhão", "Mato Grosso", "Mato Grosso do Sul", "Minas Gerais", "Pará", "Paraíba", "Paraná", "Pernambuco",
+    "Piauí", "Rio de Janeiro", "Rio Grande do Norte", "Rio Grande do Sul", "Rondônia", "Roraima", "Santa Catarina",
+    "São Paulo", "Sergipe", "Tocantins")}
+
+
+def gupy_buscas(info):
+    """Extra query params, one search each. 09/10: a remote+hybrid profile searched with NO filter (the whole
+    country, mostly on-site) and hit the time budget (gupy:prazo); now remote + hybrid only in the profile places."""
+    modelos = info["modelos"]
+    if "presencial" in modelos:
+        return [{}]
+    buscas = [{"workplaceType": "remote"}] if "remoto" in modelos else []
+    if "hibrido" in modelos:
+        lugares = [c for c in info.get("cidades") or [] if len(c.strip()) > 2]   # abbreviations out: the API wants full names
+        buscas += [{"workplaceType": "hybrid", ("state" if vf.norm(c) in ESTADOS_BR else "city"): c} for c in lugares] \
+            or [{"workplaceType": "hybrid"}]
+    return buscas or [{}]
+
+
 def gupy(ctx, termo):
     """The portal's own JSON search (portal.gupy.io/api/job-search/jobs: limit/offset, same job objects; 01/10:
     'desenvolvedor' remote = 252 jobs, the search page showed 10). Fallback: the search page's __NEXT_DATA__
     (employability-portal.gupy.io/api/v1/jobs returns 404 since 2026-10)."""
-    remoto = ctx.info["modelos"] == ["remoto"]
     teto, pagina, todos = int(ctx.cfg["gupy_limite"]), 100, []
     try:
-        while len(todos) < teto:
-            params = {"jobName": termo, "limit": str(min(pagina, teto - len(todos))), "offset": str(len(todos))}
-            if remoto:
-                params["workplaceType"] = "remote"
-            doc = json.loads(get("https://portal.gupy.io/api/job-search/jobs?" + urllib.parse.urlencode(params)))
-            data = doc.get("data")
-            if not isinstance(data, list):
-                raise ValueError("gupy api: sem data")
-            todos += data
-            # pagination.total is NOT reliable (01/10: limit=100 reports total=100 while offset 100/200 still
-            # return 100/53 jobs): keep paging while pages come back full
-            if len(data) < int(params["limit"]):
-                break
-            time.sleep(random.uniform(1, 2))   # polite between pages
-        return parse_gupy(todos)
+        for i, extra in enumerate(gupy_buscas(ctx.info)):
+            if i:
+                time.sleep(random.uniform(1, 2))   # polite between searches
+            n = 0
+            while n < teto:
+                params = {"jobName": termo, "limit": str(min(pagina, teto - n)), "offset": str(n), **extra}
+                doc = json.loads(get("https://portal.gupy.io/api/job-search/jobs?" + urllib.parse.urlencode(params)))
+                data = doc.get("data")
+                if not isinstance(data, list):
+                    raise ValueError("gupy api: sem data")
+                todos += data
+                n += len(data)
+                # pagination.total is NOT reliable (01/10: limit=100 reports total=100 while offset 100/200 still
+                # return 100/53 jobs): keep paging while pages come back full
+                if len(data) < int(params["limit"]):
+                    break
+                time.sleep(random.uniform(1, 2))   # polite between pages
+        return parse_gupy(list({j.get("id"): j for j in todos}.values()))
     except Exception:
         if todos:
-            return parse_gupy(todos)
+            return parse_gupy(list({j.get("id"): j for j in todos}.values()))
+    remoto = "remoto" in ctx.info["modelos"] and "presencial" not in ctx.info["modelos"]
     q = urllib.parse.urlencode({"term": termo}) + ("&workplaceTypes[]=remote" if remoto else "")
     return parse_gupy(gupy_jobs_da_pagina(get("https://portal.gupy.io/job-search/" + q)))
 
@@ -327,14 +365,21 @@ def motivo_filtro(ctx, v, pular_empresas, hoje=None):
     if ("presencial" not in modelos and re.search(r"presencial|on site|onsite", alvo)) or \
        ("hibrido" not in modelos and re.search(r"hibrid[oa]", alvo)):
         return "modelo"
+    # 09/10: hybrid/on-site only inside perfil "cidades" (e.g. hybrid in Curitiba yes, in São Paulo no)
+    fora_da_cidade = ctx.cidades is not None and not ctx.cidades.search(alvo)
+    if fora_da_cidade and re.search(r"hibrid[oa]|presencial|on site|onsite", alvo):
+        return "modelo"
+    # A place without a remote word is a hybrid/on-site listing: drop it on a remote-only profile, or outside
+    # the profile cities. 09/10: these two used to check modelos == ["remoto"] and switched off with "hibrido".
+    so_remoto_ali = "presencial" not in modelos and (modelos == ["remoto"] or fora_da_cidade)
     # 01/10 measured on the queue history: LinkedIn cards located in a city -> 70 jobs, 0 sends, 29 blocked as
     # hybrid/on-site by the model; located in the country ("Brasil") -> 16 jobs, 3 sends, 0 hybrid.
-    if ctx.cfg["linkedin_cidade_fora"] and modelos == ["remoto"] and v.get("fonte") == "linkedin" \
+    if ctx.cfg["linkedin_cidade_fora"] and so_remoto_ali and v.get("fonte") == "linkedin" \
             and CIDADE_LOCAL.search((v.get("local") or "").strip()) and not REMOTO_TXT.search(nt):
         return "modelo"
     # 05/10: board collectors (fontes_boards) set local="remoto" only when the board itself marks the job remote;
     # anything else on a remote-only profile is an on-site/hybrid listing (trabalhabrasil "São Paulo/SP").
-    if modelos == ["remoto"] and fontes_boards and v.get("fonte") in fontes_boards.BOARDS \
+    if so_remoto_ali and fontes_boards and v.get("fonte") in fontes_boards.BOARDS \
             and not REMOTO_TXT.search(vf.norm(v.get("local") or "") + " " + nt):
         return "modelo"
     if ctx.tipos and ctx.tipos.search(nt):
@@ -541,11 +586,11 @@ def coletar(ctx, force=False, fontes=None):
     assin = assinaturas_da_fila(vagas)
     conhecidos |= urls_da_fila(vagas)
     fontes = fontes or ctx.cfg["fontes"]
-    buscas = []
-    if "linkedin" in fontes:
-        buscas += [("linkedin", t) for t in escolhidos]
-    if "gupy" in fontes:
-        buscas += [("gupy", t) for t in gupy_termos]
+    li = [("linkedin", t) for t in escolhidos] if "linkedin" in fontes else []
+    gu = [("gupy", t) for t in gupy_termos] if "gupy" in fontes else []
+    # 09/10: interleaved, so the tempo_max_s deadline cuts both sources alike (LinkedIn first, then Gupy, left 3 of 6
+    # Gupy searches with no time once LinkedIn grew to 8 terms x 8 pages)
+    buscas = [b for par in itertools.zip_longest(li, gu) for b in par if b]
     ub = fila.get("boards_ultima")
     if ctx.cfg["boards"] and (force or not ub or datetime.fromisoformat(ub) <=
                               agora() - timedelta(minutes=int(ctx.cfg["boards_intervalo_min"]))):
