@@ -6,6 +6,26 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Saúde por portal (`bot/saude-portais.py`)**: `login_necessario`, `indisponivel`, `falha_recente`,
+  `sem_vagas_compativeis`, `funcionando` ou `nao_verificado`, cada um com evidência e data (sonda, canário, coleta,
+  rodízio, login); configurado sem evidência nunca é "funcionando". `canario-fontes.py` passa a gravar
+  `canario_fontes.json`; o loop grava `saude_portais.json` por rodada; monitor (`portais`) e `doctor` consomem.
+  `tests/test_saude_portais.py` (3), `snapshot.test.mjs`.
+- **Avaliação reproduzível de modelos (`scripts/eval-modelos.py` + `tests/golden/triagem.example.jsonl`)**: 15 vagas
+  sintéticas, regras do `prompt_triage.md`; registra disponibilidade (rc, formato, latência) separada de qualidade
+  (acertos, precisão entre as respondidas) em `bot/logs/eval-modelos.jsonl`. Fora da CI (provedor real);
+  `tests/test_eval_modelos.py` (5) com opencode falso.
+- **Compatibilidade explicável (`vaga_check.py explicar`)**: mesmo veredito do `checar`, com nível, experiência, modelo,
+  stack, contrato e salário como `confirmado`/`incompativel`/`desconhecido` e a evidência; `cobertura` = critérios
+  confirmados (peso igual, não é probabilidade). A descoberta grava `criterios`/`cobertura` em cada vaga triada.
+  `tests/test_vaga_check.sh` (10).
+- **Resumo do CV conferido contra o perfil (`bot/cv_fatos.py`, usado por `gerar_cv.py`)**: número (anos, %, contagens)
+  ou tecnologia do vocabulário técnico que não aparece em `cv_base.md`/`dados_candidato.json` faz o `gerar_cv` sair com
+  exit 2 sem gerar o PDF. Medido em 22 resumos reais: 1 seria recusado (tecnologia fora do perfil).
+  `tests/test_cv_fatos.py` (6).
+- **ruff e pytest na CI** (`ruff.toml`: só erros reais). Removidos 5 imports e 1 variável sem uso.
+- **Adesão ao passo d0 mensurável**: `add-aplicada` do robô sem intenção grava `sem_intencao` (e avisa o modelo);
+  com intenção grava `intencao_em`; `doctor` seção 7 conta as duas. `tests/test_estado.sh` (30).
 - **`doctor` seção 7 (`scripts/doctor-estado.py`, usado por `doctor.sh` e `doctor.ps1`)**: perfil legível, cada estado
   (raiz e `bot/state/*`), envios com resultado desconhecido, inconsistências do `validate-rodada`, idade e validade dos
   backups, última rodada e contagem de ERRO/ALERTA no `loop.log` — só nomes de perfil, contagens e idades (sem dado
@@ -22,6 +42,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (trava + escrita atômica). `tests/test_backup.sh` (10).
 
 ### Fixed
+- **`bot/guardiao.sh` matava às cegas quem segurava o lock (`fuser -k`)**: agora só `sleep` órfão ou processo além de
+  `OV_GUARDIAO_ORFAO_S` (1500 s); órfão ainda trabalhando adia a subida do loop. `tests/test_guardiao.sh` (3).
 - **Alertas (`scripts/notificar.sh`/`.ps1`)**: a deduplicação usava o hash exato, então o mesmo alerta com outra hora ou
   contagem saía a cada rodada; agora números são ignorados na chave (janela `OV_NOTIFY_JANELA_S`, padrão 6h) e envio
   recusado pela API (`curl -f`) não é marcado como enviado. `tests/test_notificar.sh` (4).

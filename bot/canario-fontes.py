@@ -73,8 +73,26 @@ def checar(ctx=None, termo=None):
     return falhas
 
 
+def registrar(ctx, falhas):
+    """<state dir>/canario_fontes.json {fonte: {em, ok, falha}}: evidence for bot/saude-portais.py (10/10).
+    Before, a result lived only in the Telegram alert; "working" could not be told from "never checked"."""
+    fontes = [f for f in ("linkedin", "gupy") if f in ctx.cfg["fontes"]] + list(ctx.cfg.get("boards") or [])
+    em = d.agora().isoformat(timespec="seconds")
+    doc = {}
+    for f in fontes:
+        prefixo = {"linkedin": "LinkedIn", "gupy": "Gupy"}.get(f, f) + " "
+        minhas = [x for x in falhas if x.startswith(prefixo) or x.startswith(f + ":")]
+        doc[f] = {"em": em, "ok": not minhas, "falha": "; ".join(minhas)[:200]}
+    try:
+        d.vf.save_json(os.path.join(os.path.dirname(ctx.paths["aplicadas"]), "canario_fontes.json"), doc)
+    except OSError:
+        pass   # the alert below still goes out
+
+
 def main():
-    falhas = checar()
+    ctx = d.Ctx()
+    falhas = checar(ctx)
+    registrar(ctx, falhas)
     if falhas:
         msg = ("[CANARIO] Parser de portal quebrado: " + "; ".join(falhas)
                + " (o portal mudou? ver bot/descobrir.py e bot/vaga_check.py)")

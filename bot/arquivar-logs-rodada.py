@@ -8,7 +8,6 @@ Usage: arquivar-logs-rodada.py [APLICADAS_FILE] [LOGS_JSONL]
   LOGS_JSONL     defaults to logs/rodadas.jsonl next to this script (bot/logs/).
 """
 import json
-import os
 import sys
 from datetime import datetime
 from pathlib import Path

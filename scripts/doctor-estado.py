@@ -95,6 +95,13 @@ def estados():
         if pend:
             aviso(f"estado '{nome}': {len(pend)} envio(s) com resultado desconhecido",
                   "confira no portal/e-mail; saiu = estado.py add-aplicada, nao saiu = estado.py cancelar-intencao.")
+        com = sum(1 for a in d["aplicadas"] if isinstance(a, dict) and a.get("intencao_em"))
+        sem = sum(1 for a in d["aplicadas"] if isinstance(a, dict) and a.get("sem_intencao"))
+        if sem:
+            aviso(f"estado '{nome}': {sem} envio(s) do robo sem `intencao` (passo d0) contra {com} com",
+                  "o modelo pulou a protecao contra reenvio; veja docs/OPERACAO.md (envio com resultado desconhecido).")
+        elif com:
+            ok(f"estado '{nome}': {com} envio(s) com intencao registrada antes do clique.")
         problemas = validar.check(d, os.environ.get("OV_ALLOW_UTC") == "1")
         if problemas:
             aviso(f"estado '{nome}': {len(problemas)} inconsistencia(s)", f"python3 scripts/validate-rodada.py {rel(p)}")
@@ -143,8 +150,29 @@ def operacao():
             ok("loop.log sem ERRO/ALERTA nas ultimas 300 linhas.")
 
 
+def portais():
+    saude = _modulo("saude_portais", os.path.join(ROOT, "bot", "saude-portais.py"))
+    dirs = [STATE] + sorted(os.path.dirname(p) for p in glob.glob(os.path.join(STATE, "state", "*", "aplicadas.json")))
+    achou = False
+    for d in dirs:
+        res = saude.avaliar(d)
+        if not res:
+            continue
+        achou = True
+        nome = "default" if d == STATE else os.path.basename(d)
+        ruins = {p: v for p, v in res.items() if v["estado"] in ("login_necessario", "indisponivel", "falha_recente")}
+        for p, v in ruins.items():
+            aviso(f"portal {p} ({nome}): {v['estado']}", v["evidencia"])
+        cont = {}
+        for v in res.values():
+            cont[v["estado"]] = cont.get(v["estado"], 0) + 1
+        (ok if not ruins else info)(f"portais ({nome}): " + ", ".join(f"{k}={n}" for k, n in sorted(cont.items())))
+    if not achou:
+        info("nenhuma evidencia de portal ainda (sonda/canario/coleta/rodizio) — normal antes das primeiras rodadas.")
+
+
 def main():
-    for etapa in (perfil, estados, backups, operacao):
+    for etapa in (perfil, estados, backups, operacao, portais):
         try:
             etapa()
         except Exception as e:   # one broken check must not hide the others

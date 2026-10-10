@@ -30,6 +30,28 @@ aprovada aparece no prompt com a marca `[descrição ok]`, e o passo **c0** do p
 `vaga_check.py` nas demais vagas, antes de gerar CV. Rejeitadas entram na fila como `filtrada` com motivo `desc:...`.
 Teste: `tests/test_vaga_check.sh` (os 10 casos de referência, perfil, CLI, descoberta offline).
 
+### Critérios explicados (`vaga_check.py explicar`)
+
+```bash
+python3 bot/vaga_check.py explicar /tmp/anuncio.txt "Título" [--json]
+# COMPATIVEL | criterios confirmados 3/4
+#   nivel        confirmado    junior
+#   experiencia  desconhecido  anos exigidos nao informados
+#   modelo       confirmado    remoto
+#   stack        confirmado    java, spring (fora: php)
+#   contrato     confirmado    clt
+#   salario      desconhecido  salario nao informado
+```
+
+- Mesmo veredito do `checar` (as mesmas regras; `explicar` só mostra o porquê).
+- Cada critério é `confirmado` (há evidência no texto), `incompativel` (a regra reprovou, com a evidência) ou
+  `desconhecido` (o anúncio não informa). Informação ausente **nunca** conta como confirmada, e também não reprova.
+- `cobertura` = critérios com regra (nível, experiência, modelo e stack, se configurada) confirmados / existentes.
+  Todos têm o mesmo peso. **Não é probabilidade de contratação**; contrato e salário são só informativos (o perfil
+  não tem regra para eles).
+- Na descoberta, cada vaga triada pela descrição guarda `criterios` e `cobertura` em `vagas_fila.json`.
+
+
 ## Cascata adaptativa de modelos (`bot/modelos-saude.py`)
 
 A ordem da cascata em `loop.sh`/`loop.ps1` é escrita à mão, mas modelos gratuitos variam muito: na operação privada do
@@ -177,6 +199,10 @@ verificar no portal ou no e-mail e só então registrar `add-aplicada` ou `cance
 `scripts/validate-rodada.py` imprime `[aviso]` enquanto houver pendentes, e o monitor recebe só a
 contagem (`telemetry.totals.enviosPendentes`).
 
+Adesão medida por registro: `add-aplicada` numa rodada do robô (`OV_RODADA`) que não consumiu intenção grava
+`sem_intencao: true` e devolve um aviso ao modelo; quando consumiu, grava `intencao_em`. A seção 7 do
+`bot/doctor.sh` mostra as duas contagens.
+
 Limitações: a proteção depende de o modelo chamar `intencao` antes do clique (está no passo d0 do
 prompt). Uma rodada que pula esse passo volta ao comportamento antigo. No `loop.ps1` não há
 `OV_RODADA`/`OV_TENTATIVA`, então toda intenção já existente é tratada como de outra tentativa:
@@ -198,3 +224,30 @@ Cada escrita bem-sucedida do `bot/estado.py` acrescenta uma linha JSON em `event
 - Só chaves e status: nada de motivo, texto de vaga ou dado do candidato. Fica fora do git (`.gitignore`).
 - Retenção: ao passar de 2 MB vira `eventos.jsonl.1` (uma geração guardada).
 - Ciclo de uma candidatura: `grep '"chave": "CHAVE"' bot/state/<perfil>/eventos.jsonl`.
+
+## Guardião e processos órfãos (`bot/guardiao.sh`)
+
+Sem loop vivo e com o lock ainda preso, o guardião olha cada processo que segura o lock: `sleep` órfão
+morre na hora; qualquer outro (um `descobrir.py`, `node` ou `opencode` terminando o trabalho) só morre
+depois de `OV_GUARDIAO_ORFAO_S` segundos (padrão 1500 = timeout da rodada + margem). Antes disso o
+guardião não sobe o loop e tenta de novo no próximo ciclo do cron — antes, `fuser -k` matava tudo,
+podendo cortar uma escrita ou um envio ao meio. `tests/test_guardiao.sh`.
+
+## Saúde por portal (`bot/saude-portais.py`)
+
+Um estado por portal, sempre com evidência e data, a partir dos arquivos que o robô já grava no diretório do
+estado: `sonda_sites.json` (acesso), `canario_fontes.json` (parser; gravado pelo `canario-fontes.py`),
+`vagas_fila.json` (coleta), `rodizio_saude.json` (varredura/pausa) e `login_checagens`/`aguardando_login`.
+
+| Estado | Quando |
+|---|---|
+| `login_necessario` | última checagem de login disse "não", ou há vaga compatível esperando o login |
+| `indisponivel` | a sonda viu página de bloqueio nas últimas 48h |
+| `falha_recente` | canário ou coleta falhou nas últimas 48h |
+| `sem_vagas_compativeis` | o rodízio pausou o site por estar seco — funciona, só não tinha vaga nova (não é falha) |
+| `funcionando` | evidência positiva recente: sonda ok, canário ok, varredura ou candidatura |
+| `nao_verificado` | sem evidência nas últimas 48h (= "aguardando verificação") |
+
+Portal configurado mas sem evidência nunca aparece como `funcionando`. `python3 bot/saude-portais.py` mostra a
+tabela (`--json`). O `loop.sh` grava `saude_portais.json` ao fim de cada rodada; o monitor recebe só
+`portais: {nome: estado}` e o `doctor` (seção 7) avisa os portais com problema.

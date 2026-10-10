@@ -340,9 +340,12 @@ def motivo_descricao(ctx, v):
             texto, oficial = v.pop("_descricao", ""), None
         if not texto.strip():
             return None
-        ok, motivo = vaga_check.avaliar(texto, v["titulo"], oficial, ctx.vaga_conf)
+        e = vaga_check.explicar(texto, v["titulo"], oficial, ctx.vaga_conf)   # same verdict as avaliar()
         v["desc_checada"] = True
-        return None if ok else "desc:" + motivo
+        # traceable, compact: which criteria were confirmed / unknown (never a hiring probability)
+        v["criterios"] = {k: c["estado"] for k, c in e["criterios"].items()}
+        v["cobertura"] = e["cobertura"]
+        return None if e["compativel"] else "desc:" + e["motivo"]
     except Exception:
         return None
 
