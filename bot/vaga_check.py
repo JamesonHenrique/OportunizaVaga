@@ -52,6 +52,7 @@ PALAVRAS_PAPEL = {
 OFICIAL = {
     "estagio": {"estagio"}, "internship": {"estagio"},
     "assistente": {"junior"}, "junior": {"junior"}, "entry level": {"junior"}, "associate": {"junior"},
+    "iniciante": {"junior"},   # 10/10: current pt-BR label of "Entry level"; unmapped, it dropped junior jobs
     "pleno-senior": {"pleno", "senior"}, "mid-senior level": {"pleno", "senior"},
     "diretor": {"diretor"}, "director": {"diretor"}, "executivo": {"diretor"}, "executive": {"diretor"},
 }
@@ -107,14 +108,18 @@ def avaliar(texto, titulo="", nivel_oficial=None, conf=None):
     canon = OFICIAL.get(of)
     if of and canon is not None and not (canon & conf["aceitos_oficial"]):
         return False, f"nivel oficial LinkedIn: {nivel_oficial}"
-    if of and canon is None and conf["estrito"] and not titulo_bom:
+    teto = conf["max_anos"]
+    anos = [n for n in (int(next(g for g in x.groups() if g)) for x in ANOS.finditer(t)) if n < 10]   # >=10 is company age
+    # 10/10: "Nao aplicavel" is what most Brazilian recruiters leave in the field (175 queue drops in 7 days);
+    # it says nothing, so the description decides: an accepted level word near the top or a years ask within
+    # the ceiling keeps the job, anything else is still out.
+    if of and canon is None and conf["estrito"] and not titulo_bom and not (
+            conf["bom"].search(t[:600]) or (teto is not None and anos and max(anos) <= teto)):
         return False, f"titulo sem nivel aceito e nivel oficial '{nivel_oficial}'"
     aceito = titulo_bom or bool(canon and canon & conf["aceitos_oficial"]) or bool(conf["bom"].search(t[:600]))
     m = conf["papel_fora"].search(t) if conf["papel_fora"] else None
     if m and not aceito:
         return False, f"nivel ({m.group(0)[:40]})"
-    teto = conf["max_anos"]
-    anos = [n for n in (int(next(g for g in x.groups() if g)) for x in ANOS.finditer(t)) if n < 10]   # >=10 is company age
     if teto is not None and anos and min(anos) > teto:
         return False, f"experiencia ({min(anos)}+ anos exigidos, teto do perfil {teto})"
     modelos = conf["modelos"]

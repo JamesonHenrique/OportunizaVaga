@@ -31,6 +31,9 @@ casos = [
   (("Remoto. Java e Spring.", "Junior Java Developer", "Pleno-sênior"), False),        # official level wins over the title
   (("Remoto. Node.", "Desenvolvedor Backend", "Não aplicável"), False),                # no JR in title, official not junior
   (("Remoto. Node.", "Desenvolvedor Junior Node", "Não aplicável"), True),             # JR title passes
+  (("Remoto. Vaga para pessoa desenvolvedora junior. Node.", "Desenvolvedor Backend", "Não aplicável"), True),  # 10/10: JR in the text decides
+  (("Remoto. Node. 2 anos de experiencia.", "Desenvolvedor Backend", "Não aplicável"), True),    # 10/10: years within the ceiling
+  (("Remoto. Node.", "Desenvolvedor Backend", "Iniciante"), True),                     # 10/10: pt-BR "Entry level"
   (("Requirements: 4+ years of full-stack experience, remote.", "Full-stack Engineer", "Júnior"), False),  # English + hyphen
   (("Somos uma empresa com 20 anos de experiencia no mercado. Remoto, Java.", "Dev Junior", None), True),  # company age
   (("Stack: PHP, Laravel e .NET. Remoto.", "Dev Junior", None), False),                # foreign stack, nothing of the profile

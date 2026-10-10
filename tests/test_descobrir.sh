@@ -297,6 +297,24 @@ assert d.motivo_filtro(ctx, li("Dev Java Jr", "Belo Horizonte e Região"), []) =
 assert d.motivo_filtro(ctx, li("Dev Java Jr (Remoto)", "São Paulo, SP"), []) is None
 assert d.motivo_filtro(ctx, li("Dev Java Jr", "Brasil"), []) is None
 assert d.motivo_filtro(ctx, {"titulo": "Dev Java Jr", "local": "São Paulo, SP", "fonte": "gupy"}, []) is None
+assert d.motivo_filtro(ctx, li("Dev Java Jr", "São Paulo, SP (Remoto)"), []) is None   # 10/10: logged-in card
+assert d.motivo_filtro(ctx, li("Dev Java Jr", "São Paulo, São Paulo, Brasil (Híbrido)"), []) == "modelo"
+# 10/10: a 429 pauses the LinkedIn searches of this collection; Easy Apply scores +1 and is tagged in the offer
+import urllib.error as _ue
+chamadas = []
+def g429(url, timeout=20):
+    chamadas.append(url); raise _ue.HTTPError(url, 429, "Too Many Requests", {}, None)
+d.get = g429
+try:
+    d.linkedin(ctx, "java junior")
+except _ue.HTTPError as e:
+    assert e.code == 429
+v1 = {"titulo": "Dev Java Jr", "local": "Brasil", "fonte": "linkedin", "id": "li:1"}
+assert d.motivo_descricao(ctx, v1) is None and ctx.li_429 is True
+n = len(chamadas); assert d.motivo_descricao(ctx, v1) is None and len(chamadas) == n   # no more requests
+assert d.score(ctx, dict(v1, simplificada=True)) == d.score(ctx, v1) + 1
+info = {}; d.linkedin_parse('<a data-tracking-control-name="public_jobs_apply-link-simple_onsite">', info)
+assert info == {"simplificada": True}
 json.dump({}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
 assert d.motivo_filtro(d.Ctx(), li("Dev Java Jr", "São Paulo, SP"), []) is None   # off by default
 PYSNIP
