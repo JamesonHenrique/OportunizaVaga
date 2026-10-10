@@ -1,0 +1,7 @@
+# Lint de erros reais, não de estilo: sintaxe, nome indefinido, import/variável sem uso, redefinição.
+# Mesma config local e na CI:  uvx ruff check .   (ou pipx run ruff check .)
+target-version = "py39"
+extend-exclude = ["monitor/node_modules"]
+
+[lint]
+select = ["E9", "F63", "F7", "F82", "F401", "F811", "F841"]

@@ -217,3 +217,16 @@ test('buildSnapshot relê o estado a cada chamada (daemon de longa vida)', () =>
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('portais: so nome e estado, lidos do saude_portais.json de cada perfil', () => {
+  const root = makeRoot();
+  try {
+    fs.writeFileSync(path.join(root, 'saude_portais.json'), JSON.stringify({ portais: { gupy: { estado: 'funcionando', evidencia: 'sonda ok' } } }));
+    fs.writeFileSync(path.join(root, 'state', 'frontend', 'saude_portais.json'), JSON.stringify({ portais: { indeed: { estado: 'indisponivel', evidencia: 'Verify you are human' } } }));
+    const s = runSnapshot(root, false);
+    assert.deepEqual(s.portais, { gupy: 'funcionando', indeed: 'indisponivel' });
+    assert.equal(JSON.stringify(s).includes('Verify you are human'), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -21,7 +21,8 @@ c1) CV POR VAGA (regra de esforço): só gere o PDF quando o canal REALMENTE ane
    2) Monte o spec em /tmp/cv_spec.json:
         { "empresa": "...", "vaga": "...",
           "titulo_alvo": "...",                // cargo da vaga na grafia do anúncio; só cargo de dev/analista, nunca pleno/sênior
-          "resumo_custom": "...",              // <=800 chars, 3-4 frases, verdadeiro, com keywords da vaga
+          "resumo_custom": "...",              // <=800 chars, 3-4 frases, verdadeiro, com keywords da vaga;
+                                               // número (anos, %) ou tecnologia fora do perfil = ERRO (exit 2)
           "categorias_ordem": ["...", "..."],   // subseções de "Habilidades técnicas" p/ o topo
           "so_categorias": ["...", "..."],      // 3-7 subseções p/ MOSTRAR; as demais ficam ocultas
           "palavras_chave_vaga": ["..."] }      // só skills reais da vaga que existem no meu perfil
