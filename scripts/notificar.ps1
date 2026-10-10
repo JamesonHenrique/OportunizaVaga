@@ -20,7 +20,8 @@ if (-not (Test-Path $StateDir)) { New-Item -ItemType Directory -Path $StateDir -
 if (-not (Test-Path $StatePath)) { New-Item -ItemType File -Path $StatePath | Out-Null }
 
 $md5 = [System.Security.Cryptography.MD5]::Create()
-$hashBytes = $md5.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($Mensagem))
+# Same alert = same text ignoring numbers (times, counts, ids), as in notificar.sh.
+$hashBytes = $md5.ComputeHash([System.Text.Encoding]::UTF8.GetBytes(($Mensagem -replace '[0-9]+', '#')))
 $Key = ([System.BitConverter]::ToString($hashBytes) -replace '-', '').ToLowerInvariant().Substring(0, 12)
 $Now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
@@ -28,7 +29,8 @@ $linhas = @(Get-Content $StatePath -ErrorAction SilentlyContinue)
 foreach ($l in $linhas) {
     $partes = $l -split '\s+'
     if ($partes.Count -ge 2 -and $partes[0] -eq $Key) {
-        if (($Now - [int64]$partes[1]) -lt 21600) { exit 0 }   # mesma mensagem enviada nas ultimas 6h
+        $janela = if ($env:OV_NOTIFY_JANELA_S) { [int64]$env:OV_NOTIFY_JANELA_S } else { 21600 }
+        if (($Now - [int64]$partes[1]) -lt $janela) { exit 0 }   # mesmo alerta enviado dentro da janela
     }
 }
 
