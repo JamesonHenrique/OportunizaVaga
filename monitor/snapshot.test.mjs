@@ -93,6 +93,7 @@ test('aggregate: nenhum detalhe bruto sai, mas perfis somam', () => {
     assert.equal(s.contasCriadas, undefined);
     assert.equal(s.telemetry.includeDetails, false);
     assert.equal(s.telemetry.totals.aplicadas, 2);
+    assert.equal(s.telemetry.totals.enviosPendentes, 0);
     assert.equal(s.telemetry.totals.bloqueios, 2);
     assert.deepEqual(s.porDia, { '2026-09-18': 2 });
     assert.equal(s.telemetry.totals.descartes, 8);

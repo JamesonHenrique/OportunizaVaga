@@ -292,6 +292,8 @@ export function buildSnapshot() {
   const sizeOf = (f) => { try { return fs.statSync(f).size; } catch { return 0; } };
   const loopLog = path.join(ROOT, 'loop.log');
   const loopLog1 = path.join(ROOT, 'loop.log.1');
+  // Sends whose outcome is unknown (estado.py intencao without add-aplicada): a count only, safe in aggregate mode.
+  const enviosPendentes = stateDocs.reduce((sum, item) => sum + (item.doc.envios_pendentes && typeof item.doc.envios_pendentes === 'object' ? Object.keys(item.doc.envios_pendentes).length : 0), 0);
   const descarteTotal = stateDocs.reduce((sum, item) => sum + (Number(item.doc.descartes_listagem_total) || 0), 0);
   const rodizioPorPerfil = Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.rodizio || null]));
   const perfis = stateDocs.map(item => ({ nome: item.profile, aplicadas: Array.isArray(item.doc.aplicadas) ? item.doc.aplicadas.length : 0, bloqueados: item.doc.bloqueados && typeof item.doc.bloqueados === 'object' ? Object.keys(item.doc.bloqueados).length : 0 }));
@@ -309,6 +311,7 @@ export function buildSnapshot() {
       aplicadas: applied.length,
       bloqueios: blocked.length,
       descartes: descarteTotal,
+      enviosPendentes,
       rodadasHoje,
       eventos: events.length
     },
