@@ -1,7 +1,8 @@
 #!/bin/bash
 # bot/doctor.sh — checklist de diagnostico (saida colavel em issue).
 # Checa: versao do bash, node, opencode, chrome, CDP 127.0.0.1:9222, JSONs
-# presentes e validos, cron.env ausente do git, espaco em disco.
+# presentes e validos, cron.env ausente do git, espaco em disco, e (scripts/doctor-estado.py)
+# perfil, estado de cada perfil, envios com resultado desconhecido, backups e ultima rodada.
 # Exit 0 = essencial ok (avisos [??] permitidos); 1 = falta algo essencial.
 # So LE o sistema: nao abre browser, nao se candidata, nao altera nada.
 # Uso: ./bot/doctor.sh
@@ -123,6 +124,14 @@ elif [ "$LIVRE_MB" -lt 2048 ]; then
   aviso "disco com ${LIVRE_MB}MB livres" "fique de olho; logs e perfil do Chrome crescem."
 else
   ok "disco (${LIVRE_MB}MB livres)."
+fi
+echo
+
+echo "-- 7) Estado e operacao (perfil, estados, envios pendentes, backups, ultima rodada) --"
+if command -v python3 >/dev/null 2>&1; then
+  python3 "$BOT_ROOT/scripts/doctor-estado.py" || FALTA_ESSENCIAL=1
+else
+  info "python3 ausente — checagem de estado pulada."
 fi
 echo
 
