@@ -20,7 +20,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 BASE_MD = os.path.join(AQUI, "cv_base.md")
@@ -249,7 +249,6 @@ def linha_secao(bloco, S, flow, kwset=None, com_sub=True):
 
 
 def render_competencias(bloco, S, flow, ordem, kwset):
-    nome = bloco.get("sub") or ""
     destaque = kwset or set()
     for ln in bloco["lines"]:
         txt = ln[2:] if ln.startswith(("- ", "* ")) else ln
