@@ -8,7 +8,7 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
-TOTAL=5
+TOTAL=6
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -112,6 +112,21 @@ doc = json.load(open(out, encoding="utf-8"))
 assert sorted(v["ofertas"] for v in doc["vagas"]) == [0, 1, 2], doc   # a 6 (ja registrada) nao foi ofertada
 PYSNIP
 run_snippet && relata 0 "prompt pula registradas, conta oferta e marca texto como dado" || relata 1 "prompt pula registradas, conta oferta e marca texto como dado"
+
+# 6 — 10/10: registrada por URL canonica (sem substring): /vaga/1 nao e /vaga/12; utm e caixa do e-mail nao contam.
+cat > "$SNIPPET" <<'PYSNIP'
+p = os.path.join(os.environ["STATE_DIR"], "reg.json")
+json.dump({"aplicadas": [{"chave": "k", "url": "https://x.example/vaga/12?utm_source=t"}],
+           "bloqueados": {"b": {"motivo": "enviar para rh@empresa.example"}}}, open(p, "w"))
+r = tg.conhecidos(p)
+assert not tg.ja_conhecida({"links": ["https://x.example/vaga/1"]}, r)
+assert tg.ja_conhecida({"links": ["https://x.example/vaga/12?utm_medium=z"]}, r)
+assert tg.ja_conhecida({"emails": ["RH@empresa.example"]}, r)
+v = set()
+assert tg.processa_mensagem(filtro, "c", 1, None, "Desenvolvedor Junior remoto, vaga aberta para todo o Brasil: https://x.example/vaga/77?utm_source=a", [], [], v)
+assert not tg.processa_mensagem(filtro, "c", 2, None, "Desenvolvedor Junior remoto, vaga aberta para todo o Brasil: https://x.example/vaga/77?utm_source=b", [], [], v)
+PYSNIP
+run_snippet && relata 0 "registrada e repostagem por URL canonica (sem falso positivo de substring)" || relata 1 "registrada e repostagem por URL canonica (sem falso positivo de substring)"
 
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0

@@ -181,3 +181,20 @@ Limitações: a proteção depende de o modelo chamar `intencao` antes do clique
 prompt). Uma rodada que pula esse passo volta ao comportamento antigo. No `loop.ps1` não há
 `OV_RODADA`/`OV_TENTATIVA`, então toda intenção já existente é tratada como de outra tentativa:
 a trava continua segura, só perde a idempotência dentro da mesma tentativa.
+
+## Histórico estruturado (`eventos.jsonl`)
+
+Cada escrita bem-sucedida do `bot/estado.py` acrescenta uma linha JSON em `eventos.jsonl`, ao lado do
+`aplicadas.json` do perfil:
+
+```json
+{"em": "2026-10-10T14:03:00-03:00", "rodada": "AAAAMMDD-HHMMSS", "tentativa": "AAAAMMDD-HHMMSS-2",
+ "cmd": "status", "chave": "acme_dev_123", "de": "enviada", "para": "em_analise"}
+```
+
+- `cmd` = comando do `estado.py` (`intencao`, `add-aplicada`, `cancelar-intencao`, `status`, `add-bloqueado`...);
+  `de`/`para` aparecem nas mudanças de status (inclusive via `set-campo status`, que ignora as regras).
+- Leituras e comandos recusados (exit ≠ 0) não geram evento, então o arquivo não conta duas vezes.
+- Só chaves e status: nada de motivo, texto de vaga ou dado do candidato. Fica fora do git (`.gitignore`).
+- Retenção: ao passar de 2 MB vira `eventos.jsonl.1` (uma geração guardada).
+- Ciclo de uma candidatura: `grep '"chave": "CHAVE"' bot/state/<perfil>/eventos.jsonl`.

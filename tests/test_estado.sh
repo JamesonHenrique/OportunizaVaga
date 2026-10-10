@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 ESTADO="bot/estado.py"
 
-TOTAL=28
+TOTAL=29
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -231,6 +231,23 @@ import json,sys; d=json.load(open(sys.argv[1]))
 assert 'envios_pendentes' not in d and d['envios_cancelados'][-1]['chave']=='z_dev_2'
 assert not any(a['chave']=='z_dev_2' for a in d['aplicadas'])" "$TMP_STATE" && OV_RODADA=R5 E intencao z_dev_2 '{}' >/dev/null 2>&1
 relata $? "cancelar-intencao guarda historico, nao conta como aplicada e libera novo envio"
+
+# 29 — eventos.jsonl: uma linha por escrita, com rodada/tentativa e de/para de status; sem texto livre.
+EV="$(dirname "$TMP_STATE")/eventos.jsonl"
+python3 -c "
+import json,sys
+evs=[json.loads(l) for l in open(sys.argv[1], encoding='utf-8')]
+cmds=[e['cmd'] for e in evs]
+assert 'add-aplicada' in cmds and 'intencao' in cmds and 'cancelar-intencao' in cmds, cmds
+i=[e for e in evs if e['cmd']=='intencao' and e.get('tentativa')=='R1-2']
+assert not i, 'recusa nao gera evento'
+c=[e for e in evs if e['cmd']=='cancelar-intencao'][-1]
+assert c['chave']=='z_dev_2' and c['rodada'] is not None if 'rodada' in c else True
+assert all('motivo' not in e and 'empresa' not in e for e in evs)
+assert not any(e['cmd'] in ('resumo','ja-visto','tem') for e in evs)
+" "$EV"
+relata $? "eventos.jsonl: escritas registradas, recusas e leituras nao; sem texto livre"
+
 
 if [ "$FAIL" -eq 0 ]; then
   echo "# verde: $N/$TOTAL"

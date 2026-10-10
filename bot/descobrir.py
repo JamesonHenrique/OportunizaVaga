@@ -434,44 +434,8 @@ def job_ids(chave, rec):
     return ids
 
 
-# Paths shared by DIFFERENT jobs (a recruiter profile posts many): never an identity.
-_URL_GENERICA = re.compile(r"^/(in|company|school|groups|feed|search|jobs/search|vagas|jobs|careers?|carreiras)?/?[^/]*$")
-# Query params that name the job; tried first, in this order.
-_QUERY_ID = ("jk", "gh_jid", "jobId", "id", "vaga")
-# Query params that only track the visit: dropped before comparing.
-_QUERY_RASTRO = re.compile(r"^(utm_\w*|gh_src|ref|refid|ref_id|referrer|source|src|origin|trk\w*|trackingid|refid|gclid|fbclid|"
-                           r"mc_[ce]id|lang|locale|hl|from|campaign|medium|position|page(num)?|sessionid|currentjobid|"
-                           r"lipi|eboid|rcm|tracking\w*|_ga|_gl)$", re.I)
-
-
-def url_canon(u):
-    """'url:host/path' that names ONE job across boards/reposts (02/10: the same job came back under new
-    Telegram ids and was re-offered every round); '' for generic pages (profile, home, search).
-    10/10: a path without a known id key (/vagas/detalhe?codigo=55 vs ?codigo=56) used to drop the whole query,
-    so two different jobs got one key and the second was skipped as known. Unknown params now stay (sorted),
-    tracking params (utm_*, ref, trk...) go."""
-    p = urllib.parse.urlparse(str(u or "").strip())
-    if p.scheme not in ("http", "https") or not p.netloc:
-        return ""
-    host = re.sub(r"^(www\.|br\.|m\.)", "", p.netloc.lower())
-    path = re.sub(r"/+$", "", p.path)
-    linkedin = host.endswith("linkedin.com")
-    if linkedin and "/jobs/view/" not in path and "/posts/" not in path:
-        return ""
-    if linkedin:   # the id is in the path; every LinkedIn query param is navigation/tracking
-        return f"url:{host}{path.lower()}"
-    q = urllib.parse.parse_qs(p.query)
-    chave = next((f"?{k}={q[k][0]}" for k in _QUERY_ID if q.get(k)), "")
-    if not chave:
-        resto = sorted((k, v[0]) for k, v in q.items() if not _QUERY_RASTRO.match(k))
-        chave = "?" + urllib.parse.urlencode(resto) if resto else ""
-    # a job id in the last segment (/vaga-12345, /jobs/98765) names one job even under a "generic" section
-    com_id = bool(re.search(r"\d{5,}", path.rsplit("/", 1)[-1]))
-    if host == "t.me" or path.rsplit("/", 1)[-1].lower() == "search" or (_URL_GENERICA.match(path or "/") and not chave and not com_id):
-        return ""
-    if not path and not chave:
-        return ""
-    return f"url:{host}{path}{chave}"
+# One job identity for every collector (descobrir, tg-garimpo): lives in vagas_filtros (10/10).
+url_canon = vf.url_canon
 
 
 def _tokens(t, minimo=4):
