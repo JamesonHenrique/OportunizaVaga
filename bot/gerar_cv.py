@@ -23,6 +23,9 @@ from reportlab.lib.units import cm
 from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
+# sibling modules from the REAL location (a private install runs this file through a symlink)
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from cv_fatos import nao_comprovados  # noqa: E402
 BASE_MD = os.path.join(AQUI, "cv_base.md")
 DADOS_JSON = os.path.join(AQUI, "dados_candidato.json")
 
@@ -347,6 +350,15 @@ def gerar(spec_path, saida):
         print("ERRO: resumo_custom tem nota interna (%s): o CV vai ao recrutador. Reescreva so com fatos do perfil."
               % PROIBIDO_NO_CV.search(resumo).group(0), file=sys.stderr)
         sys.exit(2)
+    if resumo:
+        # 10/10: numbers and technologies of the free-text summary must exist in the candidate's own sources
+        fontes = open(BASE_MD, encoding="utf-8").read() + "\n" + json.dumps(dados, ensure_ascii=False)
+        sem_base = nao_comprovados(resumo, fontes, allow.keys())
+        if sem_base:
+            print("ERRO: resumo_custom afirma o que nao esta no perfil (cv_base.md/dados_candidato.json): %s. "
+                  "Tire essas afirmacoes ou use so o que o perfil comprova; NADA foi gerado." % ", ".join(sem_base),
+                  file=sys.stderr)
+            sys.exit(2)
     if len(resumo) > 800:
         resumo = resumo[:800].rsplit(" ", 1)[0] + "…"
     if not resumo:

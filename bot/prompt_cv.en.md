@@ -21,7 +21,8 @@ c1) PER-JOB CV (effort rule): only generate the PDF when the channel REALLY atta
    2) Build the spec at /tmp/cv_spec.json:
         { "empresa": "...", "vaga": "...",
           "titulo_alvo": "...",                // job title as written in the posting; developer/analyst roles only, never mid/senior
-          "resumo_custom": "...",              // <=800 chars, 3-4 sentences, truthful, with job keywords
+          "resumo_custom": "...",              // <=800 chars, 3-4 sentences, truthful, with job keywords;
+                                               // a number (years, %) or technology not in the profile = ERROR (exit 2)
           "categorias_ordem": ["...", "..."],   // subsections of "Habilidades técnicas" for the top
           "so_categorias": ["...", "..."],      // 3-7 subsections to SHOW; the rest stay hidden
           "palavras_chave_vaga": ["..."] }      // only real job skills that exist in my profile
