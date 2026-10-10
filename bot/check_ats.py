@@ -11,6 +11,12 @@ Uso:
     * no perfil    -> da pra colocar no CV (acao do agente)
     * fora do perfil -> nao da pra inventar (sinal de desalinhamento da vaga)
 - Exit 0 se a cobertura dos termos do perfil for >= 75%; senao exit 1 (acao).
+  Exit 1 tambem quando o anuncio nao tem NENHUM termo do perfil (vaga desalinhada).
+  Exit 2 quando o perfil (dados_candidato.json) nao pode ser lido: sem perfil a
+  cobertura nao e verificavel, e isso nunca conta como "OK".
+- Termo presente = palavra inteira no CV ("java" nao e coberto por "javascript").
+- A % mede so cobertura de palavras-chave; nao e nota de qualidade do CV nem
+  chance de aprovacao em ATS.
 
 NUNCA use texto invisivel/branco para "encher" keyword — ATS moderno (Workday,
 Greenhouse) detecta e sinaliza fraude.
@@ -23,7 +29,8 @@ import sys
 import unicodedata
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-DADOS_JSON = os.path.join(AQUI, "dados_candidato.json")
+# loop.sh exports DADOS_CANDIDATO_FILE; standalone runs fall back to bot/dados_candidato.json
+DADOS_JSON = os.environ.get("DADOS_CANDIDATO_FILE") or os.path.join(AQUI, "dados_candidato.json")
 
 COBERTURA_MINIMA = 75
 
@@ -79,10 +86,14 @@ def norm(s):
 
 
 def _allowlist_perfil():
+    """Profile terms; None when the profile cannot be read (missing, corrupt, not an object)."""
     try:
-        dados = json.load(open(DADOS_JSON, encoding="utf-8"))
-    except OSError:
-        return {}
+        with open(DADOS_JSON, encoding="utf-8") as fh:
+            dados = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(dados, dict):
+        return None
     partes = list(dados.get("experiencia", {}).get("tecnologias", []))
     partes += list(dados.get("experiencia", {}).get("stacks_similares_jr", []) or [])
     partes += list(dados.get("experiencia", {}).get("stacks_similares", []) or [])
@@ -120,6 +131,11 @@ def _texto_pdf(path):
     return txt
 
 
+def presente(termo, texto):
+    """Whole-term match: 'java' is not covered by 'javascript', 'go' not by 'google'."""
+    return re.search(r"(?<![a-z0-9+#])" + re.escape(termo) + r"(?![a-z0-9+#])", texto) is not None
+
+
 def termos_tecnicos(texto, allow):
     """Tokens tecnicos do anuncio: no perfil, no vocabulario tecnico, ou
     claramente tecnico (digito/simbolo/caixa mista). Genericos caem fora."""
@@ -151,6 +167,10 @@ def main(argv):
             sys.exit("ERRO: arquivo nao encontrado: %s" % p)
 
     allow = _allowlist_perfil()
+    if allow is None:
+        print("NAO VERIFICAVEL: perfil ilegivel ou ausente (%s) — sem ele a cobertura do perfil nao "
+              "pode ser medida. Corrija o arquivo; isto nao conta como aprovado." % DADOS_JSON)
+        return 2
     texto_cv = norm(_texto_pdf(cv_path))
     texto_an = open(anuncio_path, encoding="utf-8", errors="replace").read()
 
@@ -163,9 +183,9 @@ def main(argv):
     for n, orig in termos:
         (no_perfil if n in allow else fora_perfil).append((n, orig))
 
-    presentes = [(n, o) for n, o in termos if n in texto_cv]
-    faltando_perfil = [(n, o) for n, o in no_perfil if n not in texto_cv]
-    faltando_fora = [(n, o) for n, o in fora_perfil if n not in texto_cv]
+    presentes = [(n, o) for n, o in termos if presente(n, texto_cv)]
+    faltando_perfil = [(n, o) for n, o in no_perfil if not presente(n, texto_cv)]
+    faltando_fora = [(n, o) for n, o in fora_perfil if not presente(n, texto_cv)]
 
     cob_geral = round(100.0 * len(presentes) / len(termos))
     cob_perfil = (round(100.0 * (len(no_perfil) - len(faltando_perfil))
@@ -183,7 +203,11 @@ def main(argv):
         print("fora do perfil (NAO invente; sinal de desalinhamento da vaga): "
               + ", ".join(o for _, o in faltando_fora))
 
-    if cob_perfil is not None and cob_perfil < COBERTURA_MINIMA:
+    if cob_perfil is None:
+        print("REPROVADO: nenhum termo tecnico do anuncio esta no perfil — vaga desalinhada; "
+              "reavalie se vale candidatar (nao invente termos).")
+        return 1
+    if cob_perfil < COBERTURA_MINIMA:
         print("REPROVADO: cobertura do perfil < %d%% — ajuste o spec e gere de novo."
               % COBERTURA_MINIMA)
         return 1
