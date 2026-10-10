@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 PY="${PYTHON:-python3}"
 
-TOTAL=7
+TOTAL=9
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -144,5 +144,27 @@ with contextlib.redirect_stdout(io.StringIO()):
 assert len(chamadas) == 1, len(chamadas)   # cap is per collection (2 jobs pass the title filters)
 PYEOF
 relata $? "max_descricoes limita as paginas de vaga baixadas por busca"
+
+# 8 — 10/10: requisitos de anos fora do padrao "N anos de experiencia" (minimo/pelo menos/at least/atuando com).
+ROOT="$ROOT" "$PY" - <<'PYEOF'
+import os, sys
+sys.path.insert(0, os.path.join(os.environ["ROOT"], "bot"))
+import perfil_render as pr, vaga_check as v
+c = v.configurar(pr.resolver({"niveis": ["junior"], "experiencia_max_anos": 2}), {})
+assert not v.avaliar("Remoto. Mínimo 5 anos em Java.", "Dev Junior", None, c)[0]
+assert not v.avaliar("Remoto. Pelo menos 4 anos com Python.", "Dev Junior", None, c)[0]
+assert not v.avaliar("Remote. At least 3 years with Go.", "Dev Junior", None, c)[0]
+assert not v.avaliar("Remoto. 6 anos atuando com Java.", "Dev Junior", None, c)[0]
+assert v.avaliar("Remoto. Empresa com 8 anos no mercado. Java.", "Dev Junior", None, c)[0]   # company age, not a requirement
+assert v.avaliar("Remoto. Minimo 1 ano com Java.", "Dev Junior", None, c)[0]
+PYEOF
+relata $? "anos exigidos: minimo/pelo menos/at least/atuando com respeitam o teto"
+
+# 9 — 10/10: perfil que existe mas nao e JSON valido para (antes virava junior/remoto em silencio).
+printf '{"niveis": ["pleno"' > "$TMP/perfil-quebrado.json"
+SAIDA="$(BOT_PERFIL="$TMP/perfil-quebrado.json" STATE_DIR="$TMP" "$PY" -c 'import sys; sys.path.insert(0, "bot"); import vagas_filtros as vf; vf.perfil_resolvido(vf.resolve_paths()["perfil_file"])' 2>&1)"
+RC=$?
+[ "$RC" -ne 0 ] && grep -q "perfil inválido" <<<"$SAIDA"
+relata $? "perfil corrompido interrompe com mensagem clara (sem cair nos padroes)"
 
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
