@@ -178,11 +178,19 @@ if [ -n "$PERFIL_FILE" ] && [ ! -f "$PERFIL_FILE" ]; then
   exit 1
 fi
 if [ -n "$PERFIL_FILE" ]; then
-  PERFIL_NOME="$(python3 - "$PERFIL_FILE" <<'PY'
+  # Perfil ilegivel PARA o loop: antes o nome saia vazio, o slug virava "perfil" e um estado
+  # novo (vazio) era semeado do exemplo — historico sumia e vagas ja enviadas voltavam.
+  if ! PERFIL_NOME="$(python3 - "$PERFIL_FILE" 2>&1 <<'PY'
 import json, sys
-print(json.load(open(sys.argv[1], encoding='utf-8')).get('nome_perfil', 'perfil'))
+d = json.load(open(sys.argv[1], encoding='utf-8'))
+if not isinstance(d, dict):
+    sys.exit('o JSON precisa ser um objeto')
+print(d.get('nome_perfil', 'perfil'))
 PY
-)"
+)"; then
+    echo "[$(date '+%F %T')] ERRO: perfil invalido ($PERFIL_FILE): $(printf '%s' "$PERFIL_NOME" | tail -1)" >> loop.log
+    exit 1
+  fi
   PERFIL_SLUG="$(printf '%s' "$PERFIL_NOME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-48)"
   [ -n "$PERFIL_SLUG" ] || PERFIL_SLUG="perfil"
   STATE_DIR="$BOT_ROOT/bot/state/$PERFIL_SLUG"
@@ -203,7 +211,14 @@ export OV_TELEMETRY_MODE="${OV_TELEMETRY_MODE:-aggregate}"
 export OV_MONITOR_INCLUDE_DETAILS="${OV_MONITOR_INCLUDE_DETAILS:-0}"
 mkdir -p "$STATE_DIR"
 if [ ! -f "$APLICADAS_FILE" ]; then
+  # Estado novo e vazio: legitimo na 1a execucao, perigoso se o nome do perfil mudou (o historico
+  # fica no slug antigo e o anti-duplicata nao o ve). Deixa rastro no log em vez de seguir calado.
+  outros="$(find "$BOT_ROOT/bot/state" -mindepth 2 -maxdepth 2 -name aplicadas.json ! -path "$APLICADAS_FILE" 2>/dev/null | head -3 | tr '\n' ' ')"
+  [ -f "$BOT_ROOT/bot/aplicadas.json" ] && [ "$APLICADAS_FILE" != "$BOT_ROOT/bot/aplicadas.json" ] && outros="$outros$BOT_ROOT/bot/aplicadas.json"
   cp "$BOT_ROOT/examples/aplicadas.example.json" "$APLICADAS_FILE"
+  if [ -n "$outros" ]; then
+    echo "[$(date '+%F %T')] AVISO: estado novo criado em $APLICADAS_FILE (perfil '$PERFIL_NOME'); ja existe historico em: $outros— se o nome_perfil mudou, mova o estado antigo para ca." >> loop.log
+  fi
 fi
 mkdir -p logs
 
@@ -489,6 +504,9 @@ while true; do
   CI=0; REPETIU=""
   while [ "$CI" -lt "${#CASCATA[@]}" ]; do
   MODELO=${CASCATA[$CI]}; CI=$((CI + 1))
+  # Each cascade attempt is its own owner of estado.py intencao: an intent left by a killed attempt is an
+  # unknown result for the next model of the SAME round too, never "mine, retry the click".
+  export OV_TENTATIVA="$OV_RODADA-$CI"
   ROUND_START=$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')
   # elapsed-time clock read by the model (bot/tempo-rodada.py, prompt rule 7d)
   mkdir -p "$STATE_DIR"; date +%s > "$STATE_DIR/rodada_inicio"; rm -f "$STATE_DIR/rodada_travou"

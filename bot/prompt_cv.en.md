@@ -45,7 +45,8 @@ c1) PER-JOB CV (effort rule): only generate the PDF when the channel REALLY atta
    4) Save the posting text to /tmp/anuncio.txt and measure coverage BEFORE attaching:
         python3 "$BOT_ROOT/bot/check_ats.py" /tmp/anuncio.txt \
           "$BOT_ROOT/bot/CV_YOUR_NAME_<Company>.pdf"
-      Target: coverage of PROFILE terms >= 75% (exit 0 = "OK"). If it failed, adjust the spec
+      Target: coverage of PROFILE terms >= 75% (exit 0 = "OK"; exit 2 = unreadable profile,
+      NOT a pass). If it failed, adjust the spec
       (resumo_custom with the MISSING terms in the posting's wording, palavras_chave_vaga,
       so_categorias) and regenerate — NEVER try to cover an "outside profile" term (the script itself
       lists those as a job misalignment).

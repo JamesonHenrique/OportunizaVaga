@@ -5,7 +5,39 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Intenção de envio (`bot/estado.py intencao` / `cancelar-intencao`)**: gravada logo antes do clique final (passo d0
+  do prompt) em `envios_pendentes`. Se o processo morre entre o clique e o `add-aplicada`, o próximo modelo da cascata
+  (`OV_TENTATIVA`) ou a próxima rodada recebe exit 1 e vê o envio no topo do `resumo`/`ja-visto` como resultado
+  desconhecido — verificar antes de reenviar. `validate-rodada.py` avisa; o monitor recebe só a contagem
+  (`telemetry.totals.enviosPendentes`). `tests/test_estado.sh` (28). Ver `docs/OPERACAO.md`.
+- **`scripts/restore-json.py`**: `--listar`, `--verificar` e restauração com simulação por padrão; recusa backup
+  inválido, avisa aplicadas que seriam esquecidas e guarda o atual como `pre-restore` antes de trocar
+  (trava + escrita atômica). `tests/test_backup.sh` (10).
+
 ### Fixed
+- **Monitor publicava dados congelados (`monitor/snapshot.mjs`)**: estado, log e "hoje" eram lidos ao importar o
+  módulo; o daemon `publish-status.mjs` reenviava esses dados com `updatedAt` novo e o vigia nunca via o monitor
+  parado. Agora tudo é lido dentro de `buildSnapshot()` (teste de regressão no mesmo processo).
+- **Backup (`scripts/backup-jsons.sh`/`.ps1`)**: origem com JSON inválido é pulada (exit 1) em vez de entrar na
+  rotação e empurrar as cópias boas; a rotação da raiz (`aplicadas.*`) apagava os backups dos perfis
+  (`aplicadas.perfil-*`) — agora o glob exige o carimbo numérico.
+- **Deduplicação (`bot/descobrir.py`)**: `url_canon` descartava parâmetros fora de 5 nomes, então
+  `detalhe?codigo=55` e `?codigo=56` viravam a mesma chave e a segunda vaga sumia; agora só parâmetros de
+  rastreio (`utm_*`, `ref`, `trk`...) saem. `ja_registrada` comparava só a 1ª palavra da empresa como substring
+  ("SAP" casava "sapiens", todo "Banco ..." colidia) e ignorava o nível; agora exige todas as palavras da empresa e
+  nível explícito diferente = vaga diferente. `tests/test_descobrir.sh`.
+- **Perfil corrompido virava júnior/remoto em silêncio**: `perfil_render.carregar` e `vagas_filtros` caíam nos padrões;
+  no `loop.sh`, o nome vazio levava a um estado novo e vazio (histórico sumia, vagas já enviadas voltavam). Agora o
+  loop para com `ERRO: perfil invalido` e os scripts saem com mensagem clara. Estado novo criado quando já existe
+  histórico de outro perfil deixa `AVISO` no `loop.log`.
+- **Filtro de anos (`bot/vaga_check.py`)**: "Mínimo 5 anos em Java", "pelo menos 4 anos com", "at least 3 years" e
+  "N anos atuando com" passavam pelo teto de experiência.
+- **`bot/check_ats.py`**: "java" era coberto por "javascript" (substring) — agora palavra inteira; perfil ausente ou
+  corrompido dava "OK" (agora exit 2, não verificável); anúncio sem nenhum termo do perfil dava "OK" (agora
+  reprovado como desalinhado). `tests/test_check_ats.py`.
+- **`tests/test_estado.sh`**: um `if` fora do lugar deixava os testes 21–23 dentro da condição final.
+
 - **CV levava nota interna ao recrutador (`bot/gerar_cv.py`)**: a frase de transferência (feita para formulário) e a
   linha "Termos do anúncio correspondidos", com os rótulos internos das stacks similares ("sem afirmar domínio"), eram
   impressas logo após o resumo. Saíram; `resumo_custom` com nota interna é recusado (exit 2) e a autochecagem

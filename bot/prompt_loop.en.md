@@ -232,6 +232,13 @@ c2) TWO-TIER (optional): to save strong-model quota, first run the cheap
    "sim"/"talvez" items (~10, ≤14 days) with this prompt on the strong model. "nao"
    adds to descartes_listagem, never to bloqueados.
 
+d0) RIGHT BEFORE the final submit click (Send/Apply/Submit), on ANY channel, record the intent:
+   `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE intencao KEY '{"empresa":"...","vaga":"...","url":"https://..."}'`
+   (the SAME key that will go into add-aplicada). Exit 1 = already applied, or a send from an earlier round with an
+   unknown result: do NOT click; check the portal ("you already applied"/my applications) or the e-mail.
+   It went out = add-aplicada; verifiably did not = `estado.py cancelar-intencao KEY "reason"`.
+   A send that failed on screen (form error, no confirmation) is also cancelar-intencao.
+
 d) Attach with the hidden file input via CDP when needed (input[name=Filedata] in Gmail).
 
 e) Log EACH sent application via
