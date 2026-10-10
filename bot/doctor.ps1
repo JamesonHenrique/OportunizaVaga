@@ -107,6 +107,16 @@ try {
 }
 Write-Host ''
 
+Write-Host '-- 7) Estado e operacao (perfil, estados, envios pendentes, backups, ultima rodada) --'
+$py = @('python3', 'python', 'py') | Where-Object { Get-Command $_ -ErrorAction SilentlyContinue } | Select-Object -First 1
+if ($py) {
+    & $py (Join-Path $BOT_ROOT 'scripts\doctor-estado.py')
+    if ($LASTEXITCODE -ne 0) { $script:FaltaEssencial = 1 }
+} else {
+    Write-Info 'python ausente — checagem de estado pulada.'
+}
+Write-Host ''
+
 if ($script:FaltaEssencial -eq 0) { Write-Host 'doctor: essencial OK (resolva os [??] se for rodar o loop real).' }
 else { Write-Host 'doctor: FALHOU — resolva os itens [FALHA] acima e rode de novo.' }
 Write-Host 'Para colar numa issue: copie deste bloco para cima e confira que nao ha dados pessoais.'
