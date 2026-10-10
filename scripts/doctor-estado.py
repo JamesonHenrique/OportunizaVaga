@@ -150,8 +150,29 @@ def operacao():
             ok("loop.log sem ERRO/ALERTA nas ultimas 300 linhas.")
 
 
+def portais():
+    saude = _modulo("saude_portais", os.path.join(ROOT, "bot", "saude-portais.py"))
+    dirs = [STATE] + sorted(os.path.dirname(p) for p in glob.glob(os.path.join(STATE, "state", "*", "aplicadas.json")))
+    achou = False
+    for d in dirs:
+        res = saude.avaliar(d)
+        if not res:
+            continue
+        achou = True
+        nome = "default" if d == STATE else os.path.basename(d)
+        ruins = {p: v for p, v in res.items() if v["estado"] in ("login_necessario", "indisponivel", "falha_recente")}
+        for p, v in ruins.items():
+            aviso(f"portal {p} ({nome}): {v['estado']}", v["evidencia"])
+        cont = {}
+        for v in res.values():
+            cont[v["estado"]] = cont.get(v["estado"], 0) + 1
+        (ok if not ruins else info)(f"portais ({nome}): " + ", ".join(f"{k}={n}" for k, n in sorted(cont.items())))
+    if not achou:
+        info("nenhuma evidencia de portal ainda (sonda/canario/coleta/rodizio) — normal antes das primeiras rodadas.")
+
+
 def main():
-    for etapa in (perfil, estados, backups, operacao):
+    for etapa in (perfil, estados, backups, operacao, portais):
         try:
             etapa()
         except Exception as e:   # one broken check must not hide the others

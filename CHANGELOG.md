@@ -6,6 +6,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Saúde por portal (`bot/saude-portais.py`)**: `login_necessario`, `indisponivel`, `falha_recente`,
+  `sem_vagas_compativeis`, `funcionando` ou `nao_verificado`, cada um com evidência e data (sonda, canário, coleta,
+  rodízio, login); configurado sem evidência nunca é "funcionando". `canario-fontes.py` passa a gravar
+  `canario_fontes.json`; o loop grava `saude_portais.json` por rodada; monitor (`portais`) e `doctor` consomem.
+  `tests/test_saude_portais.py` (3), `snapshot.test.mjs`.
 - **Avaliação reproduzível de modelos (`scripts/eval-modelos.py` + `tests/golden/triagem.example.jsonl`)**: 15 vagas
   sintéticas, regras do `prompt_triage.md`; registra disponibilidade (rc, formato, latência) separada de qualidade
   (acertos, precisão entre as respondidas) em `bot/logs/eval-modelos.jsonl`. Fora da CI (provedor real);

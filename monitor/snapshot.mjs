@@ -294,6 +294,14 @@ export function buildSnapshot() {
   const loopLog1 = path.join(ROOT, 'loop.log.1');
   // Sends whose outcome is unknown (estado.py intencao without add-aplicada): a count only, safe in aggregate mode.
   const enviosPendentes = stateDocs.reduce((sum, item) => sum + (item.doc.envios_pendentes && typeof item.doc.envios_pendentes === 'object' ? Object.keys(item.doc.envios_pendentes).length : 0), 0);
+  // Portal states computed by bot/saude-portais.py (one source of truth): portal name -> state only.
+  const portais = {};
+  for (const item of stateDocs) {
+    const doc = readJson(path.join(path.dirname(item.file), 'saude_portais.json'), null);
+    for (const [nome, v] of Object.entries(asObj(doc?.portais) || {})) {
+      if (v && typeof v.estado === 'string') portais[nome] = v.estado;
+    }
+  }
   const descarteTotal = stateDocs.reduce((sum, item) => sum + (Number(item.doc.descartes_listagem_total) || 0), 0);
   const rodizioPorPerfil = Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.rodizio || null]));
   const perfis = stateDocs.map(item => ({ nome: item.profile, aplicadas: Array.isArray(item.doc.aplicadas) ? item.doc.aplicadas.length : 0, bloqueados: item.doc.bloqueados && typeof item.doc.bloqueados === 'object' ? Object.keys(item.doc.bloqueados).length : 0 }));
@@ -344,6 +352,7 @@ export function buildSnapshot() {
     aguardandoLogin: INCLUDE_DETAILS ? aguardandoLogin : undefined,
     descoberta,
     gmailStatus,
+    portais,
     dadosFaltantes,
     descartes: INCLUDE_DETAILS ? Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.descartes_listagem || null])) : { total: descarteTotal },
     pularTipos: INCLUDE_DETAILS ? Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.pular_tipos || []])) : undefined,
