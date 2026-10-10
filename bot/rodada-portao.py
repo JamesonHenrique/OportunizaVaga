@@ -19,7 +19,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 
 BASE = os.path.dirname(os.path.realpath(__file__))
 ROOT = os.path.dirname(BASE)

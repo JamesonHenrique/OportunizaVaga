@@ -48,6 +48,10 @@ jobs:
           ((${#files[@]})) || { echo 'nenhum tests/test_*.sh versionado'; exit 1; }
           for t in "${files[@]}"; do echo "== $t"; bash "$t"; done
           echo "suite bash OK: ${#files[@]} arquivos"
+      - name: ruff (erros reais; config em ruff.toml)
+        run: pipx run ruff==0.17.0 check --output-format github .
+      - name: pytest (funcoes test_* de tests/*.py)
+        run: pipx run pytest==9.1.1 -q tests/
       - name: suite python (tests/test_*.py)
         run: |
           mapfile -t files < <(git ls-files 'tests/test_*.py')

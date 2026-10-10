@@ -29,6 +29,13 @@ Os testes de fixture copiam o arquivo por cima de `examples/` e restauram
 via `trap` — o repo volta intacto mesmo se o teste falhar.
 Fixtures em `tests/fixtures/` (nenhum dado real, tudo `@example.com`).
 
+Lint e pytest locais (mesmas versões da CI, sem instalar nada no sistema):
+
+```bash
+uvx ruff@0.17.0 check .            # ou: pipx run ruff==0.17.0 check .
+uvx --from pytest==9.1.1 pytest -q tests/
+```
+
 ## 2. Windows — espelho Pester
 
 ```powershell
@@ -65,7 +72,7 @@ com taxas, `descartes_listagem` sem `total` (soma campos), regra de resposta.
 
 | Job | Steps de qualidade |
 |-----|--------------------|
-| `linux` (ubuntu) | `bash -n` nos scripts + adaptadores, shellcheck, `node --check`, JSON válido, `scripts/validate.sh`, **`bash tests/test_validate.sh`**, **`bash tests/test_dry_run.sh`**, **`node --test monitor/`**, `sanitize.sh` |
+| `linux` (ubuntu) | `bash -n` nos scripts + adaptadores, shellcheck, `node --check`, JSON válido, `py_compile`, `scripts/validate.sh`, **ruff** (`ruff.toml`: só erros reais — sintaxe, nome indefinido, import/variável sem uso), **pytest** (`tests/*.py`), **toda `tests/test_*.sh`** e `tests/test_*.py`, **`node --test monitor/`**, `sanitize.sh` |
 | `windows` | PSScriptAnalyzer (só erros), `node --check`, JSON válido, `validate.ps1`, **`Pester tests/validate.Tests.ps1`**, `sanitize.sh` via git-bash |
 
 Dependabot (`.github/dependabot.yml`): npm em `monitor/` + github-actions, mensal.
