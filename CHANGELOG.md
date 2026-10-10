@@ -6,6 +6,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **`saude-portais.py --dir/--aplicadas`**: locais explícitos para instalações com `aplicadas.json` fora do diretório
+  dos arquivos laterais; nome que só aparece em `login_checagens` (contas, canais grafados errado) não vira portal.
 - **Saúde por portal (`bot/saude-portais.py`)**: `login_necessario`, `indisponivel`, `falha_recente`,
   `sem_vagas_compativeis`, `funcionando` ou `nao_verificado`, cada um com evidência e data (sonda, canário, coleta,
   rodízio, login); configurado sem evidência nunca é "funcionando". `canario-fontes.py` passa a gravar
