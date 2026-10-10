@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 PY="${PYTHON:-python3}"
 
-TOTAL=9
+TOTAL=10
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -166,5 +166,29 @@ SAIDA="$(BOT_PERFIL="$TMP/perfil-quebrado.json" STATE_DIR="$TMP" "$PY" -c 'impor
 RC=$?
 [ "$RC" -ne 0 ] && grep -q "perfil inválido" <<<"$SAIDA"
 relata $? "perfil corrompido interrompe com mensagem clara (sem cair nos padroes)"
+
+# 10 — 10/10: explicar() = mesmo veredito do avaliar(), cada criterio confirmado/incompativel/desconhecido.
+ROOT="$ROOT" "$PY" - <<'PYEOF'
+import os, sys
+sys.path.insert(0, os.path.join(os.environ["ROOT"], "bot"))
+import perfil_render as pr, vaga_check as v
+c = v.configurar(pr.resolver({"niveis": ["junior"], "experiencia_max_anos": 2, "modelos": ["remoto"]}),
+                 {"stack_preferida": ["java", "spring"], "stack_evitar": ["php", "laravel", "wordpress"]})
+casos = [("Vaga junior Java Spring, 1 ano de experiencia. Remoto. CLT. Salario R$ 4 mil.", "Dev Junior"),
+         ("Minimo 5 anos em Java. Remoto.", "Dev Junior"),
+         ("Modelo de trabalho: presencial em SP. Java.", "Dev Junior"),
+         ("PHP, Laravel e WordPress. Remoto.", "Dev Junior"),
+         ("Venha fazer parte do time.", "Dev")]
+for texto, tit in casos:
+    e = v.explicar(texto, tit, None, c)
+    assert e["compativel"] == v.avaliar(texto, tit, None, c)[0], (texto, e)
+e = v.explicar(*casos[0], None, c)["criterios"]
+assert all(e[k]["estado"] == "confirmado" for k in ("nivel", "experiencia", "modelo", "stack", "contrato", "salario")), e
+e = v.explicar(*casos[1], None, c)
+assert e["criterios"]["experiencia"]["estado"] == "incompativel" and not e["compativel"]
+e = v.explicar(*casos[4], None, c)["criterios"]   # nada informado: desconhecido, nunca confirmado
+assert {k: x["estado"] for k, x in e.items()} == dict.fromkeys(("nivel", "experiencia", "modelo", "stack", "contrato", "salario"), "desconhecido"), e
+PYEOF
+relata $? "explicar: mesmo veredito do avaliar; ausente = desconhecido; incompativel com evidencia"
 
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

@@ -6,6 +6,8 @@ found only AFTER the model opened and read the posting. This decides the obvious
 
   vaga_check.py checar ARQUIVO [TITULO] [NIVEL_OFICIAL]  -> "COMPATIVEL" or "INCOMPATIVEL: motivo (evidencia)"
   (used by descobrir.py on every queue job, and by the model on the saved posting, prompt step c0)
+  vaga_check.py explicar ARQUIVO [TITULO] [NIVEL_OFICIAL] [--json]
+                                                         -> same verdict + each criterion confirmado/incompativel/desconhecido
 
 CONSERVATIVE by design: it only rejects on clear evidence. Doubt -> COMPATIVEL (the model judges).
 
@@ -18,6 +20,7 @@ Everything is driven by the active profile (perfil.json) and the optional descob
   stack_preferida             the profile stack; empty = the stack rule is off
 See config/descoberta.example.json for a filled example.
 """
+import json
 import os
 import re
 import sys
@@ -128,6 +131,72 @@ def avaliar(texto, titulo="", nivel_oficial=None, conf=None):
     return True, ""
 
 
+CONTRATO = re.compile(r"\b(clt|pj|pessoa juridica|cooperad\w*|estagio|temporari[oa]|freela\w*|contractor|full[- ]time)\b")
+SALARIO = re.compile(r"(r\$|us\$|usd|brl)\s*\d[\d.,]*(\s*(mil|k))?")
+ESTADOS = ("confirmado", "incompativel", "desconhecido")
+
+
+def explicar(texto, titulo="", nivel_oficial=None, conf=None):
+    """Explainable view of the SAME rules as avaliar() (10/10). Never changes the verdict: avaliar() decides.
+
+    Returns {"compativel": bool, "motivo": str, "criterios": {...}, "cobertura": "c/t"} where each criterio is
+    {"estado": confirmado | incompativel | desconhecido, "evidencia": str}:
+      nivel        accepted level word in title/description or LinkedIn official level
+      experiencia  years required vs. the profile ceiling (experiencia_max_anos)
+      modelo       remote / hybrid / on-site stated vs. accepted modelos
+      stack        profile stack (stack_preferida) and foreign stack (stack_evitar) found in the text
+      contrato     contract type stated (informational: the profile has no contract rule)
+      salario      salary stated (informational)
+    Missing information is "desconhecido", never "confirmado". cobertura = confirmed criteria / criteria that
+    have a rule (nivel, experiencia, modelo, stack when configured). It is NOT a probability of being hired."""
+    conf = conf or carregar_conf()
+    ok, motivo = avaliar(texto, titulo, nivel_oficial, conf)
+    t, ti = _n(texto), _n(titulo)
+    of = _n(nivel_oficial).strip() if nivel_oficial else ""
+    c = {}
+    m = conf["bom"].search(ti) or conf["bom"].search(t[:600])
+    canon = OFICIAL.get(of)
+    if motivo.startswith(("nivel", "titulo sem nivel")):
+        c["nivel"] = ("incompativel", motivo)
+    elif m:
+        c["nivel"] = ("confirmado", m.group(0))
+    elif canon and canon & conf["aceitos_oficial"]:
+        c["nivel"] = ("confirmado", f"nivel oficial {nivel_oficial}")
+    else:
+        c["nivel"] = ("desconhecido", "nenhum nivel aceito citado")
+    anos = [n for n in (int(next(g for g in x.groups() if g)) for x in ANOS.finditer(t)) if n < 10]
+    teto = conf["max_anos"]
+    if not anos:
+        c["experiencia"] = ("desconhecido", "anos exigidos nao informados")
+    elif teto is not None and min(anos) > teto:
+        c["experiencia"] = ("incompativel", f"{min(anos)}+ anos, teto {teto}")
+    else:
+        c["experiencia"] = ("confirmado", f"{min(anos)} ano(s)" + ("" if teto is None else f", teto {teto}"))
+    achados = [n for n, rx in (("remoto", REMOTO), ("hibrido", HIBRIDO), ("presencial", PRESENCIAL)) if rx.search(t)]
+    if motivo.startswith("modelo"):
+        c["modelo"] = ("incompativel", motivo)
+    elif any(n in conf["modelos"] for n in achados):
+        c["modelo"] = ("confirmado", ", ".join(n for n in achados if n in conf["modelos"]))
+    else:
+        c["modelo"] = ("desconhecido", "modelo de trabalho nao informado")
+    boa = sorted({x.group(0) for x in conf["stack_boa"].finditer(t)}) if conf["stack_boa"] else []
+    fora = sorted({x.group(0) for x in conf["stack_fora"].finditer(t)}) if conf["stack_fora"] else []
+    if motivo.startswith("stack"):
+        c["stack"] = ("incompativel", motivo)
+    elif boa:
+        c["stack"] = ("confirmado", ", ".join(boa[:8]) + (f" (fora: {', '.join(fora[:4])})" if fora else ""))
+    elif conf["stack_boa"]:
+        c["stack"] = ("desconhecido", "nenhuma tecnologia do perfil citada" + (f" (fora: {', '.join(fora[:4])})" if fora else ""))
+    mc, ms = CONTRATO.search(t), SALARIO.search(t)
+    c["contrato"] = ("confirmado", mc.group(0)) if mc else ("desconhecido", "tipo de contrato nao informado")
+    c["salario"] = ("confirmado", ms.group(0).rstrip(".,")) if ms else ("desconhecido", "salario nao informado")
+    com_regra = [k for k in ("nivel", "experiencia", "modelo", "stack") if k in c]
+    conf_n = sum(1 for k in com_regra if c[k][0] == "confirmado")
+    return {"compativel": ok, "motivo": motivo,
+            "criterios": {k: {"estado": e, "evidencia": ev[:120]} for k, (e, ev) in c.items()},
+            "cobertura": f"{conf_n}/{len(com_regra)}"}
+
+
 def carregar_conf():
     """Active profile + descoberta.json, the same lookup as descobrir.py."""
     paths = vf.resolve_paths()
@@ -135,14 +204,25 @@ def carregar_conf():
 
 
 def main(argv):
-    if len(argv) >= 2 and argv[0] == "checar":
+    if len(argv) >= 2 and argv[0] in ("checar", "explicar"):
         try:
             with open(argv[1], encoding="utf-8", errors="ignore") as fh:
                 texto = fh.read()
         except OSError as e:
             print(f"erro: {e}")
             return 2
-        ok, motivo = avaliar(texto, argv[2] if len(argv) > 2 else "", argv[3] if len(argv) > 3 else None)
+        args = [x for x in argv[2:] if x != "--json"]
+        titulo, oficial = (args[0] if args else ""), (args[1] if len(args) > 1 else None)
+        if argv[0] == "explicar":
+            e = explicar(texto, titulo, oficial)
+            if "--json" in argv:
+                print(json.dumps(e, ensure_ascii=False))
+            else:
+                print(("COMPATIVEL" if e["compativel"] else f"INCOMPATIVEL: {e['motivo']}") + f" | criterios confirmados {e['cobertura']}")
+                for k, v in e["criterios"].items():
+                    print(f"  {k:<12} {v['estado']:<13} {v['evidencia']}")
+            return 0 if e["compativel"] else 1
+        ok, motivo = avaliar(texto, titulo, oficial)
         print("COMPATIVEL" if ok else f"INCOMPATIVEL: {motivo}")
         return 0 if ok else 1
     print(__doc__)
