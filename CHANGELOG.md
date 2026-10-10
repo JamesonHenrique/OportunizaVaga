@@ -6,6 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **`doctor` seção 7 (`scripts/doctor-estado.py`, usado por `doctor.sh` e `doctor.ps1`)**: perfil legível, cada estado
+  (raiz e `bot/state/*`), envios com resultado desconhecido, inconsistências do `validate-rodada`, idade e validade dos
+  backups, última rodada e contagem de ERRO/ALERTA no `loop.log` — só nomes de perfil, contagens e idades (sem dado
+  pessoal). Exit 1 só para perfil/estado ilegível. `tests/test_doctor_estado.sh` (6).
+- **`eventos.jsonl`**: cada escrita do `estado.py` vira uma linha (`em`, `rodada`, `tentativa`, `cmd`, `chave`,
+  `de`/`para`), sem texto livre; recusas e leituras não contam; gira em 2 MB. `docs/OPERACAO.md`.
 - **Intenção de envio (`bot/estado.py intencao` / `cancelar-intencao`)**: gravada logo antes do clique final (passo d0
   do prompt) em `envios_pendentes`. Se o processo morre entre o clique e o `add-aplicada`, o próximo modelo da cascata
   (`OV_TENTATIVA`) ou a próxima rodada recebe exit 1 e vê o envio no topo do `resumo`/`ja-visto` como resultado
@@ -16,6 +22,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (trava + escrita atômica). `tests/test_backup.sh` (10).
 
 ### Fixed
+- **Alertas (`scripts/notificar.sh`/`.ps1`)**: a deduplicação usava o hash exato, então o mesmo alerta com outra hora ou
+  contagem saía a cada rodada; agora números são ignorados na chave (janela `OV_NOTIFY_JANELA_S`, padrão 6h) e envio
+  recusado pela API (`curl -f`) não é marcado como enviado. `tests/test_notificar.sh` (4).
+- **Telegram (`bot/tg-garimpo.py`)**: deduplicava pelo link cru (mesma vaga com outro `?utm=` voltava) e conferia
+  "já registrada" por substring do arquivo (`/vaga/1` casava `/vaga/12`). `url_canon` foi para `vagas_filtros.py`
+  (uma regra para `descobrir` e `tg-garimpo`) e o Telegram compara URL canônica / e-mail exato.
 - **Monitor publicava dados congelados (`monitor/snapshot.mjs`)**: estado, log e "hoje" eram lidos ao importar o
   módulo; o daemon `publish-status.mjs` reenviava esses dados com `updatedAt` novo e o vigia nunca via o monitor
   parado. Agora tudo é lido dentro de `buildSnapshot()` (teste de regressão no mesmo processo).
