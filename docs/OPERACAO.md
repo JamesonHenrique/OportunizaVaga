@@ -30,6 +30,28 @@ aprovada aparece no prompt com a marca `[descrição ok]`, e o passo **c0** do p
 `vaga_check.py` nas demais vagas, antes de gerar CV. Rejeitadas entram na fila como `filtrada` com motivo `desc:...`.
 Teste: `tests/test_vaga_check.sh` (os 10 casos de referência, perfil, CLI, descoberta offline).
 
+### Critérios explicados (`vaga_check.py explicar`)
+
+```bash
+python3 bot/vaga_check.py explicar /tmp/anuncio.txt "Título" [--json]
+# COMPATIVEL | criterios confirmados 3/4
+#   nivel        confirmado    junior
+#   experiencia  desconhecido  anos exigidos nao informados
+#   modelo       confirmado    remoto
+#   stack        confirmado    java, spring (fora: php)
+#   contrato     confirmado    clt
+#   salario      desconhecido  salario nao informado
+```
+
+- Mesmo veredito do `checar` (as mesmas regras; `explicar` só mostra o porquê).
+- Cada critério é `confirmado` (há evidência no texto), `incompativel` (a regra reprovou, com a evidência) ou
+  `desconhecido` (o anúncio não informa). Informação ausente **nunca** conta como confirmada, e também não reprova.
+- `cobertura` = critérios com regra (nível, experiência, modelo e stack, se configurada) confirmados / existentes.
+  Todos têm o mesmo peso. **Não é probabilidade de contratação**; contrato e salário são só informativos (o perfil
+  não tem regra para eles).
+- Na descoberta, cada vaga triada pela descrição guarda `criterios` e `cobertura` em `vagas_fila.json`.
+
+
 ## Cascata adaptativa de modelos (`bot/modelos-saude.py`)
 
 A ordem da cascata em `loop.sh`/`loop.ps1` é escrita à mão, mas modelos gratuitos variam muito: na operação privada do

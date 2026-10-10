@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Compatibilidade explicável (`vaga_check.py explicar`)**: mesmo veredito do `checar`, com nível, experiência, modelo,
+  stack, contrato e salário como `confirmado`/`incompativel`/`desconhecido` e a evidência; `cobertura` = critérios
+  confirmados (peso igual, não é probabilidade). A descoberta grava `criterios`/`cobertura` em cada vaga triada.
+  `tests/test_vaga_check.sh` (10).
 - **Resumo do CV conferido contra o perfil (`bot/cv_fatos.py`, usado por `gerar_cv.py`)**: número (anos, %, contagens)
   ou tecnologia do vocabulário técnico que não aparece em `cv_base.md`/`dados_candidato.json` faz o `gerar_cv` sair com
   exit 2 sem gerar o PDF. Medido em 22 resumos reais: 1 seria recusado (tecnologia fora do perfil).
