@@ -19,12 +19,28 @@ if pgrep -f "bot/loop\.sh" >/dev/null; then
   : # loop vivo, nada a fazer
 else
   if fuser /tmp/oportunizavaga-loop.lock >/dev/null 2>&1; then
-    echo "[$(date '+%F %T')] guardiao: lock preso sem loop vivo, limpando orfaos" >> guardiao.log
-    fuser -k /tmp/oportunizavaga-loop.lock >/dev/null 2>&1 || true
+    # 10/10: no blind `fuser -k`. A holder with no live loop is either an orphan `sleep` (harmless: kill it) or a
+    # child still finishing work (python/opencode/node): killing that one could cut a write or a submit in half.
+    # It only dies past OV_GUARDIAO_ORFAO_S (default 1500s = 20min round timeout + margin); before that we wait.
+    vivos=0
+    for pid in $(fuser /tmp/oportunizavaga-loop.lock 2>/dev/null); do
+      idade=$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')
+      nome=$(ps -o comm= -p "$pid" 2>/dev/null)
+      [ -n "$idade" ] || continue
+      if [ "$nome" = "sleep" ] || [ "$idade" -gt "${OV_GUARDIAO_ORFAO_S:-1500}" ]; then
+        echo "[$(date '+%F %T')] guardiao: lock preso sem loop vivo, matando orfao $nome (pid $pid, ${idade}s)" >> guardiao.log
+        kill "$pid" 2>/dev/null || true
+      else
+        echo "[$(date '+%F %T')] guardiao: orfao $nome (pid $pid, ${idade}s) ainda trabalhando; espero antes de subir o loop" >> guardiao.log
+        vivos=1
+      fi
+    done
     sleep 2
   fi
-  echo "[$(date '+%F %T')] guardiao: loop caido, subindo" >> guardiao.log
-  setsid "$BOT_ROOT/bot/loop.sh" >/dev/null 2>&1 </dev/null &
+  if [ "${vivos:-0}" -eq 0 ]; then   # an orphan still working: the next cron tick tries again
+    echo "[$(date '+%F %T')] guardiao: loop caido, subindo" >> guardiao.log
+    setsid "$BOT_ROOT/bot/loop.sh" >/dev/null 2>&1 </dev/null &
+  fi
 fi
 
 # 3) Chrome com CDP — sem ele o robo nao navega e os logins se perdem de vista.

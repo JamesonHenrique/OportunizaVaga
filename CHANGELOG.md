@@ -6,6 +6,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Adesão ao passo d0 mensurável**: `add-aplicada` do robô sem intenção grava `sem_intencao` (e avisa o modelo);
+  com intenção grava `intencao_em`; `doctor` seção 7 conta as duas. `tests/test_estado.sh` (30).
 - **`doctor` seção 7 (`scripts/doctor-estado.py`, usado por `doctor.sh` e `doctor.ps1`)**: perfil legível, cada estado
   (raiz e `bot/state/*`), envios com resultado desconhecido, inconsistências do `validate-rodada`, idade e validade dos
   backups, última rodada e contagem de ERRO/ALERTA no `loop.log` — só nomes de perfil, contagens e idades (sem dado
@@ -22,6 +24,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (trava + escrita atômica). `tests/test_backup.sh` (10).
 
 ### Fixed
+- **`bot/guardiao.sh` matava às cegas quem segurava o lock (`fuser -k`)**: agora só `sleep` órfão ou processo além de
+  `OV_GUARDIAO_ORFAO_S` (1500 s); órfão ainda trabalhando adia a subida do loop. `tests/test_guardiao.sh` (3).
 - **Alertas (`scripts/notificar.sh`/`.ps1`)**: a deduplicação usava o hash exato, então o mesmo alerta com outra hora ou
   contagem saía a cada rodada; agora números são ignorados na chave (janela `OV_NOTIFY_JANELA_S`, padrão 6h) e envio
   recusado pela API (`curl -f`) não é marcado como enviado. `tests/test_notificar.sh` (4).
