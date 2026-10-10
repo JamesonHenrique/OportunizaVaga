@@ -315,6 +315,11 @@ n = len(chamadas); assert d.motivo_descricao(ctx, v1) is None and len(chamadas) 
 assert d.score(ctx, dict(v1, simplificada=True)) == d.score(ctx, v1) + 1
 info = {}; d.linkedin_parse('<a data-tracking-control-name="public_jobs_apply-link-simple_onsite">', info)
 assert info == {"simplificada": True}
+# 10/10: a search that already filtered by level turns "Nao aplicavel" into "unknown"
+assert d.oficial_util({"nivel_pela_busca": True}, "Não aplicável") is None
+assert d.oficial_util({}, "Não aplicável") == "Não aplicável"
+assert d.oficial_util({"nivel_pela_busca": True}, "Pleno-sênior") == "Pleno-sênior"
+assert d.oficial_util({"nivel_pela_busca": True}, None) is None
 json.dump({}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
 assert d.motivo_filtro(d.Ctx(), li("Dev Java Jr", "São Paulo, SP"), []) is None   # off by default
 PYSNIP

@@ -338,6 +338,17 @@ def linkedin_parse(p, info=None):
     return texto, crit.get("Nível de experiência") or crit.get("Seniority level")
 
 
+def oficial_util(v, oficial):
+    """The official level, unless it says nothing AND the search itself already filtered by level.
+    10/10: the logged-in LinkedIn search (f_E=estágio/júnior) returned "Desenvolvedor Fullstack" jobs whose page
+    says "Não aplicável"; the strict rule (title without a level word + no official level = out) dropped all of
+    them. A collector that searched by level sets v["nivel_pela_busca"]; then "Não aplicável" counts as unknown
+    and only clear evidence in the text (senior role, years over the ceiling) drops the job."""
+    if v.get("nivel_pela_busca") and vaga_check._n(oficial).strip() in ("nao aplicavel", "not applicable"):
+        return None
+    return oficial
+
+
 def motivo_descricao(ctx, v):
     """Second, deterministic gate on the DESCRIPTION (vaga_check.py): 'desc:<motivo>' or None.
     Fetch/parse failures never filter: the job goes to the model as before (fail open)."""
@@ -351,7 +362,7 @@ def motivo_descricao(ctx, v):
             texto, oficial = v.pop("_descricao", ""), None
         if not texto.strip():
             return None
-        e = vaga_check.explicar(texto, v["titulo"], oficial, ctx.vaga_conf)   # same verdict as avaliar()
+        e = vaga_check.explicar(texto, v["titulo"], oficial_util(v, oficial), ctx.vaga_conf)   # same verdict as avaliar()
         v["desc_checada"] = True
         # traceable, compact: which criteria were confirmed / unknown (never a hiring probability)
         v["criterios"] = {k: c["estado"] for k, c in e["criterios"].items()}
@@ -838,7 +849,7 @@ def triar(ctx, n=8):
         if len(texto.strip()) < 200:
             v["triagem_falhou"] = _stamp()
             continue
-        ok, motivo = vaga_check.avaliar(texto, v["titulo"], oficial, ctx.vaga_conf)
+        ok, motivo = vaga_check.avaliar(texto, v["titulo"], oficial_util(v, oficial), ctx.vaga_conf)
         v["desc_checada"], v["nivel_oficial"] = True, oficial or ""
         if not ok:
             v.update(status="filtrada", motivo="desc:" + motivo, visto_em=_stamp())
