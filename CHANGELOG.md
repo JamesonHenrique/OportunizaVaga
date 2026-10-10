@@ -6,6 +6,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Resumo do CV conferido contra o perfil (`bot/cv_fatos.py`, usado por `gerar_cv.py`)**: número (anos, %, contagens)
+  ou tecnologia do vocabulário técnico que não aparece em `cv_base.md`/`dados_candidato.json` faz o `gerar_cv` sair com
+  exit 2 sem gerar o PDF. Medido em 22 resumos reais: 1 seria recusado (tecnologia fora do perfil).
+  `tests/test_cv_fatos.py` (6).
+- **ruff e pytest na CI** (`ruff.toml`: só erros reais). Removidos 5 imports e 1 variável sem uso.
 - **Adesão ao passo d0 mensurável**: `add-aplicada` do robô sem intenção grava `sem_intencao` (e avisa o modelo);
   com intenção grava `intencao_em`; `doctor` seção 7 conta as duas. `tests/test_estado.sh` (30).
 - **`doctor` seção 7 (`scripts/doctor-estado.py`, usado por `doctor.sh` e `doctor.ps1`)**: perfil legível, cada estado
