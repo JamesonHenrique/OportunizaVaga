@@ -194,3 +194,25 @@ test('linkDaVaga: campo explicito, URL no texto, id verificado e nunca chuta', a
   assert.equal(linkDaVaga({ como: 'Gupy vaga 1234567' }), null);
   assert.equal(linkDaVaga({ url: 'https://www.linkedin.com/in/alguem' }), null);
 });
+
+test('buildSnapshot relê o estado a cada chamada (daemon de longa vida)', () => {
+  const root = makeRoot();
+  try {
+    const env = { ...process.env, CANDIDATURAS_ROOT: root, MONITOR_INCLUDE_DETAILS: '0', BOT_TZ: 'America/Sao_Paulo' };
+    // Same process, two calls, state changed in between: the second must see it.
+    const code = [
+      "import fs from 'node:fs';",
+      "import { buildSnapshot } from './monitor/snapshot.mjs';",
+      "const a = buildSnapshot().telemetry.totals.aplicadas;",
+      `const f = ${JSON.stringify(path.join(root, 'aplicadas.json'))};`,
+      "const doc = JSON.parse(fs.readFileSync(f, 'utf8'));",
+      "doc.aplicadas.push({ ...doc.aplicadas[0], chave: 'nova-chave' });",
+      "fs.writeFileSync(f, JSON.stringify(doc));",
+      "console.log(JSON.stringify([a, buildSnapshot().telemetry.totals.aplicadas]));"
+    ].join('\n');
+    const [antes, depois] = JSON.parse(execFileSync('node', ['--input-type=module', '-e', code], { cwd: REPO, env, encoding: 'utf8' }));
+    assert.equal(depois, antes + 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

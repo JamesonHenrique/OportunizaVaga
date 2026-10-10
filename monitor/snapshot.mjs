@@ -153,23 +153,6 @@ const eventsFrom = (files, source) => {
   return out.sort((a, b) => a.at.localeCompare(b.at));
 };
 
-const stateFile = (file, profile) => ({ file, profile, doc: readJson(file, null) });
-const stateFiles = [stateFile(path.join(ROOT, 'aplicadas.json'), 'default')];
-const stateDir = path.join(ROOT, 'state');
-if (fs.existsSync(stateDir)) {
-  for (const entry of fs.readdirSync(stateDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    stateFiles.push(stateFile(path.join(stateDir, entry.name, 'aplicadas.json'), entry.name));
-  }
-}
-const stateDocs = stateFiles.filter(item => item.doc && typeof item.doc === 'object');
-const aplicadas = stateDocs.find(item => item.profile === 'default')?.doc || stateDocs[0]?.doc || {};
-const allAppliedRaw = stateDocs.flatMap(item => Array.isArray(item.doc.aplicadas) ? item.doc.aplicadas.map(a => ({ ...a, perfil: item.profile })) : []);
-const allBlockedRaw = stateDocs.flatMap(item => {
-  const blocked = item.doc.bloqueados || {};
-  return Object.entries(blocked).map(([chave, value]) => ({ chave, perfil: item.profile, value }));
-});
-
 const waitSeconds = (text) => {
   const s = /em (\d+)s/.exec(text);
   if (s) return Number(s[1]);
@@ -191,18 +174,7 @@ const stateOf = (last, maxRunMin) => {
 };
 
 const nomeModelo = (txt) => (/([\w.-]+\/[\w.:-]+)/.exec(txt) || [])[1] || null;
-const hojeLocal = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
-const events = eventsFrom([path.join(ROOT, 'loop.log.1'), path.join(ROOT, 'loop.log')], 'candidaturas');
-const doDia = events.filter(e => e.at.startsWith(hojeLocal) || new Date(e.at).toLocaleDateString('en-CA', { timeZone: TZ }) === hojeLocal);
-const ultimoModelo = [...doDia].reverse().find(e => e.kind === 'modelo');
-const doTetoDia = doDia.filter(e => e.kind === 'cascata');
-const tetoPorModelo = {};
-for (const e of doTetoDia) {
-  const m = nomeModelo(e.text);
-  if (m) tetoPorModelo[m] = (tetoPorModelo[m] || 0) + 1;
-}
-const quotaCache = readJson(path.join(ROOT, 'quota-cache.json'), null);
-const openrouterQuota = quotaCache?.openrouter || null;
+
 const ESCADA = [
   'openrouter/nex-agi/nex-n2.5-pro:free', 'opencode/muse-spark-1.3-contributor-free',
   'opencode/nemotron-3-ultra-free', 'opencode/nemotron-3.5-lightning-free', 'opencode/mimo-v2.5-free',
@@ -216,84 +188,118 @@ const ESCADA = [
   'cerebras/qwen-3.8-27b', 'huggingface/deepseek-ai/DeepSeek-V4-Pro', 'huggingface/deepseek-ai/DeepSeek-V3.2',
   'huggingface/google/gemma-3-27b-it'
 ];
-const escada = ESCADA.map(id => ({ id, tier: id.split('/')[0], tetoHoje: tetoPorModelo[id] || 0 }));
-const candLast = events.filter(e => e.source === 'candidaturas').at(-1) || null;
-const applied = allAppliedRaw.map(a => {
-  const { fonte, via } = parseFonte(a.como);
-  return { ...a, quando: a.enviada_em || a.enviada_em_aprox || null, data: a.data || null, exato: Boolean(a.enviada_em), fonte, via, url: linkDaVaga(a, a.chave), status: a.status || 'enviada', respondida_em: a.respondida_em || null, desfecho: a.desfecho || null };
-});
-const porFonte = {};
-for (const a of applied) porFonte[a.fonte] = (porFonte[a.fonte] || 0) + 1;
-// Per-day counts are aggregate (no company/job text): safe in both modes, feed the hero chart.
-const porDia = {};
-for (const a of applied) {
-  const k = a.data || (a.quando ? new Date(a.quando).toLocaleDateString('en-CA', { timeZone: TZ }) : null);
-  if (k) porDia[k] = (porDia[k] || 0) + 1;
-}
-const blocked = allBlockedRaw.map(item => {
-  const o = typeof item.value === 'object' && item.value ? item.value : { motivo: String(item.value) };
-  return { chave: item.chave, perfil: item.perfil, ...o, url: linkDaVaga(o, item.chave), em: o.bloqueado_em || o.em || o.criadoEm || o.criado_em || o.at || null };
-});
-// Compatible jobs held only by an expired login; the robot sends them once the channel logs in again.
-const aguardandoLogin = stateDocs.flatMap(item => {
-  const checagens = item.doc.login_checagens || {};
-  return Object.entries(item.doc.aguardando_login || {}).map(([chave, v]) => {
-    const o = typeof v === 'object' && v ? v : {};
-    const canal = String(o.canal || '?');
-    return {
-      chave, perfil: item.profile, canal,
-      empresa: o.empresa || null, vaga: o.vaga || null,
-      url: linkDaVaga(o, chave), score: o.score ?? null,
-      motivo: String(o.motivo || o.motivo_original || '').slice(0, 600),
-      em: o.bloqueado_em || o.data || null,
-      checagem: checagens[canal] || null
-    };
-  });
-});
-// Optional state files written by the side scripts (absent on a fresh install: every read is defensive).
-// descoberta = deterministic discovery queue; gmailStatus = Gmail reply reader summary.
-const asObj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
-const fila = asObj(readJson(path.join(ROOT, 'state', 'vagas_fila.json'), null));
-const descoberta = (() => {
-  if (!fila) return null;
-  const vs = Object.values(asObj(fila.vagas) || {}).filter(asObj);
-  const porStatus = {};
-  for (const v of vs) porStatus[v.status || '?'] = (porStatus[v.status || '?'] || 0) + 1;
-  return {
-    ultimaColeta: fila.ultima_coleta || null,
-    porStatus,
-    filtradasTotal: asObj(fila.totais) || {},
-    ultima: asObj(fila.stats),
-    // Job titles/links only in details mode (aggregate mode keeps counts).
-    proximas: INCLUDE_DETAILS
-      ? vs.filter(v => v.status === 'nova')
-        .sort((a, b) => (b.score || 0) - (a.score || 0) || (a.ofertas || 0) - (b.ofertas || 0))
-        .slice(0, 8)
-        .map(v => ({ empresa: v.empresa, titulo: v.titulo, fonte: v.fonte, url: v.url, score: v.score, publicada: v.publicada }))
-      : undefined
-  };
-})();
-const gmailDoc = asObj(readJson(path.join(ROOT, 'state', 'gmail_status.json'), null));
-const gmailStatus = gmailDoc
-  ? { atualizado: gmailDoc.atualizado || null, lidas: gmailDoc.linhas_lidas ?? null, achados: Array.isArray(gmailDoc.achados) ? gmailDoc.achados.length : 0 }
-  : null;
-const contadorFalta = {};
-for (const b of blocked) for (const campo of faltantesDe(`${b.chave || ''} ${b.motivo || b.detalhe || ''}`)) contadorFalta[campo] = (contadorFalta[campo] || 0) + 1;
-const dadosFaltantes = Object.entries(contadorFalta).map(([campo, vagas]) => ({ campo, vagas })).sort((a, b) => b.vagas - a.vagas);
-const rodadasHoje = events.filter(e => e.kind === 'rodada' && e.at.startsWith(hojeLocal)).length;
-const evCand = events.filter(e => e.source === 'candidaturas');
-const sizeOf = (f) => { try { return fs.statSync(f).size; } catch { return 0; } };
-const loopLog = path.join(ROOT, 'loop.log');
-const loopLog1 = path.join(ROOT, 'loop.log.1');
-const descarteTotal = stateDocs.reduce((sum, item) => sum + (Number(item.doc.descartes_listagem_total) || 0), 0);
-const rodizioPorPerfil = Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.rodizio || null]));
-const perfis = stateDocs.map(item => ({ nome: item.profile, aplicadas: Array.isArray(item.doc.aplicadas) ? item.doc.aplicadas.length : 0, bloqueados: item.doc.bloqueados && typeof item.doc.bloqueados === 'object' ? Object.keys(item.doc.bloqueados).length : 0 }));
-const eventCounts = {};
-for (const e of events) eventCounts[e.kind] = (eventCounts[e.kind] || 0) + 1;
-const statusCounts = {};
-for (const a of applied) statusCounts[a.status] = (statusCounts[a.status] || 0) + 1;
 
+// Every input is read inside buildSnapshot(): publish-status.mjs is a long-lived
+// daemon that calls it repeatedly, so module-level reads would freeze the data
+// at process start while updatedAt kept advancing.
 export function buildSnapshot() {
+  const stateFile = (file, profile) => ({ file, profile, doc: readJson(file, null) });
+  const stateFiles = [stateFile(path.join(ROOT, 'aplicadas.json'), 'default')];
+  const stateDir = path.join(ROOT, 'state');
+  if (fs.existsSync(stateDir)) {
+    for (const entry of fs.readdirSync(stateDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      stateFiles.push(stateFile(path.join(stateDir, entry.name, 'aplicadas.json'), entry.name));
+    }
+  }
+  const stateDocs = stateFiles.filter(item => item.doc && typeof item.doc === 'object');
+  const aplicadas = stateDocs.find(item => item.profile === 'default')?.doc || stateDocs[0]?.doc || {};
+  const allAppliedRaw = stateDocs.flatMap(item => Array.isArray(item.doc.aplicadas) ? item.doc.aplicadas.map(a => ({ ...a, perfil: item.profile })) : []);
+  const allBlockedRaw = stateDocs.flatMap(item => {
+    const blocked = item.doc.bloqueados || {};
+    return Object.entries(blocked).map(([chave, value]) => ({ chave, perfil: item.profile, value }));
+  });
+
+  const hojeLocal = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+  const events = eventsFrom([path.join(ROOT, 'loop.log.1'), path.join(ROOT, 'loop.log')], 'candidaturas');
+  const doDia = events.filter(e => e.at.startsWith(hojeLocal) || new Date(e.at).toLocaleDateString('en-CA', { timeZone: TZ }) === hojeLocal);
+  const ultimoModelo = [...doDia].reverse().find(e => e.kind === 'modelo');
+  const doTetoDia = doDia.filter(e => e.kind === 'cascata');
+  const tetoPorModelo = {};
+  for (const e of doTetoDia) {
+    const m = nomeModelo(e.text);
+    if (m) tetoPorModelo[m] = (tetoPorModelo[m] || 0) + 1;
+  }
+  const quotaCache = readJson(path.join(ROOT, 'quota-cache.json'), null);
+  const openrouterQuota = quotaCache?.openrouter || null;
+
+  const escada = ESCADA.map(id => ({ id, tier: id.split('/')[0], tetoHoje: tetoPorModelo[id] || 0 }));
+  const candLast = events.filter(e => e.source === 'candidaturas').at(-1) || null;
+  const applied = allAppliedRaw.map(a => {
+    const { fonte, via } = parseFonte(a.como);
+    return { ...a, quando: a.enviada_em || a.enviada_em_aprox || null, data: a.data || null, exato: Boolean(a.enviada_em), fonte, via, url: linkDaVaga(a, a.chave), status: a.status || 'enviada', respondida_em: a.respondida_em || null, desfecho: a.desfecho || null };
+  });
+  const porFonte = {};
+  for (const a of applied) porFonte[a.fonte] = (porFonte[a.fonte] || 0) + 1;
+  // Per-day counts are aggregate (no company/job text): safe in both modes, feed the hero chart.
+  const porDia = {};
+  for (const a of applied) {
+    const k = a.data || (a.quando ? new Date(a.quando).toLocaleDateString('en-CA', { timeZone: TZ }) : null);
+    if (k) porDia[k] = (porDia[k] || 0) + 1;
+  }
+  const blocked = allBlockedRaw.map(item => {
+    const o = typeof item.value === 'object' && item.value ? item.value : { motivo: String(item.value) };
+    return { chave: item.chave, perfil: item.perfil, ...o, url: linkDaVaga(o, item.chave), em: o.bloqueado_em || o.em || o.criadoEm || o.criado_em || o.at || null };
+  });
+  // Compatible jobs held only by an expired login; the robot sends them once the channel logs in again.
+  const aguardandoLogin = stateDocs.flatMap(item => {
+    const checagens = item.doc.login_checagens || {};
+    return Object.entries(item.doc.aguardando_login || {}).map(([chave, v]) => {
+      const o = typeof v === 'object' && v ? v : {};
+      const canal = String(o.canal || '?');
+      return {
+        chave, perfil: item.profile, canal,
+        empresa: o.empresa || null, vaga: o.vaga || null,
+        url: linkDaVaga(o, chave), score: o.score ?? null,
+        motivo: String(o.motivo || o.motivo_original || '').slice(0, 600),
+        em: o.bloqueado_em || o.data || null,
+        checagem: checagens[canal] || null
+      };
+    });
+  });
+  // Optional state files written by the side scripts (absent on a fresh install: every read is defensive).
+  // descoberta = deterministic discovery queue; gmailStatus = Gmail reply reader summary.
+  const asObj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
+  const fila = asObj(readJson(path.join(ROOT, 'state', 'vagas_fila.json'), null));
+  const descoberta = (() => {
+    if (!fila) return null;
+    const vs = Object.values(asObj(fila.vagas) || {}).filter(asObj);
+    const porStatus = {};
+    for (const v of vs) porStatus[v.status || '?'] = (porStatus[v.status || '?'] || 0) + 1;
+    return {
+      ultimaColeta: fila.ultima_coleta || null,
+      porStatus,
+      filtradasTotal: asObj(fila.totais) || {},
+      ultima: asObj(fila.stats),
+      // Job titles/links only in details mode (aggregate mode keeps counts).
+      proximas: INCLUDE_DETAILS
+        ? vs.filter(v => v.status === 'nova')
+          .sort((a, b) => (b.score || 0) - (a.score || 0) || (a.ofertas || 0) - (b.ofertas || 0))
+          .slice(0, 8)
+          .map(v => ({ empresa: v.empresa, titulo: v.titulo, fonte: v.fonte, url: v.url, score: v.score, publicada: v.publicada }))
+        : undefined
+    };
+  })();
+  const gmailDoc = asObj(readJson(path.join(ROOT, 'state', 'gmail_status.json'), null));
+  const gmailStatus = gmailDoc
+    ? { atualizado: gmailDoc.atualizado || null, lidas: gmailDoc.linhas_lidas ?? null, achados: Array.isArray(gmailDoc.achados) ? gmailDoc.achados.length : 0 }
+    : null;
+  const contadorFalta = {};
+  for (const b of blocked) for (const campo of faltantesDe(`${b.chave || ''} ${b.motivo || b.detalhe || ''}`)) contadorFalta[campo] = (contadorFalta[campo] || 0) + 1;
+  const dadosFaltantes = Object.entries(contadorFalta).map(([campo, vagas]) => ({ campo, vagas })).sort((a, b) => b.vagas - a.vagas);
+  const rodadasHoje = events.filter(e => e.kind === 'rodada' && e.at.startsWith(hojeLocal)).length;
+  const evCand = events.filter(e => e.source === 'candidaturas');
+  const sizeOf = (f) => { try { return fs.statSync(f).size; } catch { return 0; } };
+  const loopLog = path.join(ROOT, 'loop.log');
+  const loopLog1 = path.join(ROOT, 'loop.log.1');
+  const descarteTotal = stateDocs.reduce((sum, item) => sum + (Number(item.doc.descartes_listagem_total) || 0), 0);
+  const rodizioPorPerfil = Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.rodizio || null]));
+  const perfis = stateDocs.map(item => ({ nome: item.profile, aplicadas: Array.isArray(item.doc.aplicadas) ? item.doc.aplicadas.length : 0, bloqueados: item.doc.bloqueados && typeof item.doc.bloqueados === 'object' ? Object.keys(item.doc.bloqueados).length : 0 }));
+  const eventCounts = {};
+  for (const e of events) eventCounts[e.kind] = (eventCounts[e.kind] || 0) + 1;
+  const statusCounts = {};
+  for (const a of applied) statusCounts[a.status] = (statusCounts[a.status] || 0) + 1;
+
   const telemetry = {
     version: 1,
     mode: TELEMETRY_MODE,
