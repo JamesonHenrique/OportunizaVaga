@@ -177,6 +177,10 @@ verificar no portal ou no e-mail e só então registrar `add-aplicada` ou `cance
 `scripts/validate-rodada.py` imprime `[aviso]` enquanto houver pendentes, e o monitor recebe só a
 contagem (`telemetry.totals.enviosPendentes`).
 
+Adesão medida por registro: `add-aplicada` numa rodada do robô (`OV_RODADA`) que não consumiu intenção grava
+`sem_intencao: true` e devolve um aviso ao modelo; quando consumiu, grava `intencao_em`. A seção 7 do
+`bot/doctor.sh` mostra as duas contagens.
+
 Limitações: a proteção depende de o modelo chamar `intencao` antes do clique (está no passo d0 do
 prompt). Uma rodada que pula esse passo volta ao comportamento antigo. No `loop.ps1` não há
 `OV_RODADA`/`OV_TENTATIVA`, então toda intenção já existente é tratada como de outra tentativa:
@@ -198,3 +202,11 @@ Cada escrita bem-sucedida do `bot/estado.py` acrescenta uma linha JSON em `event
 - Só chaves e status: nada de motivo, texto de vaga ou dado do candidato. Fica fora do git (`.gitignore`).
 - Retenção: ao passar de 2 MB vira `eventos.jsonl.1` (uma geração guardada).
 - Ciclo de uma candidatura: `grep '"chave": "CHAVE"' bot/state/<perfil>/eventos.jsonl`.
+
+## Guardião e processos órfãos (`bot/guardiao.sh`)
+
+Sem loop vivo e com o lock ainda preso, o guardião olha cada processo que segura o lock: `sleep` órfão
+morre na hora; qualquer outro (um `descobrir.py`, `node` ou `opencode` terminando o trabalho) só morre
+depois de `OV_GUARDIAO_ORFAO_S` segundos (padrão 1500 = timeout da rodada + margem). Antes disso o
+guardião não sobe o loop e tenta de novo no próximo ciclo do cron — antes, `fuser -k` matava tudo,
+podendo cortar uma escrita ou um envio ao meio. `tests/test_guardiao.sh`.

@@ -379,6 +379,12 @@ def main(argv):
         intencao = pendentes(d).pop(rec["chave"], None)   # the unknown result is now a confirmed send
         if intencao is not None and not d["envios_pendentes"]:
             d.pop("envios_pendentes")
+        # d0 adherence, measurable per record: a robot send that skipped `intencao` had no crash protection.
+        if isinstance(intencao, dict):
+            rec["intencao_em"] = intencao.get("em")
+        elif os.environ.get("OV_RODADA") and not rec.get("registro_retroativo"):
+            rec["sem_intencao"] = True
+            print("aviso: enviada sem `intencao` antes do clique (passo d0) -- nas proximas, grave a intencao ANTES de enviar")
         (d.get("bloqueados") or {}).pop(rec["chave"], None)
         if isinstance(d.get("quase_la"), dict):
             d["quase_la"].pop(rec["chave"], None)

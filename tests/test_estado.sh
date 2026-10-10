@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 ESTADO="bot/estado.py"
 
-TOTAL=29
+TOTAL=30
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -248,6 +248,17 @@ assert not any(e['cmd'] in ('resumo','ja-visto','tem') for e in evs)
 " "$EV"
 relata $? "eventos.jsonl: escritas registradas, recusas e leituras nao; sem texto livre"
 
+
+# 30 — adesao ao d0: envio do robo sem intencao fica marcado (e avisa); com intencao guarda intencao_em.
+OUT="$(OV_RODADA=R7 E add-aplicada '{"chave":"s_dev_3","empresa":"S","vaga":"Dev"}' 2>&1)"
+OV_RODADA=R8 OV_TENTATIVA=R8-1 E intencao c_dev_4 '{}' >/dev/null 2>&1
+OV_RODADA=R8 OV_TENTATIVA=R8-1 E add-aplicada '{"chave":"c_dev_4","empresa":"C","vaga":"Dev"}' >/dev/null 2>&1
+grep -q "sem .intencao" <<<"$OUT" && python3 -c "
+import json,sys; ap={a['chave']:a for a in json.load(open(sys.argv[1]))['aplicadas']}
+assert ap['s_dev_3'].get('sem_intencao') is True and 'intencao_em' not in ap['s_dev_3']
+assert ap['c_dev_4'].get('intencao_em') and 'sem_intencao' not in ap['c_dev_4']
+assert 'sem_intencao' not in ap['z_dev_77']   # fora do robo (sem OV_RODADA) nada muda" "$TMP_STATE"
+relata $? "adesao ao d0 mensuravel: sem_intencao (com aviso) x intencao_em"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "# verde: $N/$TOTAL"

@@ -95,6 +95,13 @@ def estados():
         if pend:
             aviso(f"estado '{nome}': {len(pend)} envio(s) com resultado desconhecido",
                   "confira no portal/e-mail; saiu = estado.py add-aplicada, nao saiu = estado.py cancelar-intencao.")
+        com = sum(1 for a in d["aplicadas"] if isinstance(a, dict) and a.get("intencao_em"))
+        sem = sum(1 for a in d["aplicadas"] if isinstance(a, dict) and a.get("sem_intencao"))
+        if sem:
+            aviso(f"estado '{nome}': {sem} envio(s) do robo sem `intencao` (passo d0) contra {com} com",
+                  "o modelo pulou a protecao contra reenvio; veja docs/OPERACAO.md (envio com resultado desconhecido).")
+        elif com:
+            ok(f"estado '{nome}': {com} envio(s) com intencao registrada antes do clique.")
         problemas = validar.check(d, os.environ.get("OV_ALLOW_UTC") == "1")
         if problemas:
             aviso(f"estado '{nome}': {len(problemas)} inconsistencia(s)", f"python3 scripts/validate-rodada.py {rel(p)}")
