@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Avaliação reproduzível de modelos (`scripts/eval-modelos.py` + `tests/golden/triagem.example.jsonl`)**: 15 vagas
+  sintéticas, regras do `prompt_triage.md`; registra disponibilidade (rc, formato, latência) separada de qualidade
+  (acertos, precisão entre as respondidas) em `bot/logs/eval-modelos.jsonl`. Fora da CI (provedor real);
+  `tests/test_eval_modelos.py` (5) com opencode falso.
 - **Compatibilidade explicável (`vaga_check.py explicar`)**: mesmo veredito do `checar`, com nível, experiência, modelo,
   stack, contrato e salário como `confirmado`/`incompativel`/`desconhecido` e a evidência; `cobertura` = critérios
   confirmados (peso igual, não é probabilidade). A descoberta grava `criterios`/`cobertura` em cada vaga triada.

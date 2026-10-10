@@ -57,3 +57,25 @@ provider novo:
   cascata ou um local ≥14B.
 - **Nunca** confie no modelo para inventar dado ausente: campo vazio em
   `bot/dados_candidato.json` vira `bloqueado`, por design. Isso independe do modelo.
+
+## Avaliar modelos e prompts (`scripts/eval-modelos.py`)
+
+Conjunto fixo e sintético (`tests/golden/triagem.example.jsonl`: 15 vagas fictícias, sem dado pessoal) rotulado para o
+perfil de exemplo `config/perfis/junior-backend.example.json`, julgado com as regras de `bot/prompt_triage.md`
+renderizadas para esse perfil.
+
+```bash
+python3 scripts/eval-modelos.py --modelos opencode/modelo-a,openrouter/modelo-b:free   # 1 chamada por modelo
+python3 scripts/eval-modelos.py --prompt                                               # só mostra o prompt
+python3 scripts/eval-modelos.py --resposta saida.txt --modelo X                        # pontua resposta salva
+```
+
+Cada execução acrescenta uma linha em `bot/logs/eval-modelos.jsonl` com duas medidas **separadas**:
+
+- **disponibilidade**: `rc` (0, erro ou `timeout`), quantas respondeu no formato pedido, `invalidas`, `latencia_s`;
+- **qualidade**: `acertos` sobre o total e `precisao_respondidas` (acertos entre as que respondeu) + ids `errados`.
+
+Modelo rápido que responde pouco não é "o melhor"; modelo que responde tudo não é necessariamente preciso — por isso
+as duas colunas. `prompt` é a impressão digital do prompt (regras + casos): compare só linhas com o mesmo valor.
+Chama provedor real (consome cota): fica fora da CI. `tests/test_eval_modelos.py` testa a pontuação com um `opencode`
+falso.
