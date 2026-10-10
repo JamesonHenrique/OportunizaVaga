@@ -84,7 +84,7 @@ def registrar(ctx, falhas):
         minhas = [x for x in falhas if x.startswith(prefixo) or x.startswith(f + ":")]
         doc[f] = {"em": em, "ok": not minhas, "falha": "; ".join(minhas)[:200]}
     try:
-        d.vf.save_json(os.path.join(os.path.dirname(ctx.paths["aplicadas"]), "canario_fontes.json"), doc)
+        d.vf.save_json(os.path.join(ctx.paths["state_dir"], "canario_fontes.json"), doc)
     except OSError:
         pass   # the alert below still goes out
 
