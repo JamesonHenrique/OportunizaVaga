@@ -229,10 +229,18 @@ def render(texto, perfil, lang="pt"):
 
 
 def carregar(caminho):
-    try:
-        return json.loads(Path(caminho).read_text(encoding="utf-8"))
-    except Exception:
+    """The profile dict; {} when there is no profile (empty path or missing file = historical defaults).
+    10/10: a profile that EXISTS but does not parse used to become {} too, silently turning any profile into
+    the junior/remote defaults. Now it stops with a clear message: fix the file, never guess."""
+    if not caminho or not Path(caminho).exists():
         return {}
+    try:
+        doc = json.loads(Path(caminho).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise SystemExit(f"perfil inválido: {caminho}: {e}. Corrija o arquivo (python3 -m json.tool {caminho}).")
+    if not isinstance(doc, dict):
+        raise SystemExit(f"perfil inválido: {caminho}: o JSON precisa ser um objeto.")
+    return doc
 
 
 def main(argv):

@@ -98,7 +98,7 @@ def resolve_paths():
     state_dir = os.environ.get("STATE_DIR") or ""
     if not state_dir:
         if perfil_file and os.path.exists(perfil_file):
-            nome = load_json(perfil_file, {}).get("nome_perfil", "perfil")
+            nome = perfil_render.carregar(perfil_file).get("nome_perfil", "perfil")
             slug = re.sub(r"[^a-z0-9]+", "-", str(nome).lower()).strip("-")[:48] or "perfil"
             state_dir = str(BOT_DIR / "state" / slug)
         else:
@@ -119,8 +119,8 @@ def descoberta_config(paths):
 
 def perfil_resolvido(perfil_file):
     """perfil_render.resolver() of the active profile (defaults when there is none)."""
-    doc = load_json(perfil_file, {}) if perfil_file else {}
-    return perfil_render.resolver(doc)
+    # strict: a corrupt profile stops here instead of becoming the junior/remote defaults
+    return perfil_render.resolver(perfil_render.carregar(perfil_file))
 
 
 def _alt(niveis):
