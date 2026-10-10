@@ -156,19 +156,20 @@ const csvCell = (v) => {
 
 export function rotuloStatus(s) {
   const v = (s || 'enviada').toLowerCase();
-  if (v === 'enviada') return 'ENVIADA';
-  if (v === 'entrevista') return 'ENTREVISTA';
-  if (v === 'etapa_teste') return 'TESTE / FIT CULTURAL';
-  if (v === 'proxima_etapa') return 'PRÓXIMA ETAPA';
-  if (v === 'respondida') return 'RESPONDIDA';
-  if (v === 'followup' || v === 'follow-up') return 'FOLLOW-UP';
-  if (v === 'quase_la' || v === 'quase-la') return 'QUASE LÁ';
-  if (v === 'em_analise') return 'EM ANÁLISE';
-  if (v === 'encerrada') return 'ENCERRADA';
-  if (v === 'sem_resposta') return 'SEM RESPOSTA';
-  if (v === 'sem_retorno_verificavel') return 'SEM RETORNO';
-  if (v.startsWith('enviada')) return 'ENVIADA';
-  return v.replace(/_/g, ' ').toUpperCase();
+  if (v === 'enviada') return 'Enviada';
+  if (v === 'entrevista') return 'Entrevista';
+  if (v === 'etapa_teste') return 'Teste / fit cultural';
+  if (v === 'proxima_etapa') return 'Próxima etapa';
+  if (v === 'respondida') return 'Respondida';
+  if (v === 'followup' || v === 'follow-up') return 'Follow-up';
+  if (v === 'quase_la' || v === 'quase-la') return 'Quase lá';
+  if (v === 'em_analise') return 'Em análise';
+  if (v === 'encerrada') return 'Encerrada';
+  if (v === 'sem_resposta') return 'Sem resposta';
+  if (v === 'sem_retorno_verificavel') return 'Sem retorno';
+  if (v.startsWith('enviada')) return 'Enviada';
+  const t = v.replace(/_/g, ' ');
+  return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 export function baixarCSV(nome, cabecalho, linhas) {

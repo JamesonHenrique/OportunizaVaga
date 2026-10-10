@@ -36,8 +36,8 @@ export function Sparkbars({ dados }) {
   return (
     <div className="spark" role="img" aria-label={`Envios por dia: ${dados.map(([d, n]) => `${d} ${n}`).join(', ')}`}>
       {dados.map(([dia, n]) => (
-        <span className="spark-col" key={dia} title={`${dia.slice(8)}/${dia.slice(5, 7)}: ${n} envio${n > 1 ? 's' : ''}`}>
-          <span className="spark-bar" style={{ height: `${Math.max(8, (n / max) * 100)}%` }} />
+        <span className="spark-col" key={dia} title={`${dia.slice(8)}/${dia.slice(5, 7)}: ${n} envio${n === 1 ? '' : 's'}`}>
+          <span className={`spark-bar${n ? '' : ' is-zero'}`} style={{ height: `${Math.max(8, (n / max) * 100)}%` }} />
           <span className="spark-day">{dia.slice(8)}</span>
         </span>
       ))}

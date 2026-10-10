@@ -17,6 +17,7 @@ import InvitesPanel from '@/components/dashboard/InvitesPanel';
 import BlocksPanel from '@/components/dashboard/BlocksPanel';
 import LoginQueuePanel from '@/components/dashboard/LoginQueuePanel';
 import DiscoveryPanel from '@/components/dashboard/DiscoveryPanel';
+import { CalendarDays, Send, RefreshCw, MessageSquareReply, UserPlus, Filter } from 'lucide-react';
 import TelegramPanel from '@/components/dashboard/TelegramPanel';
 import YieldPanel from '@/components/dashboard/YieldPanel';
 import RotationHealthPanel from '@/components/dashboard/RotationHealthPanel';
@@ -202,19 +203,18 @@ export default function Dashboard() {
 
   if (!d) {
     return (
-      <main className="shell">
-        <div className="skeleton" style={{ height: 72 }} />
-        <div className="skeleton" style={{ height: 140 }} />
-        <div className="skeleton" style={{ height: 96 }} />
-        <div className="layout">
-          <div className="skeleton" style={{ height: 320 }} />
-          <div className="skeleton" style={{ height: 320 }} />
+      <main className="shell" aria-busy="true">
+        <div className="skeleton" style={{ height: 52 }} />
+        <div className="overview">
+          <div className="skeleton today-hero" style={{ height: 260 }} />
+          <div className="skeleton action-center" style={{ minHeight: 260 }} />
+          <div className="skeleton kpis" style={{ height: 200 }} />
         </div>
-        <p className="loading">Conectando ao supervisor…</p>
+        <p className="loading" role="status">Conectando ao supervisor…</p>
         {erroRede && (
           <div className="panel">
             <div className="panel-body">
-              <p className="lead"><em>{erroRede} Tentativa {tentativas}. Nova tentativa automática em 8s.</em></p>
+              <p className="verdict v-bad">{erroRede} Tentativa {tentativas}. Nova tentativa automática em 8s.</p>
               <button className="btn" onClick={() => window.location.reload()}>Recarregar agora</button>
             </div>
           </div>
@@ -255,8 +255,8 @@ export default function Dashboard() {
   const stLink = statusLoop(loops.linkedin, agora, d.agenda?.proximaRodadaLinkedin);
   // Optional side robots (e.g. a LinkedIn recruiter loop) only show when they publish.
   const pills = [
-    { nome: 'Candidaturas', ...stCand, detalhe: loops.candidaturas?.message },
-    ...(loops.linkedin ? [{ nome: 'LinkedIn-RH', ...stLink, detalhe: loops.linkedin?.message }] : []),
+    { nome: 'Candidaturas', ...stCand, detalhe: loops.candidaturas?.message, vivo: loops.candidaturas?.state === 'rodando' },
+    ...(loops.linkedin ? [{ nome: 'LinkedIn-RH', ...stLink, detalhe: loops.linkedin?.message, vivo: loops.linkedin?.state === 'rodando' }] : []),
   ];
 
   // "Precisa de você" — most severe first.
@@ -301,15 +301,15 @@ export default function Dashboard() {
     titulo: 'Telegram aguardando login', sub: 'garimpo de vagas parado', acao: { rotulo: 'Ver', aba: 'telegram' } });
 
   const kpis = [
-    { rotulo: 'Últimos 7 dias', valor: d.rendimento?.aplicadas7d ?? serie.slice(-7).reduce((a, [, n]) => a + n, 0), sub: 'candidaturas' },
-    { rotulo: 'Total enviadas', valor: d.totals?.candidaturas ?? aplicadas.length, sub: `${porFonte[0]?.[0] || '—'} lidera (${porFonte[0]?.[1] ?? 0})` },
+    { rotulo: 'Últimos 7 dias', valor: d.rendimento?.aplicadas7d ?? serie.slice(-7).reduce((a, [, n]) => a + n, 0), sub: 'candidaturas', icone: CalendarDays },
+    { rotulo: 'Total enviadas', valor: d.totals?.candidaturas ?? aplicadas.length, sub: `${porFonte[0]?.[0] || '—'} lidera (${porFonte[0]?.[1] ?? 0})`, icone: Send },
     { rotulo: 'Rodadas por envio', valor: d.rendimento?.rodadasPorCandidatura != null ? String(d.rendimento.rodadasPorCandidatura).replace('.', ',') : '—',
-      sub: `${d.rendimento?.rodadas7d ?? '—'} rodadas em 7 dias`, dica: 'Quanto menor, mais eficiente' },
+      sub: `${d.rendimento?.rodadas7d ?? '—'} rodadas em 7 dias`, dica: 'Quanto menor, mais eficiente', icone: RefreshCw },
     { rotulo: 'Respostas', valor: aplicadas.filter(a => ['etapa_teste', 'proxima_etapa', 'entrevista', 'encerrada', 'respondida'].includes(stDe(a))).length,
-      sub: `${entrevistas.length} entrevista · ${testes.length + etapas.length} teste/etapa · ${aplicadas.filter(a => stDe(a) === 'em_analise').length} em análise` },
+      sub: `${entrevistas.length} entrevista · ${testes.length + etapas.length} teste/etapa · ${aplicadas.filter(a => stDe(a) === 'em_analise').length} em análise`, icone: MessageSquareReply },
     d.linkedin
-      ? { rotulo: 'Convites LinkedIn', valor: d.totals?.convites ?? convites.length, sub: `${loops.linkedin?.convitesHoje ?? 0}/${d.linkedin?.limiteDiario ?? 10} hoje` }
-      : { rotulo: 'Vagas descartadas', valor: d.descartes?.total ?? d.telemetry?.totals?.descartes ?? '—', sub: 'filtradas antes de abrir', dica: 'Nível, stack ou modelo incompatível' },
+      ? { rotulo: 'Convites LinkedIn', valor: d.totals?.convites ?? convites.length, sub: `${loops.linkedin?.convitesHoje ?? 0}/${d.linkedin?.limiteDiario ?? 10} hoje`, icone: UserPlus }
+      : { rotulo: 'Vagas descartadas', valor: d.descartes?.total ?? d.telemetry?.totals?.descartes ?? '—', sub: 'filtradas antes de abrir', dica: 'Nível, stack ou modelo incompatível', icone: Filter },
   ];
 
   const abas = [
@@ -327,13 +327,12 @@ export default function Dashboard() {
                    avisoCache={(erroRede || usandoCache) ? `${erroRede || 'Instância fria na Vercel.'} Exibindo o retrato de ${horaSeg(d.updatedAt)}; nova tentativa em ~${proximaTentativaEm}s.` : null}
                    publico={!!d._redacted} demo={!!d._demo} />
       <main className="shell">
-        <div className="hero-grid">
+        <div className="overview">
           <TodayHero hojeLabel={hojeLabel} hoje={serie[serie.length - 1][1]} serie={serie}
-                     rodadasHoje={loops.candidaturas?.rodadasHoje ?? 0} />
+                     rodadasHoje={loops.candidaturas?.rodadasHoje} />
           <ActionCenter itens={acoes} abrirAba={abrirAba} />
+          <KpiRow itens={kpis} />
         </div>
-
-        <KpiRow itens={kpis} />
 
         <section id="detalhes" className="detail">
           <DetailTabs abas={abas} ativa={abaAtiva} onChange={abrirAba} />
