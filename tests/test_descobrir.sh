@@ -105,6 +105,17 @@ assert d.url_canon("https://br.linkedin.com/in/fulana-") == "" and d.url_canon("
 assert d.url_canon("https://acme.com/") == "" and d.url_canon("") == "" and d.url_canon("mailto:x@y.z") == ""
 assert d.url_canon("https://www.linkedin.com/jobs/view/123/") == d.url_canon("https://br.linkedin.com/jobs/view/123") != ""
 assert d.url_canon("https://boards.greenhouse.io/acme/jobs/55?gh_src=x") == "url:boards.greenhouse.io/acme/jobs/55"
+# 10/10: unknown id params stay (two jobs, two keys); tracking params go; search pages are never a job
+assert d.url_canon("https://x.com/vagas/detalhe?codigo=55") != d.url_canon("https://x.com/vagas/detalhe?codigo=56")
+assert d.url_canon("https://x.com/vagas/detalhe?codigo=55&utm_source=tg&ref=a") == d.url_canon("https://x.com/vagas/detalhe?codigo=55")
+assert d.url_canon("https://acme.com/vaga-12345") != "" and d.url_canon("https://acme.com/jobs/search?q=java") == ""
+assert d.url_canon("https://www.linkedin.com/jobs/view/3912345678/?trk=a&refId=b") == d.url_canon("https://linkedin.com/jobs/view/3912345678")
+# 10/10: company as whole words (all of them), and an explicit different level is a different job
+assert not d.ja_registrada({"empresa": "SAP", "titulo": "Backend Java Developer"}, ["sapiens backend java developer"])
+assert not d.ja_registrada({"empresa": "Banco Pan", "titulo": "Backend Java Developer"}, ["banco inter backend java developer"])
+assert not d.ja_registrada({"empresa": "Banco Inter", "titulo": "Backend Java Pleno"}, ["banco inter backend java junior"])
+assert d.ja_registrada({"empresa": "Banco Inter", "titulo": "Backend Java Junior"}, ["banco inter backend java junior"])
+assert d.ja_registrada({"empresa": "Acme S.A.", "titulo": "Backend Java Developer"}, ["acme sa backend java developer"])
 # near-twin titles: reposts match, two real postings of one company do not (measured on 57 real records)
 A = lambda e, t: d._assinatura({"empresa": e, "titulo": t})
 assert d.gemea_de({"empresa": "Acme | Eng", "titulo": "Back End C++(17)"}, [A("Acme | Eng", "Back End C++(17)")])
