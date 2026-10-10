@@ -135,3 +135,26 @@ Caminhos por env: `APLICADAS_FILE`, `OV_GMAIL_STATUS`, `NOTIFY`, `OV_ESTADO_PY`;
 
 `funil-fontes.py [APLICADAS] [--curto]`: envio → retorno → avanço por fonte e por `caminho` (fila × rodízio),
 mais "sem resposta há >21 dias" calculado na hora (o status nunca é rebaixado). Teste: `tests/test_kit_funil.sh`.
+
+## Backups e restauração (`scripts/backup-jsons.sh`, `scripts/restore-json.py`)
+
+`backup-jsons.sh` (ou `.ps1`) copia `aplicadas.json` e `dados_candidato.json` — da raiz e de cada
+`bot/state/<perfil>/` — para `bot/backups/<prefixo>.AAAAMMDD-HHMM.json`, mantendo as 14 cópias mais
+recentes **por prefixo**. Uma origem que não é JSON válido é pulada (exit 1) e não gira a rotação,
+para que um arquivo corrompido não empurre as cópias boas para fora.
+
+```bash
+python3 scripts/restore-json.py --listar        # backups, validade e destino de cada um
+python3 scripts/restore-json.py --verificar     # exit 1 se algum backup estiver inválido
+python3 scripts/restore-json.py bot/backups/aplicadas.AAAAMMDD-HHMM.json            # simulação
+python3 scripts/restore-json.py bot/backups/aplicadas.AAAAMMDD-HHMM.json --aplicar  # restaura
+```
+
+- Sem `--aplicar` nada é alterado: o comando mostra destino, contagens e quantas aplicadas do
+  arquivo atual **não** existem no backup (seriam esquecidas e poderiam ser reenviadas).
+- Backup com JSON inválido ou sem a lista `aplicadas` é recusado.
+- Antes de substituir, o arquivo atual vai para `bot/backups/<prefixo>.pre-restore.<carimbo>.json`
+  (fora da rotação). A escrita usa a mesma trava + troca atômica do `bot/estado.py`.
+- Pare o loop (e o guardião/cron que o religa) antes: uma rodada em andamento pode regravar o estado antigo.
+- Os backups ficam no mesmo disco e contêm `dados_candidato.json` (dados pessoais); `bot/backups/`
+  já está no `.gitignore`. Cópia fora da máquina fica a cargo do usuário.

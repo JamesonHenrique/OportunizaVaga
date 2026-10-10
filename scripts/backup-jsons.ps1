@@ -11,19 +11,30 @@ $Dest = if ($env:OV_BACKUP_DIR) { $env:OV_BACKUP_DIR } else { Join-Path $BOT_ROO
 if (-not (Test-Path $Dest)) { New-Item -ItemType Directory -Path $Dest -Force | Out-Null }
 $Stamp = (Get-Date).ToString('yyyyMMdd-HHmm')
 $Keep = 14
+$Rc = 0
 
 function Backup-File([string]$Src, [string]$Prefix) {
     if (-not (Test-Path $Src)) { return }   # perfil/arquivo ainda nao existe: nada a fazer
     $destFile = Join-Path $Dest ("{0}.{1}.json" -f $Prefix, $Stamp)
     try {
+        Get-Content -Path $Src -Raw -Encoding UTF8 | ConvertFrom-Json | Out-Null
+    } catch {
+        # Corrupt source: skip it and keep the old copies (otherwise rotation would push them out).
+        Write-Error ("[{0}] FALHA: {1} nao e JSON valido - backup pulado" -f $Stamp, $Src) -ErrorAction Continue
+        $script:Rc = 1
+        return
+    }
+    try {
         Copy-Item -Path $Src -Destination $destFile -Force
         Write-Output ("[{0}] ok: {1} -> {2}" -f $Stamp, $Src, (Split-Path -Leaf $destFile))
     } catch {
-        Write-Error ("[{0}] FALHA ao copiar: {1}" -f $Stamp, $Src)
+        Write-Error ("[{0}] FALHA ao copiar: {1}" -f $Stamp, $Src) -ErrorAction Continue
+        $script:Rc = 1
         return
     }
     # rotacao: mantem as 14 mais recentes
     $existentes = Get-ChildItem -Path $Dest -Filter ("{0}.*.json" -f $Prefix) -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match ('^' + [regex]::Escape($Prefix) + '\.\d') } |
         Sort-Object LastWriteTime -Descending
     if ($existentes -and $existentes.Count -gt $Keep) {
         $existentes | Select-Object -Skip $Keep | Remove-Item -Force -ErrorAction SilentlyContinue
@@ -47,3 +58,4 @@ if (Test-Path $stateRoot) {
         }
     }
 }
+exit $Rc
