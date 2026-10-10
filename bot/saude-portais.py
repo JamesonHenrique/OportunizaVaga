@@ -2,6 +2,8 @@
 """saude-portais.py — one evidence-based state per portal, from the files the robot already writes (10/10).
 
   saude-portais.py            table;  --json  machine output;  --gravar  also writes <state>/saude_portais.json
+  --dir DIR / --aplicadas F   explicit locations (default: the active profile's state dir, as the loop resolves it).
+                              A private install keeps aplicadas.json at its root and the side files in state/.
 
 States (first match wins, each with its evidence and date):
   login_necessario       last login check of the channel said "nao", or compatible jobs wait for its login
@@ -36,11 +38,11 @@ def _quando(v):
         return None
 
 
-def avaliar(state_dir, agora=None):
+def avaliar(state_dir, agora=None, aplicadas_path=None):
     agora = agora or datetime.now().astimezone()
     recente = lambda t: t is not None and agora - t <= timedelta(hours=JANELA_H)   # noqa: E731
     ler = lambda nome: vf.load_json(os.path.join(state_dir, nome), {}) or {}        # noqa: E731
-    ap = ler("aplicadas.json")
+    ap = vf.load_json(aplicadas_path, {}) if aplicadas_path else ler("aplicadas.json")
     sonda, canario, fila, rod = ler("sonda_sites.json"), ler("canario_fontes.json"), ler("vagas_fila.json"), ler("rodizio_saude.json")
     sites_rod = rod.get("sites") if isinstance(rod.get("sites"), dict) else {}
     login = ap.get("login_checagens") if isinstance(ap.get("login_checagens"), dict) else {}
@@ -51,8 +53,9 @@ def avaliar(state_dir, agora=None):
     coleta_em = _quando(fila.get("ultima_coleta"))
     quebradas = set(fila.get("fontes_quebradas") or [])
     erros = {e.split(":", 1)[0] for e in ((fila.get("stats") or {}).get("erros") or []) if isinstance(e, str)}
-    nomes = set(sonda) | set(canario) | set(sites_rod) | set(login) | set(espera) | quebradas
-    nomes -= {"gmail", "google"}   # login accounts, not job portals
+    # A name seen ONLY in login_checagens is not enough to call it a portal: that map also keeps account logins
+    # (gmail/google) and fossils of misspelled channels written by a model (03/10: "solids").
+    nomes = set(sonda) | set(canario) | set(sites_rod) | set(espera) | quebradas
     out = {}
     for p in sorted(nomes):
         cands = []   # (state, evidence, when)
@@ -92,10 +95,17 @@ def avaliar(state_dir, agora=None):
     return out
 
 
+def _opcao(argv, nome):
+    return argv[argv.index(nome) + 1] if nome in argv and argv.index(nome) + 1 < len(argv) else None
+
+
 def main(argv):
-    paths = vf.resolve_paths()
-    state_dir = os.path.dirname(paths["aplicadas"])
-    res = avaliar(state_dir)
+    aplicadas = _opcao(argv, "--aplicadas")
+    state_dir = _opcao(argv, "--dir")
+    if not state_dir:
+        aplicadas = aplicadas or vf.resolve_paths()["aplicadas"]
+        state_dir = os.path.dirname(aplicadas)
+    res = avaliar(state_dir, aplicadas_path=aplicadas)
     if "--gravar" in argv:
         vf.save_json(os.path.join(state_dir, "saude_portais.json"),
                      {"atualizado": datetime.now().astimezone().isoformat(timespec="minutes"), "portais": res})
