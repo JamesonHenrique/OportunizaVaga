@@ -125,7 +125,8 @@ def processa_mensagem(filtro, canal, msg_id, data, text, botoes, entidades, vist
     links, emails = extract(text, botoes, entidades)
     if not links and not emails:
         return None  # only "message me" -> nothing to apply to
-    key = links[0] if links else emails[0]
+    # canonical url: the same job reposted with another ?utm=... is one job (10/10)
+    key = (vf.url_canon(links[0]) or links[0]) if links else emails[0].lower()
     if key in vistos:
         return None
     vistos.add(key)
@@ -220,21 +221,35 @@ async def run(login):
     return 0
 
 
+def conhecidos(aplicadas_path):
+    """Canonical job urls + e-mails mentioned anywhere in aplicadas.json (every section)."""
+    try:
+        with open(aplicadas_path, encoding="utf-8") as fh:
+            texto = fh.read()
+    except OSError:
+        return set()
+    urls = {vf.url_canon(u) for u in re.findall(r"https?://[^\s\"'<>]+", texto)}
+    emails = {e.lower() for e in re.findall(r"[\w.+-]+@[\w-]+\.[\w.-]+", texto)}
+    return (urls | emails) - {""}
+
+
+def ja_conhecida(v, registrado):
+    """10/10: was a substring test over the raw file -- https://x.com/vaga/1 'matched' .../vaga/12, and a
+    reposted link with another ?utm= did not match at all. Now: canonical url or exact e-mail."""
+    chaves = [vf.url_canon(u) for u in v.get("links", [])] + [e.lower() for e in v.get("emails", [])]
+    return any(c and c in registrado for c in chaves)
+
+
 def prompt(n):
     conf = load_conf()
     paths = vf.resolve_paths()
     out_file = os.path.join(paths["state_dir"], "telegram_vagas.json")
     doc = vf.load_json(out_file, {})
-    try:
-        with open(paths["aplicadas"], encoding="utf-8") as fh:
-            registrado = fh.read()
-    except OSError:
-        registrado = ""
+    registrado = conhecidos(paths["aplicadas"])
     vagas = doc.get("vagas", [])
     top = []
     for v in vagas:
-        chaves = [u.split("?")[0] for u in v.get("links", [])] + v.get("emails", [])
-        if int(v.get("ofertas", 0)) >= conf["max_ofertas"] or any(c and c in registrado for c in chaves):
+        if int(v.get("ofertas", 0)) >= conf["max_ofertas"] or ja_conhecida(v, registrado):
             continue
         top.append(v)
         if len(top) >= n:
