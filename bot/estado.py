@@ -9,6 +9,9 @@ short line.
   estado.py [--file F] ja-visto EMPRESA [TITULO]  applied/blocked records of a company ("MESMA VAGA provavel" first)
   estado.py [--file F] add-aplicada JSON          append to aplicadas (needs "chave"); also records "ats" coverage
                                                   when "cv" names a CV_*.pdf and the posting saved in step c1 is fresh
+  estado.py [--file F] intencao CHAVE JSON        BEFORE the final submit click: envios_pendentes[CHAVE] (empresa, vaga, url);
+                                                  exit 1 = already applied or unknown result from an earlier round: do NOT submit
+  estado.py [--file F] cancelar-intencao CHAVE MOTIVO  the pending send verifiably did NOT go out (form error, no confirmation)
   estado.py [--file F] add-bloqueado CHAVE JSON   set bloqueados[CHAVE] (JSON object or plain motivo)
   estado.py [--file F] set-quase-la CHAVE JSON    set quase_la[CHAVE]; JSON=null removes it
   estado.py [--file F] descartes N N N               increments descartes_listagem (nivel modelo stack), e.g. 3 1 2
@@ -112,8 +115,27 @@ def vencidos(d, hoje=None):
     return out
 
 
+def _agora():
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def pendentes(d):
+    """envios_pendentes as a dict (absent or malformed in old state files = none)."""
+    p = d.get("envios_pendentes")
+    return p if isinstance(p, dict) else {}
+
+
 def resumo(d):
     out = []
+    # 10/10: a send whose result is unknown (process died between the submit click and add-aplicada).
+    # Listed first: re-sending it blindly is the duplicate application this record exists to prevent.
+    pend = pendentes(d)
+    if pend:
+        out.append(f"ENVIOS COM RESULTADO DESCONHECIDO ({len(pend)}) — NAO reenvie: verifique no portal/e-mail se a "
+                   "candidatura saiu; saiu = add-aplicada, nao saiu = cancelar-intencao CHAVE MOTIVO:")
+        for k, v in pend.items():
+            v = v if isinstance(v, dict) else {}
+            out.append(f"  {k} | {v.get('empresa', '?')} | {v.get('vaga', '?')} | {v.get('url', '-')} | desde {v.get('em', '?')}")
     rod = d.get("rodizio", {})
     out.append(f"rodizio.proximo={rod.get('proximo')} ultima_rodada={rod.get('ultima_rodada')} ordem={','.join(rod.get('ordem', []))}")
     out.append(f"pular_empresas={json.dumps(d.get('pular_empresas', []), ensure_ascii=False)}")
@@ -161,7 +183,7 @@ def ja_visto(d, empresa, titulo=""):
     e = _norm(empresa)
     tt = {w for w in _norm(titulo).split() if len(w) >= 3 and w not in _STOP}
     achados = []
-    for sec in ("aplicadas", "quase_la", "bloqueados", "bloqueados_arquivados"):
+    for sec in ("envios_pendentes", "aplicadas", "quase_la", "bloqueados", "bloqueados_arquivados"):
         v = d.get(sec) or {}
         for k, rec in (v.items() if isinstance(v, dict) else ((x.get("chave") if isinstance(x, dict) else x, x) for x in v)):
             rec = rec if isinstance(rec, dict) else {"motivo": str(rec)}
@@ -174,10 +196,12 @@ def ja_visto(d, empresa, titulo=""):
             rt = {w for w in _norm(rec.get("vaga") or k).split() if len(w) >= 3 and w not in _STOP}
             score = len(tt & rt) / len(tt) if tt else 0
             achados.append((score, sec, k, rec))
-    achados.sort(key=lambda x: -x[0])
+    achados.sort(key=lambda x: (x[1] != "envios_pendentes", -x[0]))   # unknown-result sends always first
     linhas = []
     for score, sec, k, rec in achados[:6]:
         tag = "MESMA VAGA provavel" if tt and score >= 0.5 else "mesma empresa"
+        if sec == "envios_pendentes":
+            tag = "ENVIO COM RESULTADO DESCONHECIDO (NAO reenvie; verifique)"
         linhas.append(f"{tag} | {sec} | {k} | {str(rec.get('vaga') or '')[:50]} | {short(rec)[:90]}")
     return linhas
 
@@ -281,7 +305,7 @@ def main(argv):
         return 0
     if cmd in ("get", "tem"):
         k = args[0]
-        for sec in ("aplicadas", "bloqueados", "quase_la", "bloqueados_arquivados"):
+        for sec in ("aplicadas", "envios_pendentes", "bloqueados", "quase_la", "bloqueados_arquivados"):
             v = d.get(sec)
             hit = None
             if isinstance(v, dict) and k in v:
@@ -330,9 +354,47 @@ def main(argv):
             rec["rodada"] = os.environ["OV_RODADA"]   # which loop round wrote it (logs/rodada-<id>.log)
         medir_ats(rec)
         d["aplicadas"].append(rec)
+        intencao = pendentes(d).pop(rec["chave"], None)   # the unknown result is now a confirmed send
+        if intencao is not None and not d["envios_pendentes"]:
+            d.pop("envios_pendentes")
         (d.get("bloqueados") or {}).pop(rec["chave"], None)
         if isinstance(d.get("quase_la"), dict):
             d["quase_la"].pop(rec["chave"], None)
+    elif cmd == "intencao":
+        # 10/10: written right BEFORE the final submit click. If the process dies between the click and
+        # add-aplicada, this record survives and the next round (any model of the cascade) sees an unknown
+        # result instead of a fresh job -- the gap that turned a killed round into a duplicate application.
+        k = args[0]
+        info = parse(args[1]) if len(args) > 1 else {}
+        info = info if isinstance(info, dict) else {"vaga": str(info)}
+        if any(a.get("chave") == k for a in d.get("aplicadas", [])):
+            print(f"ja existe em aplicadas: {k} -- NAO envie de novo")
+            return 1
+        rodada = os.environ.get("OV_RODADA") or ""
+        # owner = the cascade attempt (loop.sh OV_TENTATIVA): the next model of the same round must not
+        # inherit a killed attempt's click. Without the loop (manual runs) the owner is empty = always "other".
+        dono = os.environ.get("OV_TENTATIVA") or rodada
+        atual = pendentes(d).get(k)
+        if isinstance(atual, dict) and (not dono or atual.get("tentativa", atual.get("rodada")) != dono):
+            print(f"resultado desconhecido desde {atual.get('em')} (rodada {atual.get('rodada') or '?'}): {k} -- NAO "
+                  "envie; verifique no portal/e-mail. Saiu = add-aplicada; nao saiu = cancelar-intencao CHAVE MOTIVO")
+            return 1
+        if atual is None:   # same round calling again (retry of the click) keeps the first timestamp
+            rec = {c: str(info[c])[:300] for c in ("empresa", "vaga", "url", "como") if info.get(c)}
+            rec.update(em=_agora(), rodada=rodada, tentativa=dono)
+            d.setdefault("envios_pendentes", {})[k] = rec
+    elif cmd == "cancelar-intencao":
+        k, motivo = args[0], args[1]
+        rec = pendentes(d).pop(k, None)
+        if rec is None:
+            print(f"nao existe em envios_pendentes: {k}")
+            return 1
+        if not d["envios_pendentes"]:
+            d.pop("envios_pendentes")
+        # kept (bounded) so a wrong cancel can be traced; never counted as an application
+        hist = d.setdefault("envios_cancelados", [])
+        hist.append(dict(rec, chave=k, cancelada_em=_agora(), motivo=motivo[:200]))
+        del hist[:-100]
     elif cmd == "add-bloqueado":
         k, v = args[0], parse(args[1])
         if not isinstance(v, dict):

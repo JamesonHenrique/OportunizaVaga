@@ -242,6 +242,13 @@ c2) TWO-TIER (opcional): para economizar quota do modelo forte, rode antes a
    "sim"/"talvez" (~10, ≤14 dias) com este prompt no modelo forte. O "nao"
    soma em descartes_listagem, nunca em bloqueados.
 
+d0) IMEDIATAMENTE ANTES do clique final de envio (Enviar/Candidatar-se/Submit), em QUALQUER canal, grave a intenção:
+   `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE intencao CHAVE '{"empresa":"...","vaga":"...","url":"https://..."}'`
+   (a MESMA chave que irá no add-aplicada). Exit 1 = já aplicada ou envio de rodada anterior com resultado
+   desconhecido: NÃO clique; verifique no portal ("você já se candidatou"/minhas candidaturas) ou no e-mail.
+   Saiu = add-aplicada; comprovadamente não saiu = `estado.py cancelar-intencao CHAVE "motivo"`.
+   Envio que falhou na tela (erro de formulário, sem confirmação) também = cancelar-intencao.
+
 d) Anexe com o input file oculto via CDP quando necessário (input[name=Filedata] no Gmail).
 
 e) Registre CADA candidatura enviada via

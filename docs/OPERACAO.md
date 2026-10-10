@@ -135,3 +135,49 @@ Caminhos por env: `APLICADAS_FILE`, `OV_GMAIL_STATUS`, `NOTIFY`, `OV_ESTADO_PY`;
 
 `funil-fontes.py [APLICADAS] [--curto]`: envio → retorno → avanço por fonte e por `caminho` (fila × rodízio),
 mais "sem resposta há >21 dias" calculado na hora (o status nunca é rebaixado). Teste: `tests/test_kit_funil.sh`.
+
+## Backups e restauração (`scripts/backup-jsons.sh`, `scripts/restore-json.py`)
+
+`backup-jsons.sh` (ou `.ps1`) copia `aplicadas.json` e `dados_candidato.json` — da raiz e de cada
+`bot/state/<perfil>/` — para `bot/backups/<prefixo>.AAAAMMDD-HHMM.json`, mantendo as 14 cópias mais
+recentes **por prefixo**. Uma origem que não é JSON válido é pulada (exit 1) e não gira a rotação,
+para que um arquivo corrompido não empurre as cópias boas para fora.
+
+```bash
+python3 scripts/restore-json.py --listar        # backups, validade e destino de cada um
+python3 scripts/restore-json.py --verificar     # exit 1 se algum backup estiver inválido
+python3 scripts/restore-json.py bot/backups/aplicadas.AAAAMMDD-HHMM.json            # simulação
+python3 scripts/restore-json.py bot/backups/aplicadas.AAAAMMDD-HHMM.json --aplicar  # restaura
+```
+
+- Sem `--aplicar` nada é alterado: o comando mostra destino, contagens e quantas aplicadas do
+  arquivo atual **não** existem no backup (seriam esquecidas e poderiam ser reenviadas).
+- Backup com JSON inválido ou sem a lista `aplicadas` é recusado.
+- Antes de substituir, o arquivo atual vai para `bot/backups/<prefixo>.pre-restore.<carimbo>.json`
+  (fora da rotação). A escrita usa a mesma trava + troca atômica do `bot/estado.py`.
+- Pare o loop (e o guardião/cron que o religa) antes: uma rodada em andamento pode regravar o estado antigo.
+- Os backups ficam no mesmo disco e contêm `dados_candidato.json` (dados pessoais); `bot/backups/`
+  já está no `.gitignore`. Cópia fora da máquina fica a cargo do usuário.
+
+## Envio com resultado desconhecido (`estado.py intencao`)
+
+Uma candidatura passa por três estados no `aplicadas.json`:
+
+| Estado | Onde fica | Quem grava |
+|---|---|---|
+| intenção (resultado desconhecido) | `envios_pendentes[CHAVE]` | `estado.py intencao`, logo antes do clique final |
+| enviada (confirmada) | `aplicadas[]` | `estado.py add-aplicada` (remove a intenção) |
+| não enviada (comprovado) | `envios_cancelados[]` (últimas 100) | `estado.py cancelar-intencao CHAVE MOTIVO` |
+
+Se o processo morre entre o clique e o `add-aplicada` (timeout, watchdog, queda do Chrome ou da
+máquina), a intenção sobra. Resultado desconhecido **não** é tratado como falha: a próxima
+tentativa — outro modelo da cascata na mesma rodada (`OV_TENTATIVA`) ou a rodada seguinte — recebe
+exit 1 de `intencao` para essa chave e a vê no topo do `resumo` e do `ja-visto`. O modelo deve
+verificar no portal ou no e-mail e só então registrar `add-aplicada` ou `cancelar-intencao`.
+`scripts/validate-rodada.py` imprime `[aviso]` enquanto houver pendentes, e o monitor recebe só a
+contagem (`telemetry.totals.enviosPendentes`).
+
+Limitações: a proteção depende de o modelo chamar `intencao` antes do clique (está no passo d0 do
+prompt). Uma rodada que pula esse passo volta ao comportamento antigo. No `loop.ps1` não há
+`OV_RODADA`/`OV_TENTATIVA`, então toda intenção já existente é tratada como de outra tentativa:
+a trava continua segura, só perde a idempotência dentro da mesma tentativa.

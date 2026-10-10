@@ -53,7 +53,10 @@ OFICIAL = {
     "diretor": {"diretor"}, "director": {"diretor"}, "executivo": {"diretor"}, "executive": {"diretor"},
 }
 ANOS = re.compile(r"(\d{1,2})\s*\+?\s*(?:anos?|years?)\s+(?:de\s+experiencia|of\s+(?:[\w-]+\s+){0,3}experience|experience|full[- ]stack|in\b)"
-                  r"|experiencia\s+(?:minima\s+)?de\s+(\d{1,2})\s*\+?\s*anos?")
+                  r"|experiencia\s+(?:minima\s+)?de\s+(\d{1,2})\s*\+?\s*anos?"
+                  # 10/10: "minimo 5 anos em java", "pelo menos 4 anos com", "at least 3 years" slipped through
+                  r"|(?:minimo|no minimo|pelo menos|at least|minimum(?: of)?)\s+(?:de\s+)?(\d{1,2})\s*\+?\s*(?:anos?|years?)\b"
+                  r"|(\d{1,2})\s*\+?\s*anos?\s+(?:atuando|trabalhando)\s+(?:com|em)\b")
 PRESENCIAL = re.compile(r"\b(100%\s+(presencial|on-?site)|trabalho\s+presencial|modelo\s+(de\s+trabalho\s*)?:?\s*presencial|"
                         r"regime\s+presencial|atuacao\s+presencial|work\s+model:?\s*on-?site)")
 HIBRIDO = re.compile(r"\b(modelo\s+(de\s+trabalho\s*)?:?\s*hibrido|regime\s+hibrido|atuacao\s+hibrida|hibrido\s*\(\d|"
@@ -108,7 +111,7 @@ def avaliar(texto, titulo="", nivel_oficial=None, conf=None):
     if m and not aceito:
         return False, f"nivel ({m.group(0)[:40]})"
     teto = conf["max_anos"]
-    anos = [n for n in (int(x.group(1) or x.group(2)) for x in ANOS.finditer(t) if (x.group(1) or x.group(2))) if n < 10]   # >=10 is company age
+    anos = [n for n in (int(next(g for g in x.groups() if g)) for x in ANOS.finditer(t)) if n < 10]   # >=10 is company age
     if teto is not None and anos and min(anos) > teto:
         return False, f"experiencia ({min(anos)}+ anos exigidos, teto do perfil {teto})"
     modelos = conf["modelos"]

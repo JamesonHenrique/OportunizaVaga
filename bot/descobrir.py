@@ -436,41 +436,77 @@ def job_ids(chave, rec):
 
 # Paths shared by DIFFERENT jobs (a recruiter profile posts many): never an identity.
 _URL_GENERICA = re.compile(r"^/(in|company|school|groups|feed|search|jobs/search|vagas|jobs|careers?|carreiras)?/?[^/]*$")
+# Query params that name the job; tried first, in this order.
+_QUERY_ID = ("jk", "gh_jid", "jobId", "id", "vaga")
+# Query params that only track the visit: dropped before comparing.
+_QUERY_RASTRO = re.compile(r"^(utm_\w*|gh_src|ref|refid|ref_id|referrer|source|src|origin|trk\w*|trackingid|refid|gclid|fbclid|"
+                           r"mc_[ce]id|lang|locale|hl|from|campaign|medium|position|page(num)?|sessionid|currentjobid|"
+                           r"lipi|eboid|rcm|tracking\w*|_ga|_gl)$", re.I)
 
 
 def url_canon(u):
     """'url:host/path' that names ONE job across boards/reposts (02/10: the same job came back under new
-    Telegram ids and was re-offered every round); '' for generic pages (profile, home, search)."""
+    Telegram ids and was re-offered every round); '' for generic pages (profile, home, search).
+    10/10: a path without a known id key (/vagas/detalhe?codigo=55 vs ?codigo=56) used to drop the whole query,
+    so two different jobs got one key and the second was skipped as known. Unknown params now stay (sorted),
+    tracking params (utm_*, ref, trk...) go."""
     p = urllib.parse.urlparse(str(u or "").strip())
     if p.scheme not in ("http", "https") or not p.netloc:
         return ""
     host = re.sub(r"^(www\.|br\.|m\.)", "", p.netloc.lower())
     path = re.sub(r"/+$", "", p.path)
-    if host.endswith("linkedin.com") and "/jobs/view/" not in path and "/posts/" not in path:
+    linkedin = host.endswith("linkedin.com")
+    if linkedin and "/jobs/view/" not in path and "/posts/" not in path:
         return ""
-    if host == "t.me" or _URL_GENERICA.match(path or "/") and not p.query:
-        return ""
+    if linkedin:   # the id is in the path; every LinkedIn query param is navigation/tracking
+        return f"url:{host}{path.lower()}"
     q = urllib.parse.parse_qs(p.query)
-    chave = next((f"?{k}={q[k][0]}" for k in ("jk", "gh_jid", "jobId", "id", "vaga") if q.get(k)), "")
+    chave = next((f"?{k}={q[k][0]}" for k in _QUERY_ID if q.get(k)), "")
+    if not chave:
+        resto = sorted((k, v[0]) for k, v in q.items() if not _QUERY_RASTRO.match(k))
+        chave = "?" + urllib.parse.urlencode(resto) if resto else ""
+    # a job id in the last segment (/vaga-12345, /jobs/98765) names one job even under a "generic" section
+    com_id = bool(re.search(r"\d{5,}", path.rsplit("/", 1)[-1]))
+    if host == "t.me" or path.rsplit("/", 1)[-1].lower() == "search" or (_URL_GENERICA.match(path or "/") and not chave and not com_id):
+        return ""
     if not path and not chave:
         return ""
-    return f"url:{host}{path.lower() if host.endswith('linkedin.com') else path}{chave}"
+    return f"url:{host}{path}{chave}"
 
 
 def _tokens(t, minimo=4):
     return {w for w in vf.norm(t).split() if len(w) >= minimo}
 
 
+# Strong level words only: they tell two postings of one company apart (Java Junior vs Java Pleno).
+_NIVEL_FORTE = {n: re.compile(rf"\b({rx})\b") for n, rx in (
+    ("estagio", r"estagi\w*|intern"), ("trainee", r"trainee"), ("junior", r"junior|jr"),
+    ("pleno", r"pleno|pl"), ("senior", r"senior|sr"))}
+_EMP_VAZIO = ("carreiras", "brasil", "grupo", "oficial", "none", "ltda", "eireli", "inc", "llc", "ltd", "corp")
+
+
+def _niveis(texto_norm):
+    return {n for n, rx in _NIVEL_FORTE.items() if rx.search(texto_norm)}
+
+
 def ja_registrada(v, blobs):
-    """Same job seen on another board (other id): company + most title words already in a record."""
+    """Same job seen on another board (other id): company + most title words already in a record.
+    10/10: the company is compared as WHOLE words, all of them ("SAP" no longer matches "sapiens", "Banco Inter"
+    no longer matches every "Banco ..."), and a different explicit level means a different job."""
     # 02/10: >= 3 letters, so short company names (3 letters) are compared at all
-    emp = [w for w in vf.norm(v.get("empresa")).split() if len(w) >= 3 and w not in ("carreiras", "brasil", "grupo", "oficial", "none")]
+    emp = {w for w in vf.norm(v.get("empresa")).replace(".", "").split() if len(w) >= 3 and w not in _EMP_VAZIO}
     tit = _tokens(v.get("titulo")) - {"desenvolvedor", "desenvolvedora", "pessoa", "junior", "remoto", "vaga"}
     if not emp or len(tit) < 2:   # one word ("backend") is too weak to call two postings the same
         return False
+    nivel = _niveis(vf.norm(v.get("titulo")))
     for b in blobs:
-        if emp[0] in b and len(tit & set(b.split())) >= max(1, round(0.7 * len(tit))):
-            return True
+        palavras = set(b.split()) | set(b.replace(".", "").split())
+        if not emp <= palavras or len(tit & palavras) < max(1, round(0.7 * len(tit))):
+            continue
+        outro = _niveis(b)
+        if nivel and outro and not (nivel & outro):
+            continue
+        return True
     return False
 
 
@@ -504,7 +540,7 @@ _TIT_VAZIO = {"desenvolvedor", "desenvolvedora", "pessoa", "remoto", "remota", "
 
 def _assinatura(v):
     """(company key, title words) for near-twin matching; None when too weak to compare."""
-    emp = [w for w in vf.norm(v.get("empresa")).split() if len(w) >= 3 and w not in ("carreiras", "brasil", "grupo", "oficial", "none")]
+    emp = [w for w in vf.norm(v.get("empresa")).split() if len(w) >= 3 and w not in _EMP_VAZIO]
     tit = frozenset(_tokens(v.get("titulo"), 3) - _TIT_VAZIO)
     return (emp[0], tit) if emp and tit else None
 

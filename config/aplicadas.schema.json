@@ -32,6 +32,8 @@
     },
     "bloqueados": { "type": "object" },
     "bloqueados_arquivados": { "type": "object" },
+    "envios_pendentes": { "type": "object", "description": "Envio cujo resultado e desconhecido: gravado por estado.py intencao logo antes do clique final e removido por add-aplicada (enviado) ou cancelar-intencao (nao enviado). Sobrar aqui = verificar antes de reenviar.", "additionalProperties": { "type": "object" } },
+    "envios_cancelados": { "type": "array", "description": "Ultimas 100 intencoes canceladas (envio comprovadamente nao saiu); historico, nunca conta como candidatura." },
     "quase_la": { "type": "object", "description": "Vaga que so nao foi enviada por falta de UM dado (ex.: campo ausente em dados_candidato.json); retomada por estado.py assim que o dado existir." },
     "contas_criadas": { "type": "object" },
     "descartes_listagem": {
