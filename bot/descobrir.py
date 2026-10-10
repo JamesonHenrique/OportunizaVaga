@@ -210,7 +210,9 @@ def linkedin(ctx, termo):
         time.sleep(random.uniform(1.5, 3))   # polite between pages
         try:
             vs = pagina(cur)
-        except Exception:
+        except Exception as e:
+            if getattr(e, "code", None) == 429:
+                ctx.li_429 = True
             break   # keep what we have; retry from the same cursor next time
         out += vs
         cur = cur + 10 if len(vs) >= 10 else 10
@@ -318,10 +320,17 @@ def board(nome):
     return lambda ctx, termo: fn(termo, get_robots)
 
 
-def linkedin_detalhe(jid):
+def linkedin_detalhe(jid, info=None):
     """Public job page (no login): (description text, official "experience level" or None).
-    Same guest endpoint family as the search; the label is localized by Accept-Language (pt-BR/en)."""
-    p = get(f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{jid}")
+    Same guest endpoint family as the search; the label is localized by Accept-Language (pt-BR/en).
+    info (dict, optional) gets "simplificada": True when the apply button is LinkedIn's own (Easy Apply)."""
+    return linkedin_parse(get(f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{jid}"), info)
+
+
+def linkedin_parse(p, info=None):
+    """linkedin_detalhe over an already fetched job page (triar() also needs the raw page for ENCERRADA)."""
+    if info is not None and "apply-link-simple_onsite" in p:   # 10/10: seen live on the guest page
+        info["simplificada"] = True
     m = re.search(r'show-more-less-html__markup[^>]*>(.*?)</div>', p, re.S)
     crit = {html.unescape(a): html.unescape(b) for a, b in re.findall(
         r'description__job-criteria-subheader">\s*([^<]+?)\s*<.*?description__job-criteria-text[^>]*>\s*([^<]+?)\s*<', p, re.S)}
@@ -334,7 +343,9 @@ def motivo_descricao(ctx, v):
     Fetch/parse failures never filter: the job goes to the model as before (fail open)."""
     try:
         if v["fonte"] == "linkedin":
-            texto, oficial = linkedin_detalhe(v["id"].split(":", 1)[1])
+            if getattr(ctx, "li_429", False):
+                return None   # LinkedIn throttled this collection: no more requests, the job goes unchecked
+            texto, oficial = linkedin_detalhe(v["id"].split(":", 1)[1], v)
             v["nivel_oficial"] = oficial
         else:
             texto, oficial = v.pop("_descricao", ""), None
@@ -346,7 +357,9 @@ def motivo_descricao(ctx, v):
         v["criterios"] = {k: c["estado"] for k, c in e["criterios"].items()}
         v["cobertura"] = e["cobertura"]
         return None if e["compativel"] else "desc:" + e["motivo"]
-    except Exception:
+    except Exception as e:
+        if getattr(e, "code", None) == 429:
+            ctx.li_429 = True
         return None
 
 
@@ -378,7 +391,8 @@ def motivo_filtro(ctx, v, pular_empresas, hoje=None):
     # 01/10 measured on the queue history: LinkedIn cards located in a city -> 70 jobs, 0 sends, 29 blocked as
     # hybrid/on-site by the model; located in the country ("Brasil") -> 16 jobs, 3 sends, 0 hybrid.
     if ctx.cfg["linkedin_cidade_fora"] and so_remoto_ali and v.get("fonte") == "linkedin" \
-            and CIDADE_LOCAL.search((v.get("local") or "").strip()) and not REMOTO_TXT.search(nt):
+            and CIDADE_LOCAL.search((v.get("local") or "").strip()) and not REMOTO_TXT.search(nt) \
+            and not REMOTO_TXT.search(vf.norm(v.get("local") or "")):   # 10/10: logged-in cards say "(Remoto)"
         return "modelo"
     # 05/10: board collectors (fontes_boards) set local="remoto" only when the board itself marks the job remote;
     # anything else on a remote-only profile is an on-site/hybrid listing (trabalhabrasil "São Paulo/SP").
@@ -406,6 +420,8 @@ def score(ctx, v, hoje=None):
         s += 2
     if ctx.bom and ctx.bom.search(nt):
         s += 1
+    if v.get("simplificada"):
+        s += 1   # 10/10: Easy Apply was 3 of the 4 LinkedIn sends since 01/10 (no ATS, no account)
     try:
         if v.get("publicada") and datetime.fromisoformat(v["publicada"]).date() >= ((hoje or agora()) - timedelta(days=3)).date():
             s += 1
@@ -612,13 +628,17 @@ def coletar(ctx, force=False, fontes=None):
         if fora_do_prazo():
             stats["erros"].append(f"{nome}:prazo")
             continue
+        if nome == "linkedin" and getattr(ctx, "li_429", False):
+            continue   # 10/10: after a 429 the remaining LinkedIn searches only dig the throttle deeper
         pf = por_fonte.setdefault(nome, [0, 0, 0])
         pf[0] += 1
         try:
             achadas = (board(nome[6:]) if nome.startswith("board:") else FONTES[nome])(ctx, termo)
         except Exception as e:  # one source down never stops the others
-            stats["erros"].append(f"{nome}:{type(e).__name__}")
+            stats["erros"].append(f"{nome}:{type(e).__name__}" + (":429" if getattr(e, "code", None) == 429 else ""))
             pf[1] += 1
+            if nome == "linkedin" and getattr(e, "code", None) == 429:
+                ctx.li_429 = True
             continue
         pf[2] += len(achadas)
         for v in achadas:
@@ -735,7 +755,7 @@ def prompt(ctx, n):
         v["mostrada"] = int(v.get("mostrada", 0)) + 1
         v["oferta_aberta"] = True   # marcar(LOG) counts it as an offer only if the round log shows the job was opened
         titulo = re.sub(r"\s+", " ", v["titulo"])[:120]
-        tag = " [descrição ok]" if v.get("desc_checada") else ""
+        tag = (" [descrição ok]" if v.get("desc_checada") else "") + (" [candidatura simplificada]" if v.get("simplificada") else "")
         print(f"  {i}) [score {v.get('score', 0)}]{tag} {(v.get('empresa') or '?')[:60]} — {titulo} | {v['fonte']} | "
               f"{(v.get('local') or '')[:40]} | publ. {v.get('publicada') or '?'} | {v['url']}")
     print("  " + (ctx.cfg["prompt_registro"] or "Registre CADA uma com o campo \"url\" acima: aplicou → estado.py "
@@ -800,12 +820,15 @@ def triar(ctx, n=8):
         try:
             if v["fonte"] == "linkedin":
                 jid = v["id"].split(":", 1)[1]
+                # 10/10: one request, not two (the page was fetched again by linkedin_detalhe)
                 pagina = get(f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{jid}")
                 fechada = bool(ENCERRADA.search(pagina))
-                texto, oficial = linkedin_detalhe(jid)
+                texto, oficial = linkedin_parse(pagina, v)
             else:
                 (texto, fechada), oficial = texto_generico(v["url"]), None
-        except Exception:
+        except Exception as e:
+            if getattr(e, "code", None) == 429:
+                break   # 10/10: throttled — stop; marking triagem_falhou would skip these jobs for good
             v["triagem_falhou"] = _stamp()
             continue
         if fechada:
