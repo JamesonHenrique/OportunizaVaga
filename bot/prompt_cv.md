@@ -20,7 +20,7 @@ c1) CV POR VAGA (regra de esforço): só gere o PDF quando o canal REALMENTE ane
       — ATS e recrutadores entendem melhor.
    2) Monte o spec em /tmp/cv_spec.json:
         { "empresa": "...", "vaga": "...",
-          "frase_key": "default",
+          "titulo_alvo": "...",                // cargo da vaga na grafia do anúncio; só cargo de dev/analista, nunca pleno/sênior
           "resumo_custom": "...",              // <=800 chars, 3-4 frases, verdadeiro, com keywords da vaga
           "categorias_ordem": ["...", "..."],   // subseções de "Habilidades técnicas" p/ o topo
           "so_categorias": ["...", "..."],      // 3-7 subseções p/ MOSTRAR; as demais ficam ocultas
@@ -31,6 +31,9 @@ c1) CV POR VAGA (regra de esforço): só gere o PDF quando o canal REALMENTE ane
       em 10pt legível e o CV longe de um muro de skills irrelevantes. Mapeie pela área da vaga
       (ex.: vaga de dev → "Backend"/"Frontend"/"Banco de dados"; vaga de automação → a categoria
       de automação/integração do SEU cv_base).
+      RESUMO: frase 1 = cargo da vaga + 2-3 stacks REAIS pedidas; frase 2 = experiência com número; frase 3 =
+      prova ligada à vaga. Nunca lista crua de tecnologias nem nota interna ("similar", "sem afirmar domínio",
+      "disponível para atuar,"): o gerador recusa (exit 2) e a autochecagem reprova o PDF.
    3) Gere o PDF (o script SÓ retorna exit 0 se o arquivo tiver 1 página e o texto passar na
       auto-checagem de nome + seções; qualquer ERRO = corrija o spec e rode de novo):
         python3 "$BOT_ROOT/bot/gerar_cv.py" /tmp/cv_spec.json \

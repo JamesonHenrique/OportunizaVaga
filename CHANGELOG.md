@@ -6,6 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- **CV levava nota interna ao recrutador (`bot/gerar_cv.py`)**: a frase de transferência (feita para formulário) e a
+  linha "Termos do anúncio correspondidos", com os rótulos internos das stacks similares ("sem afirmar domínio"), eram
+  impressas logo após o resumo. Saíram; `resumo_custom` com nota interna é recusado (exit 2) e a autochecagem
+  reprova o PDF que contiver uma. O resumo ganhou título de seção (o ATS acha a seção pelo heading), o headline
+  aceita `titulo_alvo` (cargo da vaga, só dev/analista e nunca pleno/sênior) e o PDF leva assunto e palavras-chave
+  nos metadados. `prompt_cv.md`/`.en.md`: `frase_key` → `titulo_alvo` e regra do resumo.
 - **Híbrida de qualquer cidade entrava como remota (`bot/descobrir.py`)**: com `hibrido` em `modelos`, a busca do Gupy
   deixa de filtrar `workplaceType=remote`, mas `parse_gupy` gravava `local="remoto"` em toda vaga. Agora o local vem de
   `workplaceType`/`city`/`state`; híbrida/presencial fora de `cidades` do perfil vira `modelo`, e os filtros de card
