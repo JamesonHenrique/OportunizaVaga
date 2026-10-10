@@ -504,6 +504,9 @@ while true; do
   CI=0; REPETIU=""
   while [ "$CI" -lt "${#CASCATA[@]}" ]; do
   MODELO=${CASCATA[$CI]}; CI=$((CI + 1))
+  # Each cascade attempt is its own owner of estado.py intencao: an intent left by a killed attempt is an
+  # unknown result for the next model of the SAME round too, never "mine, retry the click".
+  export OV_TENTATIVA="$OV_RODADA-$CI"
   ROUND_START=$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')
   # elapsed-time clock read by the model (bot/tempo-rodada.py, prompt rule 7d)
   mkdir -p "$STATE_DIR"; date +%s > "$STATE_DIR/rodada_inicio"; rm -f "$STATE_DIR/rodada_travou"

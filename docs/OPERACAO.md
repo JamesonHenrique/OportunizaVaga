@@ -158,3 +158,26 @@ python3 scripts/restore-json.py bot/backups/aplicadas.AAAAMMDD-HHMM.json --aplic
 - Pare o loop (e o guardião/cron que o religa) antes: uma rodada em andamento pode regravar o estado antigo.
 - Os backups ficam no mesmo disco e contêm `dados_candidato.json` (dados pessoais); `bot/backups/`
   já está no `.gitignore`. Cópia fora da máquina fica a cargo do usuário.
+
+## Envio com resultado desconhecido (`estado.py intencao`)
+
+Uma candidatura passa por três estados no `aplicadas.json`:
+
+| Estado | Onde fica | Quem grava |
+|---|---|---|
+| intenção (resultado desconhecido) | `envios_pendentes[CHAVE]` | `estado.py intencao`, logo antes do clique final |
+| enviada (confirmada) | `aplicadas[]` | `estado.py add-aplicada` (remove a intenção) |
+| não enviada (comprovado) | `envios_cancelados[]` (últimas 100) | `estado.py cancelar-intencao CHAVE MOTIVO` |
+
+Se o processo morre entre o clique e o `add-aplicada` (timeout, watchdog, queda do Chrome ou da
+máquina), a intenção sobra. Resultado desconhecido **não** é tratado como falha: a próxima
+tentativa — outro modelo da cascata na mesma rodada (`OV_TENTATIVA`) ou a rodada seguinte — recebe
+exit 1 de `intencao` para essa chave e a vê no topo do `resumo` e do `ja-visto`. O modelo deve
+verificar no portal ou no e-mail e só então registrar `add-aplicada` ou `cancelar-intencao`.
+`scripts/validate-rodada.py` imprime `[aviso]` enquanto houver pendentes, e o monitor recebe só a
+contagem (`telemetry.totals.enviosPendentes`).
+
+Limitações: a proteção depende de o modelo chamar `intencao` antes do clique (está no passo d0 do
+prompt). Uma rodada que pula esse passo volta ao comportamento antigo. No `loop.ps1` não há
+`OV_RODADA`/`OV_TENTATIVA`, então toda intenção já existente é tratada como de outra tentativa:
+a trava continua segura, só perde a idempotência dentro da mesma tentativa.

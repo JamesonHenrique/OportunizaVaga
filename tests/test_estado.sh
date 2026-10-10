@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 ESTADO="bot/estado.py"
 
-TOTAL=23
+TOTAL=28
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -185,7 +185,7 @@ relata $? "resumo-candidato traz o essencial e deixa documentos fora"
 DADOS_CANDIDATO_FILE=examples/dados_candidato.example.json python3 "$ESTADO" dado experiencia.tecnologias | grep -q .
 relata $? "dado le campo aninhado do dados_candidato"
 
-if # 21 — descartes: placeholder copiado e recusado sem traceback; rotulos aceitos.
+# 21 — descartes: placeholder copiado e recusado sem traceback; rotulos aceitos.
 OUT21="$(python3 "$ESTADO" --file "$TMP_STATE" descartes NIVEL MODELO STACK 2>&1)"; A=$?
 python3 "$ESTADO" --file "$TMP_STATE" descartes nivel 1 modelo 2 stack 3 >/dev/null 2>&1; B=$?
 [ "$A" -ne 0 ] && [ "$B" -eq 0 ] && ! echo "$OUT21" | grep -q Traceback \
@@ -203,7 +203,36 @@ python3 "$ESTADO" --file "$TMP_STATE" set-campo y_dev_78 caminho fila >/dev/null
 python3 -c "import json,sys;a=[a for a in json.load(open(sys.argv[1]))['aplicadas'] if a['chave']=='y_dev_78'][0];assert a['rodada']=='R9' and a['caminho']=='fila',a" "$TMP_STATE"
 relata $? "OV_RODADA carimba rodada; set-campo grava campo"
 
-[ "$FAIL" -eq 0 ]; then
+# 24..28 — intencao: envio com resultado desconhecido nunca vira reenvio cego (processo morto entre clique e registro).
+E() { python3 "$ESTADO" --file "$TMP_STATE" "$@"; }
+OV_RODADA=R1 E intencao w_dev_1 '{"empresa":"Wexample","vaga":"Dev Backend","url":"https://w.example.com/v/1"}' >/dev/null 2>&1 \
+  && OV_RODADA=R1 E intencao w_dev_1 '{"empresa":"Wexample","vaga":"Dev Backend"}' >/dev/null 2>&1
+relata $? "intencao grava e repetir na MESMA rodada e idempotente (exit 0)"
+
+OUT="$(OV_RODADA=R2 E intencao w_dev_1 '{"empresa":"Wexample"}' 2>&1)"; RC=$?
+OV_RODADA=R1 OV_TENTATIVA=R1-2 E intencao w_dev_1 '{}' >/dev/null 2>&1; RC2=$?
+[ "$RC" -eq 1 ] && [ "$RC2" -eq 1 ] && grep -q "resultado desconhecido" <<<"$OUT"
+relata $? "outra rodada ou outro modelo da cascata (crash entre clique e registro): intencao recusa com exit 1"
+
+E resumo | grep -q "ENVIOS COM RESULTADO DESCONHECIDO (1)" \
+  && E ja-visto Wexample "Dev Backend" | head -1 | grep -q "ENVIO COM RESULTADO DESCONHECIDO" \
+  && [ "$(E tem w_dev_1)" = "sim envios_pendentes" ]
+relata $? "pendente aparece no resumo, primeiro no ja-visto e no tem"
+
+E add-aplicada '{"chave":"w_dev_1","empresa":"Wexample","vaga":"Dev Backend"}' >/dev/null 2>&1
+python3 -c "import json,sys;d=json.load(open(sys.argv[1]));assert 'envios_pendentes' not in d,d.get('envios_pendentes')" "$TMP_STATE" \
+  && ! OV_RODADA=R3 E intencao w_dev_1 '{}' >/dev/null 2>&1
+relata $? "add-aplicada confirma o envio (limpa o pendente); nova intencao da mesma chave e recusada"
+
+OV_RODADA=R4 E intencao z_dev_2 '{"empresa":"Zexample"}' >/dev/null 2>&1
+E cancelar-intencao z_dev_2 "erro no formulario, sem confirmacao" >/dev/null 2>&1
+python3 -c "
+import json,sys; d=json.load(open(sys.argv[1]))
+assert 'envios_pendentes' not in d and d['envios_cancelados'][-1]['chave']=='z_dev_2'
+assert not any(a['chave']=='z_dev_2' for a in d['aplicadas'])" "$TMP_STATE" && OV_RODADA=R5 E intencao z_dev_2 '{}' >/dev/null 2>&1
+relata $? "cancelar-intencao guarda historico, nao conta como aplicada e libera novo envio"
+
+if [ "$FAIL" -eq 0 ]; then
   echo "# verde: $N/$TOTAL"
   exit 0
 else

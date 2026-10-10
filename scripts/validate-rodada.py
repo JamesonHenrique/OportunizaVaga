@@ -78,6 +78,12 @@ def main(argv):
         print("  [FALHA] JSON invalido: %s" % e)
         return 1
     falhas = check(ap, os.environ.get("OV_ALLOW_UTC") == "1")
+    # Not a failure: the state is consistent, the outcome of a send is just not known yet. The next round
+    # sees these first (estado.py resumo) and must verify before any re-send.
+    pend = ap.get("envios_pendentes") if isinstance(ap.get("envios_pendentes"), dict) else {}
+    if pend:
+        print("  [aviso] %d envio(s) com resultado desconhecido (envios_pendentes): %s"
+              % (len(pend), ", ".join(sorted(pend)[:10])))
     for f in falhas:
         print("  [FALHA] " + f)
     if falhas:
