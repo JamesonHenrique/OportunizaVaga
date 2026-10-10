@@ -115,6 +115,26 @@ def vencidos(d, hoje=None):
     return out
 
 
+EVENTOS_MAX = 2 * 1024 * 1024   # bytes; one rotated generation (eventos.jsonl.1) is kept
+
+
+def registrar_evento(path, ev):
+    """Append one structured line to eventos.jsonl next to the state file (10/10).
+    Who changed what, when, in which round/cascade attempt: the history used to live only in free-text logs
+    (loop.log, 20 round logs) that rotate away. Keys and statuses only -- no free text, no candidate data.
+    Best effort: a failure here never undoes the state write that already happened."""
+    arq = os.path.join(os.path.dirname(os.path.abspath(path)), "eventos.jsonl")
+    ev = {"em": _agora(), "rodada": os.environ.get("OV_RODADA") or None,
+          "tentativa": os.environ.get("OV_TENTATIVA") or None, **ev}
+    try:
+        if os.path.exists(arq) and os.path.getsize(arq) > EVENTOS_MAX:
+            os.replace(arq, arq + ".1")
+        with open(arq, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({k: v for k, v in ev.items() if v is not None}, ensure_ascii=False) + "\n")
+    except OSError as e:
+        print(f"aviso: evento nao registrado ({e})", file=sys.stderr)
+
+
 def _agora():
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
@@ -279,6 +299,7 @@ def main(argv):
         print(__doc__)
         return 2
     cmd, args = argv[0], argv[1:]
+    ev = {"cmd": cmd}   # filled by the write commands below; appended to eventos.jsonl after the save
     # A refusal message that teaches a flag nobody can type is a trap: the flag is accepted in any
     # position, including after the record and the status, because that is where a reader puts it.
     if "--forcar" in args:
@@ -350,6 +371,7 @@ def main(argv):
             print(f"erro: status '{str(rec.get('status'))[:40]}' desconhecido (use {', '.join(sorted(STATUS_OK))}; detalhe vai em 'obs'); NADA gravado")
             return 2
         rec.setdefault("status", "enviada")   # without it the funnel/monitor miscount the application
+        ev.update(chave=rec["chave"], para=rec["status"])
         if os.environ.get("OV_RODADA") and not rec.get("rodada"):
             rec["rodada"] = os.environ["OV_RODADA"]   # which loop round wrote it (logs/rodada-<id>.log)
         medir_ats(rec)
@@ -379,6 +401,7 @@ def main(argv):
             print(f"resultado desconhecido desde {atual.get('em')} (rodada {atual.get('rodada') or '?'}): {k} -- NAO "
                   "envie; verifique no portal/e-mail. Saiu = add-aplicada; nao saiu = cancelar-intencao CHAVE MOTIVO")
             return 1
+        ev["chave"] = k
         if atual is None:   # same round calling again (retry of the click) keeps the first timestamp
             rec = {c: str(info[c])[:300] for c in ("empresa", "vaga", "url", "como") if info.get(c)}
             rec.update(em=_agora(), rodada=rodada, tentativa=dono)
@@ -389,6 +412,7 @@ def main(argv):
         if rec is None:
             print(f"nao existe em envios_pendentes: {k}")
             return 1
+        ev["chave"] = k
         if not d["envios_pendentes"]:
             d.pop("envios_pendentes")
         # kept (bounded) so a wrong cancel can be traced; never counted as an application
@@ -443,6 +467,7 @@ def main(argv):
                   f"'{st}' e nivel {ORDEM.get(st, 0)} -- recuo nao gravado. "
                   f"use --forcar se a empresa reabriu o processo, ou marque status_manual.")
             return 3
+        ev.update(chave=k, de=rec.get("status") or "enviada", para=st)
         if rec.get("status") != st:
             h = {"de": rec.get("status"), "para": st, "em": datetime.now().astimezone().isoformat(timespec="seconds")}
             if len(args) > 3 and args[3]:
@@ -458,6 +483,9 @@ def main(argv):
         if rec is None:
             print(f"nao existe em aplicadas: {k}")
             return 1
+        ev.update(chave=k, campo=campo)
+        if campo == "status":   # set-campo bypasses the status rules: leave a trace of it
+            ev.update(de=rec.get("status"), para=val if isinstance(val, str) else None)
         rec[campo] = val
     elif cmd == "del-aplicada":
         # archived, not deleted: aplicadas_removidas keeps the record + why, so it can be restored by hand
@@ -466,6 +494,7 @@ def main(argv):
         if rec is None:
             print(f"nao existe em aplicadas: {k}")
             return 1
+        ev["chave"] = k
         d["aplicadas"] = [a for a in d["aplicadas"] if a.get("chave") != k]
         d.setdefault("aplicadas_removidas", []).append(
             dict(rec, removida_em=datetime.now().astimezone().isoformat(timespec="seconds"), motivo_remocao=motivo[:200]))
@@ -486,7 +515,10 @@ def main(argv):
     else:
         print(f"comando desconhecido: {cmd}. Comandos: " + ", ".join(comandos()))
         return 2
+    if cmd in ("add-bloqueado", "set-quase-la", "conta"):
+        ev["chave"] = args[0]
     save(path, d)
+    registrar_evento(path, ev)
     print(f"ok {cmd}")
     return 0
 
