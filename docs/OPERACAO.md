@@ -232,3 +232,22 @@ morre na hora; qualquer outro (um `descobrir.py`, `node` ou `opencode` terminand
 depois de `OV_GUARDIAO_ORFAO_S` segundos (padrão 1500 = timeout da rodada + margem). Antes disso o
 guardião não sobe o loop e tenta de novo no próximo ciclo do cron — antes, `fuser -k` matava tudo,
 podendo cortar uma escrita ou um envio ao meio. `tests/test_guardiao.sh`.
+
+## Saúde por portal (`bot/saude-portais.py`)
+
+Um estado por portal, sempre com evidência e data, a partir dos arquivos que o robô já grava no diretório do
+estado: `sonda_sites.json` (acesso), `canario_fontes.json` (parser; gravado pelo `canario-fontes.py`),
+`vagas_fila.json` (coleta), `rodizio_saude.json` (varredura/pausa) e `login_checagens`/`aguardando_login`.
+
+| Estado | Quando |
+|---|---|
+| `login_necessario` | última checagem de login disse "não", ou há vaga compatível esperando o login |
+| `indisponivel` | a sonda viu página de bloqueio nas últimas 48h |
+| `falha_recente` | canário ou coleta falhou nas últimas 48h |
+| `sem_vagas_compativeis` | o rodízio pausou o site por estar seco — funciona, só não tinha vaga nova (não é falha) |
+| `funcionando` | evidência positiva recente: sonda ok, canário ok, varredura ou candidatura |
+| `nao_verificado` | sem evidência nas últimas 48h (= "aguardando verificação") |
+
+Portal configurado mas sem evidência nunca aparece como `funcionando`. `python3 bot/saude-portais.py` mostra a
+tabela (`--json`). O `loop.sh` grava `saude_portais.json` ao fim de cada rodada; o monitor recebe só
+`portais: {nome: estado}` e o `doctor` (seção 7) avisa os portais com problema.

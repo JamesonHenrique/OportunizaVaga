@@ -638,6 +638,9 @@ while true; do
     fi
   fi
 
+  # Estado de cada portal a partir das evidencias da rodada (sonda, canario, coleta, rodizio, login): monitor/doctor.
+  python3 "$BOT_ROOT/bot/saude-portais.py" --gravar >/dev/null 2>&1 || true
+
   if is_broken_session "$ROUND_LOG"; then
     FAILS=$((FAILS + 1))
     W=$(fail_wait "$FAILS")
