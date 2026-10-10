@@ -101,6 +101,35 @@ def blocos_de(sections, nome):
         yield bloco
 
 
+# ------------------------------------------------------------- texto que nunca vai p/ o CV
+# 09/10: 31 de 48 CVs enviados levaram notas internas ao recrutador ("disponivel para atuar, sem afirmar dominio",
+# "Termos do anuncio correspondidos neste perfil: React JR (similar ...)"). A frase de transferencia e para
+# FORMULARIO (estado.py dado respostas_padrao_gupy); no CV a skill similar aparece so na secao "Stacks adjacentes".
+PROIBIDO_NO_CV = re.compile(r"sem afirmar|similar|termos do an[uú]ncio|dispon[ií]vel para atuar,|transfer[ií]vel para",
+                            re.I)
+
+
+def limpar_rotulo(p):
+    """'React JR (similar Angular/TypeScript — ...)' -> 'React' (the label is for the model, the name for the CV)."""
+    p = re.sub(r"\s*\(.*$", "", str(p)).strip()
+    return re.sub(r"\s+(JR|b[aá]sico)$", "", p, flags=re.I).strip() or str(p)
+
+
+# Titulo-alvo (linha logo abaixo do nome): espelha o cargo da vaga, o fator que o ATS mais pesa. So entra se for um
+# cargo que o candidato de fato exerce/pleiteia; nivel so Junior/Trainee/Estagio (regra 3 do prompt).
+CARGO_OK = re.compile(r"^(pessoa )?(desenvolvedor[a]?|developer|engenheir[oa] de software|software engineer|analista de "
+                      r"(sistemas|desenvolvimento|automa[cç][aã]o|integra[cç][aã]o)|programador[a]?)\b", re.I)
+NIVEL_OK = re.compile(r"\b(j[uú]nior|jr\.?|trainee|est[aá]gi[oa]|estagi[aá]ri[oa])\b", re.I)
+NIVEL_FORA = re.compile(r"\b(pleno|s[eê]nior|sr\.?|senior|staff|especialista|l[ií]der|lead|ii|iii)\b", re.I)
+
+
+def titulo_valido(t):
+    t = re.sub(r"\s+", " ", str(t or "")).strip(" -|·")
+    if not t or len(t) > 90 or not CARGO_OK.search(t) or NIVEL_FORA.search(t) or PROIBIDO_NO_CV.search(t):
+        return None
+    return t
+
+
 # ------------------------------------------------------------- allowlist kw
 def _partes_kw(txt):
     txt = txt[2:] if txt.startswith(("- ", "* ")) else txt
@@ -126,7 +155,7 @@ def carregar_allowlist(dados, sections=None):
         p = p.strip()
         if not p:
             continue
-        allow.setdefault(norm(p), p)
+        allow.setdefault(norm(p), limpar_rotulo(p))
         for pedaco in re.split(r"[/,;(]| \+ ", p):
             pedaco = pedaco.strip(" .")
             if len(norm(pedaco)) >= 3:
@@ -277,14 +306,15 @@ def _checar_texto(path, titulo, sections):
         print("aviso: sem extrator de texto (pdftotext/pypdf); auto-checagem pulada")
         return []
     probs = []
+    m = PROIBIDO_NO_CV.search(txt)
+    if m:
+        probs.append("nota interna no texto do CV: '%s'" % m.group(0))
     linhas = [norm(l) for l in txt.splitlines() if norm(l)]
     primeiro = norm(titulo).split(" ")[0]
     if not any(primeiro in l for l in linhas[:3]):
         probs.append("nome nao encontrado no texto extraido do PDF")
     idx = -1
     for nome in sections:
-        if norm(nome) == "resumo":
-            continue
         alvo = norm(nome)
         # headings sao linhas proprias no texto extraido (evita falso positivo
         # de "Experiencia" dentro do resumo)
@@ -307,16 +337,17 @@ def gerar(spec_path, saida):
     kw_ok, kw_caiu = filtrar_kw(spec.get("palavras_chave_vaga"), allow)
     kwset = {norm(k) for k in kw_ok}
 
-    frase = ""
-    rp = dados.get("respostas_padrao_gupy", {})
-    chave = spec.get("frase_key")
-    if chave:
-        frase = (rp.get("frases_transferencia", {}).get(chave)
-                 or rp.get("frase_transferencia", ""))
-    if not frase:
-        frase = rp.get("frase_transferencia", "")
+    # 09/10: frase de transferencia NAO entra no CV (era nota interna impressa p/ o recrutador; ver PROIBIDO_NO_CV)
+    alvo = titulo_valido(spec.get("titulo_alvo"))
+    if spec.get("titulo_alvo") and not alvo:
+        print("aviso: titulo_alvo recusado (cargo/nivel fora do perfil): %s — mantido o titulo do cv_base"
+              % spec.get("titulo_alvo"), file=sys.stderr)
 
     resumo = (spec.get("resumo_custom") or "").strip()
+    if PROIBIDO_NO_CV.search(resumo):
+        print("ERRO: resumo_custom tem nota interna (%s): o CV vai ao recrutador. Reescreva so com fatos do perfil."
+              % PROIBIDO_NO_CV.search(resumo).group(0), file=sys.stderr)
+        sys.exit(2)
     if len(resumo) > 800:
         resumo = resumo[:800].rsplit(" ", 1)[0] + "…"
     if not resumo:
@@ -348,24 +379,21 @@ def gerar(spec_path, saida):
     ordem = [norm(o) for o in
              (spec.get("categorias_ordem") or spec.get("so_categorias") or [])]
 
+    nome_resumo = next((n for n in sections if norm(n) == "resumo"), "Resumo")
+
     def montar(corpo_pt):
         S = estilos(corpo_pt)
         flow = []
         flow.append(Paragraph(esc(titulo), S["nome"]))
-        for m in meta:
-            flow.append(Paragraph(esc(m), S["meta"]))
-        if spec.get("vaga") or spec.get("empresa"):
-            linha = " · ".join(x for x in [spec.get("vaga"), spec.get("empresa")] if x)
-            flow.append(Paragraph(esc("Candidatura: " + linha), S["cargo"]))
+        for i, m in enumerate(meta):
+            if i == 0 and alvo:   # headline: target title + the base stack line after the "|"
+                m = alvo + (" | " + m.split("|", 1)[1].strip() if "|" in m else "")
+            flow.append(Paragraph(esc(m), S["cargo"] if i == 0 else S["meta"]))
         flow.append(HRFlowable(width="100%", thickness=1.1, color=COR_TITULO,
                                spaceBefore=4, spaceAfter=6))
 
+        h2(nome_resumo, S, flow)   # 09/10: ATS finds the summary by its heading; it had none
         flow.append(Paragraph(esc(resumo), S["corpo"]))
-        if frase:
-            flow.append(Paragraph(esc(frase), S["nota"]))
-        if kw_ok:
-            flow.append(Paragraph("Termos do anúncio correspondidos neste perfil: "
-                                  + esc(", ".join(kw_ok)), S["kw"]))
 
         pos = {n: i for i, n in enumerate(ordem)}
         for nome, blocos in sections.items():
@@ -392,7 +420,8 @@ def gerar(spec_path, saida):
     for tam in (10.0, 9.5, 9.0, 8.8):
         doc = SimpleDocTemplate(saida, pagesize=A4, leftMargin=1.5 * cm,
                                 rightMargin=1.5 * cm, topMargin=1.1 * cm,
-                                bottomMargin=1.0 * cm, title=titulo, author=titulo)
+                                bottomMargin=1.0 * cm, title=titulo, author=titulo,
+                                subject=alvo or (meta[0] if meta else ""), keywords=", ".join(kw_ok))
         doc.build(montar(tam))
         pag = _pdf_paginas(saida)
         if pag is None:

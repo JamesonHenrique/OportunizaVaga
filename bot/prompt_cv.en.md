@@ -20,7 +20,7 @@ c1) PER-JOB CV (effort rule): only generate the PDF when the channel REALLY atta
       recruiters understand better.
    2) Build the spec at /tmp/cv_spec.json:
         { "empresa": "...", "vaga": "...",
-          "frase_key": "default",
+          "titulo_alvo": "...",                // job title as written in the posting; developer/analyst roles only, never mid/senior
           "resumo_custom": "...",              // <=800 chars, 3-4 sentences, truthful, with job keywords
           "categorias_ordem": ["...", "..."],   // subsections of "Habilidades técnicas" for the top
           "so_categorias": ["...", "..."],      // 3-7 subsections to SHOW; the rest stay hidden
@@ -31,6 +31,9 @@ c1) PER-JOB CV (effort rule): only generate the PDF when the channel REALLY atta
       body at 10pt and the CV away from a wall of irrelevant skills. Map by job area (e.g. dev job →
       "Backend"/"Frontend"/"Banco de dados"; automation job → the automation/integration category of
       YOUR cv_base).
+      SUMMARY: sentence 1 = the posting's title + 2-3 REAL stacks it asks for; sentence 2 = experience with a
+      number; sentence 3 = proof tied to the job. Never a raw tech list nor internal notes ("similar",
+      "sem afirmar domínio"): the generator refuses (exit 2) and the self-check fails the PDF.
    3) Generate the PDF (the script only returns exit 0 if the file has 1 page and the text passes the
       name + sections self-check; any ERROR = fix the spec and run again):
         python3 "$BOT_ROOT/bot/gerar_cv.py" /tmp/cv_spec.json \
