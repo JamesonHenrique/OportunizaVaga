@@ -59,6 +59,9 @@ DEFAULTS = {
     "linkedin_dias": 7,
     "linkedin_paginas": 1,      # pages per term per collection (page 1 + N-1 from a cursor kept in the queue); 1 = old behaviour
     "linkedin_max_start": 990,  # cursor wraps here (the guest search stops around 1000)
+    "linkedin_pausa_h": 3,      # after a 429 the LinkedIn guest search sleeps this long, doubling on each new 429...
+    "linkedin_pausa_max_h": 24, # ...up to this; a collection without 429 resets it (0 = no pause, old behaviour)
+    "linkedin_horas": [],       # [from, to) local hours the LinkedIn guest search may run, e.g. [7, 23]; [] = always
     "fontes": ["linkedin", "gupy"],
     "gupy_termos": [],          # empty = first two words of each profile term
     "stack_evitar": [],         # title words that reject a job (unless it also has stack_preferida)
@@ -592,6 +595,33 @@ def avisar_fontes(fila, por_fonte, erros):
     fila["fontes_quebradas"] = sorted(quebradas)
 
 
+def linkedin_fora(ctx, fila, force=False):
+    """Why the LinkedIn guest search sits out this collection ('' = it runs).
+    14/10: the 429 only stopped the rest of ONE collection; the next one, 60 min later, hit the still-throttled
+    endpoint again (~54 requests/collection, 24 h a day) and kept the throttle alive — 429 in most collections
+    on 13-14/10. Now a 429 pauses it across collections (linkedin_pausa) and linkedin_horas keeps it off at night.
+    --force skips the hour window, never the 429 pause."""
+    p = fila.get("li_pausa") or {}
+    if p.get("ate") and datetime.fromisoformat(p["ate"]) > agora():
+        return f"pausa apos 429 ate {p['ate']}"
+    horas = ctx.cfg["linkedin_horas"]
+    if not force and len(horas) == 2 and not (int(horas[0]) <= agora().hour < int(horas[1])):
+        return f"fora do horario {horas[0]}-{horas[1]}h"
+    return ""
+
+
+def linkedin_pausa(ctx, fila):
+    """After a collection that ran LinkedIn: a 429 sets/doubles the pause, a clean run clears it."""
+    base = float(ctx.cfg["linkedin_pausa_h"])
+    if not getattr(ctx, "li_429", False) or base <= 0:
+        fila.pop("li_pausa", None)
+        return
+    n = int((fila.get("li_pausa") or {}).get("n", 0)) + 1
+    horas = min(base * 2 ** (n - 1), float(ctx.cfg["linkedin_pausa_max_h"]))
+    fila["li_pausa"] = {"n": n, "ate": (agora() + timedelta(hours=horas)).isoformat(timespec="seconds")}
+    print(f"descobrir: linkedin 429, pausado por {horas:g}h (#{n})")
+
+
 def coletar(ctx, force=False, fontes=None):
     fila = vf.load_json(ctx.fila_path, {"vagas": {}, "stats": {}})
     base_fila = copy.deepcopy(fila)   # salvar_fila applies only this run's changes
@@ -616,7 +646,10 @@ def coletar(ctx, force=False, fontes=None):
     assin = assinaturas_da_fila(vagas)
     conhecidos |= urls_da_fila(vagas)
     fontes = fontes or ctx.cfg["fontes"]
-    li = [("linkedin", t) for t in escolhidos] if "linkedin" in fontes else []
+    li_fora = linkedin_fora(ctx, fila, force)
+    if li_fora:
+        print(f"descobrir: linkedin fora nesta coleta ({li_fora})")
+    li = [("linkedin", t) for t in escolhidos] if "linkedin" in fontes and not li_fora else []
     gu = [("gupy", t) for t in gupy_termos] if "gupy" in fontes else []
     # 09/10: interleaved, so the tempo_max_s deadline cuts both sources alike (LinkedIn first, then Gupy, left 3 of 6
     # Gupy searches with no time once LinkedIn grew to 8 terms x 8 pages)
@@ -708,6 +741,8 @@ def coletar(ctx, force=False, fontes=None):
     for k in [k for k, v in vagas.items() if v.get("status") != "nova" and v.get("visto_em", "") < limite]:
         vagas.pop(k)
     fila["li_cursor"] = {t: c for t, c in ctx.li_cursor.items() if t in ctx.termos}
+    if li:
+        linkedin_pausa(ctx, fila)
     fila["ultima_coleta"] = agora().isoformat(timespec="seconds")
     # Merge, never replace: tg-garimpo.py writes its own stats.telegram into this SAME fila
     # (D4), so the previous `fila["stats"] = ...` wiped the Telegram stamp on every collection
