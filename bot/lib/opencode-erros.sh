@@ -13,16 +13,24 @@
 # 06/10: is_quota was lost when this file was extracted from loop.sh, but bot/loop.sh kept calling it — bash
 # answered 127 ("command not found"), read as "not quota", so a quota printed in the round log never counted.
 is_quota() {
-  grep -qE '^[[:space:]]*QUOTA_EXAUSTA|Error from provider.*([Rr]ate limit|[Qq]uota|429|[Ee]xhausted|[Tt]oo [Mm]any)|AI_RetryError|RateLimitError' "$1"
+  grep -qE '^[[:space:]]*QUOTA_EXAUSTA|Error from provider.*([Rr]ate limit|[Qq]uota|429|[Ee]xhausted|[Tt]oo [Mm]any)|AI_RetryError|RateLimitError' "$1" ||
+    # opencode 2 (16/10) prints the provider error as a red "Error: " line; the ANSI codes only come from opencode
+    # itself, so a job posting quoting "Error: Rate limit" in the round body cannot match
+    grep -qE $'\e\\[91m\e\\[1mError: \e\\[0m.*([Rr]ate limit|[Qq]uota|429|[Ee]xhausted|[Tt]oo [Mm]any|[Ff]ree usage)' "$1"
 }
 
 OC_LOG_DIR=${OC_LOG_DIR:-$HOME/.local/share/opencode/log}
 erro_opencode_log() {
   local f dir=${2:-$BASE}
-  f=$(ls -t "$OC_LOG_DIR"/*.log 2>/dev/null | head -1)
+  # opencode 2 writes ONE opencode.log; V1 wrote one file per run (newest wins). free-fallback.log lives in the same
+  # dir, so the V2 file is named instead of trusting "newest *.log".
+  if [ -f "$OC_LOG_DIR/opencode.log" ]; then f=$OC_LOG_DIR/opencode.log
+  else f=$(ls -t "$OC_LOG_DIR"/*.log 2>/dev/null | grep -v '/free-fallback\.log$' | head -1); fi
   [ -n "$f" ] || return 0
   tail -c 8000000 "$f" | awk -v since="$1" -v dir="$dir" '
-    /message="creating instance"/ {
+    # opencode 1 tags a run with "creating instance", opencode 2 (16/10) with "location services booted"; both
+    # carry run= and directory= on that line, and the ERROR lines keep the same run=/timestamp=/level= fields
+    /message="(creating instance|location services booted)"/ {
       if (match($0, /run=[0-9a-f]+/)) { r = substr($0, RSTART + 4, RLENGTH - 4) }
       if (index($0, "directory=" dir) && !index($0, "directory=" dir "/")) mine[r] = 1
       next
