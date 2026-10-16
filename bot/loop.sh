@@ -17,6 +17,10 @@ export PATH="$HOME/.opencode/bin:$HOME/.local/share/fnm/aliases/default/bin:$HOM
 OPENCODE_BIN="$HOME/.opencode/bin/opencode"
 NODE_BIN="$HOME/.local/share/fnm/aliases/default/bin/node"
 [ -x "$OPENCODE_BIN" ] || { echo "[$(date '+%F %T')] ERRO: opencode nao encontrado em $OPENCODE_BIN" >> loop.log; exit 1; }
+# OpenCode 2's `run` attaches to a shared background service by default, so this loop's env (OPENCODE_CONFIG_CONTENT,
+# plugin switches) would not reach the tools. --standalone = private server in this process tree; --auto = no
+# permission prompt that nobody would answer. OpenCode 1 has neither flag.
+OC_RUN=(); case "$("$OPENCODE_BIN" --version 2>/dev/null)" in *v2.*) OC_RUN=(--standalone --auto) ;; esac
 [ -x "$NODE_BIN" ]     || { echo "[$(date '+%F %T')] ERRO: node nao encontrado em $NODE_BIN" >> loop.log; exit 1; }
 
 # Chaves de provedores que exigem env (OpenRouter): o cron nao herda o ambiente
@@ -143,7 +147,7 @@ USAR_COPILOT=0
 
 # Descarta modelos que o opencode nao lista mais (nome morto gasta uma vaga da cascata ou quebra a
 # rodada). Suave: se a listagem falhar, mantem a lista como esta.
-AVAILABLE_MODELS=$(timeout 30 "$OPENCODE_BIN" models 2>/dev/null)
+AVAILABLE_MODELS=$(timeout 30 "$OPENCODE_BIN" models "${OC_RUN[@]:0:1}" 2>/dev/null)
 if [ -n "$AVAILABLE_MODELS" ]; then
   MODELOS_VALIDOS=()
   for M in "${MODELOS[@]}"; do
@@ -522,7 +526,7 @@ while true; do
   [ -n "$OC_CFG" ] && OC_ENV=(OPENCODE_CONFIG_CONTENT="$OC_CFG")
   setsid env "${OC_ENV[@]}" timeout --kill-after=30s "$RUN_TIMEOUT" \
     env CHROME_LOCK_YIELD_RC=75 CHROME_LOCK_FILE="$BROWSER_LOCK" "$BOT_ROOT/bot/chrome-lock.sh" loop normal 900 -- \
-    "$OPENCODE_BIN" run -m "$MODELO" --title "candidaturas-$(date '+%F-%H%M')" "$(cat "$RUNTIME_PROMPT")" \
+    "$OPENCODE_BIN" run "${OC_RUN[@]}" -m "$MODELO" --title "candidaturas-$(date '+%F-%H%M')" "$(cat "$RUNTIME_PROMPT")" \
     </dev/null 9>&- >"$ROUND_LOG" 2>&1 &
   ROUND_PID=$!
 
