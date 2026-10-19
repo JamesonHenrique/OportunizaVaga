@@ -190,6 +190,10 @@ Detalhes em [`docs/SEGURANCA.md`](docs/SEGURANCA.md).
 | [`docs/FAQ.md`](docs/FAQ.md) | permissão dos portais, quota, locks, novos sites |
 | [`docs/PROMPTS.md`](docs/PROMPTS.md) | como adaptar stack, termos e filtros ao seu perfil |
 
+## Autor
+
+Feito por **Jameson Henrique**: [portfólio](https://jamesonhenrique-portfolio.vercel.app/) · [LinkedIn](https://www.linkedin.com/in/jamesonhenrique/) · [GitHub](https://github.com/JamesonHenrique).
+
 ## Licença
 
 MIT — veja [`LICENSE`](LICENSE). Contribuições: [`CONTRIBUTING.md`](CONTRIBUTING.md).
