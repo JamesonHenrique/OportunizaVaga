@@ -5,7 +5,7 @@ Regras para agentes (OpenCode, Claude Code, Codex) neste repositório. O `monito
 ## Identidade visual
 
 - A marca é “OportunizaVaga”; assinatura: “Sua busca, em movimento.”
-- Fonte canônica: `branding/tokens.json`, `branding/tokens.css`, `branding/manifest-assets.json`, `branding/logos/`, `branding/icons/` e `docs/marca/GUIA-DE-MARCA.md`. O ZIP em `assets/` é o pacote original do kit (fonte de desenvolvimento, não servir no navegador).
+- Fonte canônica: `branding/tokens.json`, `branding/tokens.css`, `branding/manifest-assets.json`, `branding/logos/`, `branding/icons/` e `docs/marca/GUIA-DE-MARCA.md`.
 - `monitor/app/globals.css` espelha os valores de `branding/tokens.css` nos blocos de tokens; componentes leem só variáveis CSS. Mudou um token? Atualize os dois.
 - Chartreuse (`--brand-lime`) é acento de marca, nunca sucesso semântico nem texto pequeno em fundo claro. `--brand-green` é alias de sucesso semântico.
 - Status sempre com texto/ícone além da cor. Contraste WCAG AA nos dois temas.
