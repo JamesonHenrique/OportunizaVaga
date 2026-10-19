@@ -1,7 +1,10 @@
 # OportunizaVaga 🤖🇧🇷
 
 <p align="center">
-  <img src="assets/logo.svg" alt="OportunizaVaga logo" width="480">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="branding/logos/logo-horizontal-escuro.png">
+    <img src="branding/logos/logo-horizontal-claro.png" alt="OportunizaVaga logo" width="480">
+  </picture>
 </p>
 
 [![CI](https://img.shields.io/github/actions/workflow/status/JamesonHenrique/OportunizaVaga/ci.yml?branch=main&label=CI)](.github/workflows/ci.yml)
