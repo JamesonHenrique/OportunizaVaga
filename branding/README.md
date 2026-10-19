@@ -1,6 +1,6 @@
 # branding/ — masters da identidade visual
 
-Origem: kit de identidade visual v1.0.0, copiado sem redesenho (o ZIP de envio foi removido do repositório). Documentos do kit: `docs/marca/`.
+Origem: kit v1.0.0 (o ZIP foi removido do repositório), revisado na v2.0.0 a partir da prancha oficial `assets/Styleboard de Identidade OportunizaVaga.png` (símbolo e tagline). Documentos do kit: `docs/marca/`.
 
 | Arquivo | Uso |
 |---|---|

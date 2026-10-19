@@ -4,10 +4,11 @@ Regras para agentes (OpenCode, Claude Code, Codex) neste repositório. O `monito
 
 ## Identidade visual
 
-- A marca é “OportunizaVaga”; assinatura: “Sua busca, em movimento.”
+- A marca é “OportunizaVaga”; assinatura: “Sinal que vira movimento.”
 - Fonte canônica: `branding/tokens.json`, `branding/tokens.css`, `branding/manifest-assets.json`, `branding/logos/`, `branding/icons/` e `docs/marca/GUIA-DE-MARCA.md`.
 - `monitor/app/globals.css` espelha os valores de `branding/tokens.css` nos blocos de tokens; componentes leem só variáveis CSS. Mudou um token? Atualize os dois.
-- Chartreuse (`--brand-lime`) é acento de marca, nunca sucesso semântico nem texto pequeno em fundo claro. `--brand-green` é alias de sucesso semântico.
+- Chartreuse (`--brand-chartreuse`) é acento de marca (pontos de rota, item ativo, OK em painel escuro), nunca sucesso semântico nem texto em fundo claro. Sucesso semântico é `--ok`. Os aliases da v1 (`--brand-lime`, `--brand-green`, `--brand-blue`, `--brand-grad`) foram removidos na v2.
+- Estrutura do monitor (v2): sidebar navy = abas reais, hero, KPIs do payload, card "Monitor da Automação". Referência visual: `assets/Styleboard de Identidade OportunizaVaga.png`.
 - Status sempre com texto/ícone além da cor. Contraste WCAG AA nos dois temas.
 - Skill reutilizável: `.opencode/skills/identity-system/`. Agentes: `.opencode/agents/` (`brand-auditor`, `accessibility-reviewer`, `qa-reviewer` são somente leitura; `ui-implementer` edita só apresentação).
 

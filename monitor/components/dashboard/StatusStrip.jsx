@@ -1,6 +1,6 @@
 'use client';
 
-import { Sun, Moon, CloudOff, EyeOff, Activity, WifiOff } from 'lucide-react';
+import { Sun, Moon, CloudOff, EyeOff, Activity, WifiOff, FlaskConical } from 'lucide-react';
 import { desde, dataHora } from '@/lib/dashboard';
 
 function alternarTema() {
@@ -10,32 +10,26 @@ function alternarTema() {
   try { localStorage.setItem('monitor:tema', novo); } catch {}
 }
 
-// One sticky line that answers "is it alive?": a pill per loop + heartbeat.
-// Cache / public-view notices shrink to icons with a tooltip.
-export default function StatusStrip({ loops, semSinal, updatedAt, agora, avisoCache, publico, demo }) {
+// Top bar of the main area: context on the left, "is it alive?" on the right (heartbeat + theme).
+// Loop states live in the automation monitor card; cache/public notices are spelled out, not tooltip-only.
+export default function StatusStrip({ contexto, semSinal, updatedAt, agora, avisoCache, publico, demo }) {
   const hb = updatedAt ? desde(updatedAt, agora) : 'nunca';
   return (
-    <header className="strip">
-      <div className="strip-inner">
-        <div className="strip-brand">
-          <img src="/icon.svg" alt="" className="strip-mark" aria-hidden="true" />
-          <div className="strip-name">
-            <b>Oportuniza<span>Vaga</span></b>
-            <small>Monitor do robô de candidaturas</small>
-          </div>
-        </div>
-        <div className="strip-pills" role="group" aria-label="Estado dos robôs">
-          {loops.map(l => (
-            <span key={l.nome} className={`pill pill-${l.tom}${l.vivo ? ' is-live' : ''}`} title={l.detalhe || ''}>
-              <i aria-hidden="true" />{l.nome} <b>· {l.frase}</b>
+    <header className="topbar">
+      <div className="topbar-row">
+        <p className="topbar-ctx">Monitor de candidaturas{contexto && <span> · {contexto}</span>}</p>
+        <div className="topbar-side">
+          {demo && (
+            <span className="topbar-tag" title="Dados fictícios gerados pelo monitor (MONITOR_DEMO=1)">
+              <FlaskConical className="ico" aria-hidden="true" /><span>Demo · dados fictícios</span>
             </span>
-          ))}
-        </div>
-        <div className="strip-side">
-          {demo && <span className="pill pill-mute" title="Dados fictícios gerados pelo monitor (MONITOR_DEMO=1)"><i aria-hidden="true" />demo · dados fictícios</span>}
-          {avisoCache && <span className="strip-ico" title={avisoCache}><CloudOff className="ico" aria-label={avisoCache} /></span>}
-          {publico && <span className="strip-ico" title="Visão pública: terminal oculto. Abra com ?secret=SUA_CHAVE."><EyeOff className="ico" aria-label="Visão pública" /></span>}
-          <span className={`heartbeat${semSinal ? ' is-stale' : ''}`}
+          )}
+          {publico && (
+            <span className="topbar-tag" title="Terminal e textos dos eventos ficam ocultos. Abra com ?secret=SUA_CHAVE.">
+              <EyeOff className="ico" aria-hidden="true" /><span>Visão pública</span>
+            </span>
+          )}
+          <span className={`heartbeat${semSinal ? ' is-stale' : ''}`} role="status"
                 title={`Último heartbeat do PC: ${updatedAt ? dataHora(updatedAt) : 'nenhum'}`}>
             {semSinal ? <WifiOff className="ico" aria-hidden="true" /> : <Activity className="ico" aria-hidden="true" />}
             <span className="hb-label">{semSinal ? 'Sem sinal' : 'Heartbeat'}</span>
@@ -47,6 +41,9 @@ export default function StatusStrip({ loops, semSinal, updatedAt, agora, avisoCa
           </button>
         </div>
       </div>
+      {avisoCache && (
+        <p className="topbar-warn" role="status"><CloudOff className="ico" aria-hidden="true" />{avisoCache}</p>
+      )}
     </header>
   );
 }
