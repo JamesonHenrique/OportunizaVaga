@@ -10,7 +10,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (`assets/Styleboard de Identidade OportunizaVaga.png`): símbolo redesenhado (anel cobalto aberto, cápsula e ponto
   chartreuse, sem seta), tagline corrigida em todos os SVGs/PNGs/docs, tokens v2 sem os aliases da v1. O monitor da
   demo ganha sidebar navy mapeada às abas reais, hero “Oportunidades em movimento”, KPIs do payload e o card
-  “Monitor da Automação”; API, polling, cookie de sessão e modo agregado inalterados.
+  “Monitor da Automação”; API, polling, cookie de sessão e modo agregado inalterados. `assets/demo.gif` regravado da demo publicada (tour pelas seções, tema claro e escuro).
 - **Identidade visual v1.0.0** (“Sua busca, em movimento.”): masters em `branding/` (tokens JSON/CSS, logos e
   ícones vetoriais, padrão, banner social), docs em `docs/marca/`. O monitor adota a
   paleta (noturno, cobalto, chartreuse), Manrope + IBM Plex Mono e o favicon vetorial (o anterior era PNG em

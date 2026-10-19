@@ -28,7 +28,7 @@ running on your own PC at **zero cost** (free AI models + Brazilian job boards).
 ## Demo
 
 <p align="center">
-  <img src="assets/demo.gif" alt="OportunizaVaga monitor: status strip, today's applications, what needs you, and detail tabs" width="820">
+  <img src="assets/demo.gif" alt="OportunizaVaga monitor: section sidebar, indicators, what needs you, automation monitor and dark theme" width="820">
   <br><em>▶️ The monitor with <b>fictional data</b>. Want a simulated round without applying anywhere? <code>./bot/dry-run.sh</code></em>
 </p>
 
