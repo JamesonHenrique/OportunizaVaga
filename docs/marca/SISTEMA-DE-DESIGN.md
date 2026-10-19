@@ -91,7 +91,7 @@ Os temas devem transmitir a mesma identidade. O claro usa Off White e superfíci
 
 ### Dashboard / início
 
-Hero curto com status do monitor, atualização recente e frase “Sua busca, em movimento.”; métricas de candidaturas e oportunidades; primeiro plano para “Precisa de você”; lista de atividades recentes. Não criar novos números só para preencher cards.
+Hero curto com status do monitor, atualização recente e frase “Sinal que vira movimento.”; métricas de candidaturas e oportunidades; primeiro plano para “Precisa de você”; lista de atividades recentes. Não criar novos números só para preencher cards.
 
 ### Candidaturas
 
