@@ -1,6 +1,6 @@
 # branding/ — masters da identidade visual
 
-Origem: `assets/KIT-IDENTIDADE-VISUAL-OPORTUNIZAVAGA.zip` (kit v1.0.0, pasta `OportunizaVaga-identidade-visual/branding/`), copiado sem redesenho. Documentos do kit: `docs/marca/`.
+Origem: kit de identidade visual v1.0.0, copiado sem redesenho (o ZIP de envio foi removido do repositório). Documentos do kit: `docs/marca/`.
 
 | Arquivo | Uso |
 |---|---|
