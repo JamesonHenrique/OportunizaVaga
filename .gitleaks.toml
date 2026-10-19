@@ -13,6 +13,8 @@ paths = [
   '''config/pacing\.example\.env''',
   '''docs/SEGURANCA\.md''',
   '''scripts/sanitize\.sh''',
+  # captured job-board HTML: the hits are AWS SigV4 query strings of the board's own CDN URLs (19/10 audit)
+  '''tests/fixtures/boards/programathor\.html''',
 ]
 regexes = [
   '''seu-email@example\.com''',

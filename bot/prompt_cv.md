@@ -43,12 +43,13 @@ c1) CV POR VAGA (regra de esforço): só gere o PDF quando o canal REALMENTE ane
       nome) no lugar de SEU_NOME. O script imprime "kw no CV: ..." e "kw DESCARTADAS (fora do
       perfil): ..." — se algo que você pediu caiu, é porque NÃO existe no perfil: NÃO tente
       contornar nem recrie o PDF com conteúdo inventado; siga com o que passou.
-   4) Salve o texto do anúncio em /tmp/anuncio.txt e meça a cobertura ANTES de anexar:
-        python3 "$BOT_ROOT/bot/check_ats.py" /tmp/anuncio.txt \
-          "$BOT_ROOT/bot/CV_SEU_NOME_<Empresa>.pdf"
-      Meta: cobertura dos termos DO PERFIL >= 75% (exit 0 = "OK"; exit 2 = perfil ilegível,
-      NÃO conta como aprovado). Se reprovou, ajuste o spec
+   4) Salve o texto do anúncio em /tmp/anuncio.txt e passe o PDF pelo portão ATS ANTES de anexar:
+        "$BOT_ROOT/bot/cv-pronto.sh" /tmp/anuncio.txt "$BOT_ROOT/bot/CV_SEU_NOME_<Empresa>.pdf"
+      Ele roda o check_ats.py e só imprime "ANEXAR <caminho>" com exit 0 quando a cobertura dos termos
+      DO PERFIL >= 75%. Exit 1 = reprovado; exit 2 = NÃO VERIFICÁVEL (perfil ilegível, arquivo ausente, PDF
+      sem texto) — 1 e 2 NUNCA contam como aprovado. Se reprovou, ajuste o spec
       (resumo_custom com os termos FALTANTES na formulação do anúncio, palavras_chave_vaga,
       so_categorias) e gere o PDF de novo — NUNCA tente cobrir termo "fora do perfil" (o próprio
       script lista esses termos como desalinhamento da vaga).
-   5) Anexe o PDF gerado (1 página) ao envio.
+   5) Anexe SÓ o caminho que o cv-pronto.sh imprimiu em "ANEXAR" (1 página). Sem "ANEXAR" = não anexe
+      PDF por vaga: use o CV do perfil do portal, se houver, ou registre quase_la com a falta.
