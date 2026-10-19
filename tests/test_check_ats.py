@@ -76,3 +76,42 @@ if __name__ == "__main__":
         if nome.startswith("test_") and callable(fn):
             fn()
             print("ok -", nome)
+
+
+def test_arquivo_ausente_nao_e_ok():
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        rc = check_ats.main(["check_ats.py", "/nao/existe/anuncio.txt", "/nao/existe/cv.pdf"])
+    assert rc == 2 and "NAO VERIFICAVEL" in out.getvalue(), out.getvalue()
+
+
+def test_pdf_sem_texto_nao_e_ok():
+    def sem_texto(_p):
+        raise check_ats.NaoVerificavel("nao extraiu texto")
+    antigo = check_ats._texto_pdf
+    check_ats._texto_pdf = sem_texto
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            an, cv, dj = (os.path.join(d, n) for n in ("a.txt", "cv.pdf", "dados.json"))
+            open(an, "w").write(ANUNCIO); open(cv, "w").close(); open(dj, "w").write(json.dumps(PERFIL))
+            antigo_dj, check_ats.DADOS_JSON = check_ats.DADOS_JSON, dj
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                rc = check_ats.main(["check_ats.py", an, cv])
+            check_ats.DADOS_JSON = antigo_dj
+    finally:
+        check_ats._texto_pdf = antigo
+    assert rc == 2 and "NAO VERIFICAVEL" in out.getvalue()
+
+
+def test_termo_curto_nao_casa_com_hifen():
+    assert not check_ats.presente("go", "fizemos o go-live em marco")
+    assert check_ats.presente("go", "apis em go e python")
+    assert check_ats.presente("spring", "spring-boot")   # longer terms keep '-' as a border
+
+
+def test_termos_curtos_do_perfil_entram_na_conta():
+    termos = [n for n, _ in check_ats.termos_tecnicos("Requisitos: Go, R e C. Vamos go ahead.", {"r"})]
+    assert "go" in termos and "r" in termos     # Go (capitalized, known) and R (listed in the profile)
+    assert "c" not in termos                    # one letter outside the profile stays out
+    assert termos.count("go") == 1

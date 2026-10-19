@@ -8,7 +8,7 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
-TOTAL=19
+TOTAL=20
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -492,6 +492,42 @@ assert len(urls) == 4 and "workplaceType=hybrid&state=Paran%C3%A1" in urls[1] an
 assert sorted(x["id"] for x in v) == ["gupy:1", "gupy:2"], v   # same job from two searches = one listing
 PYSNIP
 run_snippet && relata 0 "hibrido so nas cidades do perfil; Gupy grava o modelo e o local reais" || relata 1 "hibrido so nas cidades do perfil; Gupy grava o modelo e o local reais"
+
+# 20 — 14/10: um 429 pausa a busca guest do LinkedIn ENTRE coletas (recuo 3h, 6h... ate o teto); coleta limpa zera;
+# linkedin_horas deixa o LinkedIn fora da janela (o --force ignora a janela, nunca a pausa).
+cat > "$SNIPPET" <<'PYSNIP'
+import urllib.error as _ue
+from datetime import datetime as _dt
+json.dump({"intervalo_min": 0, "linkedin_pausa_h": 3, "linkedin_pausa_max_h": 8, "linkedin_horas": [7, 23]},
+          open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
+hora = {"t": "2026-09-29T12:00:00-03:00"}
+d.agora = lambda: _dt.fromisoformat(hora["t"])
+chamadas, modo = [], {"li": "429"}
+def rede(url, timeout=20):
+    if "linkedin" in url:
+        chamadas.append(url)
+        if modo["li"] == "429":
+            raise _ue.HTTPError(url, 429, "Too Many Requests", {}, None)
+        return LI
+    return GU
+d.get = rede
+fila = lambda: json.load(open(d.Ctx().fila_path))
+d.coletar(d.Ctx())
+p = fila()["li_pausa"]; assert p == {"n": 1, "ate": "2026-09-29T15:00:00-03:00"}, p
+n = len(chamadas); assert n == 1, chamadas          # the 429 already stopped the rest of this collection
+hora["t"] = "2026-09-29T14:00:00-03:00"; d.coletar(d.Ctx(), force=True)
+assert len(chamadas) == n                           # paused: not one LinkedIn request, even with --force
+hora["t"] = "2026-09-29T15:30:00-03:00"; d.coletar(d.Ctx())
+p = fila()["li_pausa"]; assert p == {"n": 2, "ate": "2026-09-29T21:30:00-03:00"}, p   # 2nd 429 in a row: 6h...
+hora["t"] = "2026-09-29T21:31:00-03:00"; d.coletar(d.Ctx())
+assert fila()["li_pausa"]["n"] == 3 and fila()["li_pausa"]["ate"] == "2026-09-30T05:31:00-03:00"   # ...capped at 8h
+modo["li"] = "ok"; n = len(chamadas)
+hora["t"] = "2026-09-30T06:00:00-03:00"; d.coletar(d.Ctx())
+assert len(chamadas) == n and "li_pausa" in fila()  # 06h is outside [7, 23): skipped, the pause counter is kept
+d.coletar(d.Ctx(), force=True)
+assert len(chamadas) > n and "li_pausa" not in fila()   # --force ignores the window; a clean run clears the pause
+PYSNIP
+run_snippet && relata 0 "linkedin: 429 pausa entre coletas com recuo; janela de horario" || relata 1 "linkedin: 429 pausa entre coletas com recuo; janela de horario"
 
 [ "$FAIL" -eq 0 ] || { echo "# $FAIL falha(s) de $TOTAL"; exit 1; }
 exit 0

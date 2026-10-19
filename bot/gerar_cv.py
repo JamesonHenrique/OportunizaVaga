@@ -26,8 +26,9 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 # sibling modules from the REAL location (a private install runs this file through a symlink)
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from cv_fatos import nao_comprovados  # noqa: E402
-BASE_MD = os.path.join(AQUI, "cv_base.md")
-DADOS_JSON = os.path.join(AQUI, "dados_candidato.json")
+# Same env override as check_ats.py (loop.sh exports DADOS_CANDIDATO_FILE); standalone runs use the files next to it.
+BASE_MD = os.environ.get("CV_BASE_FILE") or os.path.join(AQUI, "cv_base.md")
+DADOS_JSON = os.environ.get("DADOS_CANDIDATO_FILE") or os.path.join(AQUI, "dados_candidato.json")
 
 COR_TITULO = colors.HexColor("#0b3d5c")
 COR_TEXTO = colors.HexColor("#1c1c1c")
