@@ -12,8 +12,8 @@ Uso:
     * fora do perfil -> nao da pra inventar (sinal de desalinhamento da vaga)
 - Exit 0 se a cobertura dos termos do perfil for >= 75%; senao exit 1 (acao).
   Exit 1 tambem quando o anuncio nao tem NENHUM termo do perfil (vaga desalinhada).
-  Exit 2 quando o perfil (dados_candidato.json) nao pode ser lido: sem perfil a
-  cobertura nao e verificavel, e isso nunca conta como "OK".
+  Exit 2 quando a cobertura nao e verificavel: perfil (dados_candidato.json) ilegivel,
+  anuncio/PDF ausente ou PDF sem texto extraivel. Isso nunca conta como "OK".
 - Termo presente = palavra inteira no CV ("java" nao e coberto por "javascript").
 - A % mede so cobertura de palavras-chave; nao e nota de qualidade do CV nem
   chance de aprovacao em ATS.
@@ -33,6 +33,13 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 DADOS_JSON = os.environ.get("DADOS_CANDIDATO_FILE") or os.path.join(AQUI, "dados_candidato.json")
 
 COBERTURA_MINIMA = 75
+# Short tech names only count when capitalized ("Go", "QA"), so "go" in prose stays out; one-letter languages
+# (R, C) only when the profile lists them — a stray "C)" in a list is not the C language.
+CURTOS_TECNICOS = {"go", "qa", "ui", "ux", "ml", "ai", "bi", "ia"}
+
+
+class NaoVerificavel(Exception):
+    """Coverage cannot be measured (missing input, unreadable PDF): exit 2, never an OK."""
 
 STOPWORDS = set("""
 a o as os um uma uns umas de do da dos das em no na nos nas por para pelo pela
@@ -124,16 +131,17 @@ def _texto_pdf(path):
             from pypdf import PdfReader
             txt = "\n".join((p.extract_text() or "") for p in PdfReader(path).pages)
         except Exception:
-            sys.exit("ERRO: sem extrator de texto (pdftotext/pypdf) — "
-                     "nao da para avaliar o CV.")
+            raise NaoVerificavel("sem extrator de texto (pdftotext/pypdf) — nao da para avaliar o CV")
     if not txt.strip():
-        sys.exit("ERRO: nao extraiu texto de %s (PDF invalido?)." % path)
+        raise NaoVerificavel("nao extraiu texto de %s (PDF invalido?)" % path)
     return txt
 
 
 def presente(termo, texto):
-    """Whole-term match: 'java' is not covered by 'javascript', 'go' not by 'google'."""
-    return re.search(r"(?<![a-z0-9+#])" + re.escape(termo) + r"(?![a-z0-9+#])", texto) is not None
+    """Whole-term match: 'java' is not covered by 'javascript', 'go' not by 'google'.
+    Terms of up to 2 letters also treat '-' as part of a word, so 'go' is not covered by 'go-live'."""
+    borda = "a-z0-9+#" + ("-" if len(termo) <= 2 else "")
+    return re.search("(?<![%s])" % borda + re.escape(termo) + "(?![%s])" % borda, texto) is not None
 
 
 def termos_tecnicos(texto, allow):
@@ -142,9 +150,9 @@ def termos_tecnicos(texto, allow):
     vistos, ordem = set(), []
     for m in re.finditer(r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9+#./_-]*", texto):
         orig = m.group(0).strip("._-")
-        if len(orig) < 3:
-            continue
         n = norm(orig)
+        if len(orig) < 3 and not (orig[:1].isupper() and (n in allow or n in CURTOS_TECNICOS)):
+            continue
         if n in STOPWORDS or n in vistos:
             continue
         tecnico = (n in allow or n in TECH_VOCAB
@@ -164,14 +172,19 @@ def main(argv):
     anuncio_path, cv_path = argv[1], argv[2]
     for p in (anuncio_path, cv_path):
         if not os.path.exists(p):
-            sys.exit("ERRO: arquivo nao encontrado: %s" % p)
+            print("NAO VERIFICAVEL: arquivo nao encontrado: %s — isto nao conta como aprovado." % p)
+            return 2
 
     allow = _allowlist_perfil()
     if allow is None:
         print("NAO VERIFICAVEL: perfil ilegivel ou ausente (%s) — sem ele a cobertura do perfil nao "
               "pode ser medida. Corrija o arquivo; isto nao conta como aprovado." % DADOS_JSON)
         return 2
-    texto_cv = norm(_texto_pdf(cv_path))
+    try:
+        texto_cv = norm(_texto_pdf(cv_path))
+    except NaoVerificavel as e:
+        print("NAO VERIFICAVEL: %s — isto nao conta como aprovado." % e)
+        return 2
     texto_an = open(anuncio_path, encoding="utf-8", errors="replace").read()
 
     termos = termos_tecnicos(texto_an, allow)
