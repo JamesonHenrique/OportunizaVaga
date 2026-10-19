@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "2.0.0",
   "brand": "OportunizaVaga",
-  "notes": "SVGs are canonical vector assets. The concept board is an art-direction reference and is not the source of truth for exact copy or geometry.",
+  "notes": "SVGs are canonical vector assets. The official styleboard (assets/Styleboard de Identidade OportunizaVaga.png) is the visual reference for symbol, copy and layout.",
   "assets": [
     {
       "path": "branding/logos/logo-horizontal-claro.svg",

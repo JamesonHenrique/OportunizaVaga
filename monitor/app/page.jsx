@@ -6,7 +6,9 @@ import StatusStrip from '@/components/dashboard/StatusStrip';
 import ActionCenter from '@/components/dashboard/ActionCenter';
 import TodayHero from '@/components/dashboard/TodayHero';
 import KpiRow from '@/components/dashboard/KpiRow';
-import DetailTabs from '@/components/dashboard/DetailTabs';
+import Sidebar from '@/components/dashboard/Sidebar';
+import AutomationMonitor from '@/components/dashboard/AutomationMonitor';
+import { Mark } from '@/components/brand/Brand';
 import ApplicationsPanel from '@/components/dashboard/ApplicationsPanel';
 import TerminalPanel from '@/components/dashboard/TerminalPanel';
 import TimelinePanel from '@/components/dashboard/TimelinePanel';
@@ -17,7 +19,7 @@ import InvitesPanel from '@/components/dashboard/InvitesPanel';
 import BlocksPanel from '@/components/dashboard/BlocksPanel';
 import LoginQueuePanel from '@/components/dashboard/LoginQueuePanel';
 import DiscoveryPanel from '@/components/dashboard/DiscoveryPanel';
-import { CalendarDays, Send, RefreshCw, MessageSquareReply, UserPlus, Filter } from 'lucide-react';
+import { Send, RefreshCw, MessageSquareReply, UserPlus, Filter } from 'lucide-react';
 import TelegramPanel from '@/components/dashboard/TelegramPanel';
 import YieldPanel from '@/components/dashboard/YieldPanel';
 import RotationHealthPanel from '@/components/dashboard/RotationHealthPanel';
@@ -45,11 +47,17 @@ export default function Dashboard() {
   const prevSnap = useRef(null);
   const secretUmaVez = useRef(null);
   const [aba, setAba] = useState('candidaturas');
+  const [naDetalhe, setNaDetalhe] = useState(false);   // sidebar highlight: overview vs the open tab
   const abrirAba = (id) => {
     setAba(id);
     try { localStorage.setItem(ABA_KEY, id); } catch {}
     requestAnimationFrame(() => document.getElementById('detalhes')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
+  const irPara = (id) => {
+    if (id === 'inicio') window.scrollTo({ top: 0, behavior: 'smooth' });
+    else abrirAba(id);
+  };
+  const irPrecisa = () => document.getElementById('precisa')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   useEffect(() => {
     // Hydrate from local cache first: never show "Conectando…" again if good data was seen.
@@ -192,6 +200,22 @@ export default function Dashboard() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [bloqueios]);
 
+  // Sidebar highlight follows the scroll: the open tab once its section reaches the upper part of the screen.
+  const temDados = Boolean(dados || ultimoBom.current);
+  useEffect(() => {
+    if (!temDados) return;
+    const medir = () => {
+      const el = document.getElementById('detalhes');
+      // a short tab may not scroll far enough: reaching the page bottom also counts as being in the details
+      const noFim = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+      setNaDetalhe(Boolean(el) && (el.getBoundingClientRect().top < window.innerHeight * 0.45 || (noFim && window.scrollY > 0)));
+    };
+    medir();
+    window.addEventListener('scroll', medir, { passive: true });
+    window.addEventListener('resize', medir);
+    return () => { window.removeEventListener('scroll', medir); window.removeEventListener('resize', medir); };
+  }, [temDados]);
+
   // Tab title becomes a semaphore: you can tell it stopped without opening the page.
   useEffect(() => {
     const dd = dados || ultimoBom.current;
@@ -203,12 +227,14 @@ export default function Dashboard() {
 
   if (!d) {
     return (
+      <div className="app">
+      <aside className="sidebar"><span className="side-brand"><Mark size={30} /></span></aside>
       <main className="shell" aria-busy="true">
-        <div className="skeleton" style={{ height: 52 }} />
+        <div className="skeleton" style={{ height: 96 }} />
+        <div className="skeleton" style={{ height: 132 }} />
         <div className="overview">
-          <div className="skeleton today-hero" style={{ height: 260 }} />
-          <div className="skeleton action-center" style={{ minHeight: 260 }} />
-          <div className="skeleton kpis" style={{ height: 200 }} />
+          <div className="skeleton" style={{ minHeight: 300 }} />
+          <div className="skeleton automation" style={{ minHeight: 300 }} />
         </div>
         <p className="loading" role="status">Conectando ao supervisor…</p>
         {erroRede && (
@@ -220,6 +246,7 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+      </div>
     );
   }
 
@@ -268,7 +295,7 @@ export default function Dashboard() {
     sub: 'PC desligado, dormindo ou sem internet. Confira o loop e o publish-status.mjs.' });
   for (const [p, loop] of pills.map(p => [p, p.nome === 'Candidaturas' ? loops.candidaturas : loops.linkedin])) {
     if (p.tom === 'bad' && !parado) acoes.push({ id: `loop-${p.nome}`, tom: 'bad', titulo: `${p.nome} ${p.frase}`,
-      sub: loop?.message, acao: { rotulo: 'Ver robô', aba: 'robo' } });
+      sub: loop?.message, acao: { rotulo: 'Ver automação', aba: 'robo' } });
   }
   if (horasSemEnviar != null && horasSemEnviar > 24) acoes.push({ id: 'seco', tom: 'warn',
     titulo: `Sem envio há ${Math.round(horasSemEnviar)}h`, sub: `${rodadasDesdeEnvio} rodadas desde o último envio`, acao: { rotulo: 'Diagnóstico', aba: 'robo' } });
@@ -300,8 +327,17 @@ export default function Dashboard() {
   if (d.telegram?.status === 'aguardando login') acoes.push({ id: 'tg', tom: 'info',
     titulo: 'Telegram aguardando login', sub: 'garimpo de vagas parado', acao: { rotulo: 'Ver', aba: 'telegram' } });
 
+  const pendentes = acoes.filter(a => a.tom !== 'info').length;
+  const criticos = acoes.filter(a => a.tom === 'bad').length;
+  const ult = d.descoberta?.ultima;
   const kpis = [
-    { rotulo: 'Últimos 7 dias', valor: d.rendimento?.aplicadas7d ?? serie.slice(-7).reduce((a, [, n]) => a + n, 0), sub: 'candidaturas', icone: CalendarDays },
+    { rotulo: 'Novas vagas', valor: ult?.novas ?? '—', ponto: 'lime', destaque: true, ir: () => abrirAba('robo'),
+      sub: ult ? `${ult.lidas ?? '—'} lidas na última coleta${d.descoberta?.ultimaColeta ? ` · ${desde(d.descoberta.ultimaColeta, agora)}` : ''}` : 'sem coleta registrada',
+      dica: 'Vagas novas que passaram nos filtros na última coleta' },
+    { rotulo: 'Candidaturas em 7 dias', valor: d.rendimento?.aplicadas7d ?? serie.slice(-7).reduce((a, [, n]) => a + n, 0), ponto: 'cobalt', destaque: true,
+      sub: `${serie[serie.length - 1][1]} hoje · ${loops.candidaturas?.rodadasHoje ?? '—'} rodadas hoje`, ir: () => abrirAba('candidaturas') },
+    { rotulo: 'Precisa de você', valor: pendentes, ponto: 'coral', destaque: true, ir: irPrecisa,
+      sub: `${pendentes ? `${criticos} crítico(s)` : 'nada pendente'}${acoes.length > pendentes ? ` · +${acoes.length - pendentes} informativo(s)` : ''}` },
     { rotulo: 'Total enviadas', valor: d.totals?.candidaturas ?? aplicadas.length, sub: `${porFonte[0]?.[0] || '—'} lidera (${porFonte[0]?.[1] ?? 0})`, icone: Send },
     { rotulo: 'Rodadas por envio', valor: d.rendimento?.rodadasPorCandidatura != null ? String(d.rendimento.rodadasPorCandidatura).replace('.', ',') : '—',
       sub: `${d.rendimento?.rodadas7d ?? '—'} rodadas em 7 dias`, dica: 'Quanto menor, mais eficiente', icone: RefreshCw },
@@ -315,28 +351,63 @@ export default function Dashboard() {
   const abas = [
     { id: 'candidaturas', rotulo: 'Candidaturas', conta: aplicadas.length },
     { id: 'bloqueios', rotulo: 'Bloqueios', conta: bloqueios.length, alerta: aguardandoLogin.length > 0 || precisaAcao.length > 0 || retentar.length > 0 },
-    { id: 'robo', rotulo: 'Robô', alerta: pills.some(p => p.tom === 'bad') },
+    { id: 'robo', rotulo: 'Automação', alerta: pills.some(p => p.tom === 'bad') },
     ...(d.linkedin ? [{ id: 'linkedin', rotulo: 'LinkedIn', conta: convites.length }] : []),
     ...(d.telegram ? [{ id: 'telegram', rotulo: 'Telegram' }] : []),
   ];
   const abaAtiva = abas.some(a => a.id === aba) ? aba : 'candidaturas';
 
+  const abaRot = abas.find(a => a.id === abaAtiva)?.rotulo;
+  const navItens = [{ id: 'inicio', rotulo: 'Início' }, ...abas];
+  const heartbeat = d.updatedAt ? desde(d.updatedAt, agora) : 'nunca';
+  const fontesRuins = d.fontesOk ? Object.entries(d.fontesOk).filter(([, ok]) => ok === false).map(([k]) => k) : null;
+
   return (
-    <>
-      <StatusStrip loops={pills} semSinal={semSinal} updatedAt={d.updatedAt} agora={agora}
-                   avisoCache={(erroRede || usandoCache) ? `${erroRede || 'Instância fria na Vercel.'} Exibindo o retrato de ${horaSeg(d.updatedAt)}; nova tentativa em ~${proximaTentativaEm}s.` : null}
-                   publico={!!d._redacted} demo={!!d._demo} />
+    <div className="app" id="topo">
+      <Sidebar itens={navItens} ativo={naDetalhe ? abaAtiva : 'inicio'} onSelect={irPara}
+               rodape={<>
+                 <span className={`side-hb${semSinal ? ' is-stale' : ''}`}><i aria-hidden="true" />{semSinal ? 'Sem sinal' : 'Robô conectado'} · {heartbeat}</span>
+                 <small>{d._demo ? 'Demo · dados fictícios' : d._redacted ? 'Visão pública' : 'Acesso completo'} · fuso {d.tz || TZ}</small>
+               </>} />
       <main className="shell">
+        <StatusStrip contexto={hojeLabel} semSinal={semSinal} updatedAt={d.updatedAt} agora={agora}
+                     avisoCache={erroRede ? `${erroRede} Exibindo o retrato de ${horaSeg(d.updatedAt)}; nova tentativa em ~${proximaTentativaEm}s.` : null}
+                     publico={!!d._redacted} demo={!!d._demo} />
+
+        <section className="hero" aria-labelledby="hero-title">
+          <div className="hero-txt">
+            <h1 id="hero-title">Oportunidades em movimento</h1>
+            <p>Vagas encontradas. Candidaturas no controle.</p>
+          </div>
+          <svg className="hero-route" viewBox="0 0 320 96" aria-hidden="true" focusable="false">
+            <path d="M6 70 C 52 70 58 30 104 34 S 150 78 196 62 S 252 14 314 20" />
+            <circle cx="104" cy="34" r="4.5" className="r-lime" />
+            <circle cx="196" cy="62" r="4" className="r-cobalt" />
+            <circle cx="314" cy="20" r="5" className="r-lime" />
+          </svg>
+        </section>
+
+        <KpiRow itens={kpis} />
+
         <div className="overview">
-          <TodayHero hojeLabel={hojeLabel} hoje={serie[serie.length - 1][1]} serie={serie}
-                     rodadasHoje={loops.candidaturas?.rodadasHoje} />
-          <ActionCenter itens={acoes} abrirAba={abrirAba} />
-          <KpiRow itens={kpis} />
+          <div className="overview-main">
+            <div id="precisa" className="anchor">
+              <ActionCenter itens={acoes} abrirAba={abrirAba} />
+            </div>
+            <TodayHero hojeLabel={hojeLabel} hoje={serie[serie.length - 1][1]} serie={serie}
+                       rodadasHoje={loops.candidaturas?.rodadasHoje} />
+          </div>
+          <AutomationMonitor loops={pills} eventos={d.events || []} semSinal={semSinal} heartbeat={heartbeat}
+                             rodadasHoje={loops.candidaturas?.rodadasHoje} proximoSite={d.rodizio?.proximo}
+                             fontesRuins={fontesRuins} onAbrir={() => abrirAba('robo')} />
         </div>
 
-        <section id="detalhes" className="detail">
-          <DetailTabs abas={abas} ativa={abaAtiva} onChange={abrirAba} />
-          <div className="tab-panel" role="tabpanel" aria-labelledby={`tab-${abaAtiva}`}>
+        <section id="detalhes" className="detail" aria-labelledby="detail-title">
+          <div className="detail-head">
+            <h2 id="detail-title">{abaRot}</h2>
+            <span className="detail-route" aria-hidden="true" />
+          </div>
+          <div className="tab-panel">
             {abaAtiva === 'candidaturas' && !d.applied && (
               <p className="notice">
                 Modo agregado: a lista de candidaturas fica oculta. Para ver os detalhes, rode o publisher com
@@ -393,6 +464,6 @@ export default function Dashboard() {
           {d.publisher?.host ? ` · fonte ${d.publisher.host}#${d.publisher.pid}` : ''}
         </footer>
       </main>
-    </>
+    </div>
   );
 }
