@@ -1,0 +1,115 @@
+/* OportunizaVaga Design Tokens v1.0.0
+   Canonical source: branding/tokens.json
+   Compatibility aliases retain existing monitor/app/globals.css selectors.
+*/
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Brand */
+  --brand-ink: #101826;
+  --brand-navy: #101826;
+  --brand-cobalt: #3E63F5;
+  --brand-blue: #3E63F5;
+  --brand-lime: #D7F36A;
+  --brand-coral: #FF725E;
+  --brand-offwhite: #F7F7F2;
+  --brand-ice: #E6EAF0;
+  --brand-green: #167A57; /* compatibility alias: semantic success, not brand lime */
+  --brand-grad: linear-gradient(110deg, #3E63F5 0%, #5875FF 100%);
+
+  /* Light surfaces */
+  --bg: #F7F7F2;
+  --bg-elev: #EEF1F5;
+  --surface: #FFFFFF;
+  --surface-2: #F7F9FC;
+  --surface-3: #E9EEF5;
+  --line: #DCE2EA;
+  --line-2: #C6D0DD;
+  --tx: #101826;
+  --tx2: #4B596D;
+  --tx3: #5D6B7F; /* darkened from #68768A: WCAG AA on bg/surface-3 */
+  --ink: #101826;
+  --ink-inv: #FFFFFF;
+  --track: #E4E9F0;
+  --scroll: #C9D2DE;
+  --scroll-hover: #A8B5C5;
+
+  /* Interaction */
+  --accent: #3E63F5;
+  --accent-tx: #2F4ED0;
+  --accent-bg: #E9EDFF;
+  --chip: #EEF1FF;
+  --ring: 0 0 0 3px rgba(62, 99, 245, .24);
+
+  /* Semantic states: never rely on color alone */
+  --ok: #167A57; --ok-bg: #E4F5EC; --ok-dot: #167A57;
+  --warn: #9A5B0B; --warn-bg: #FFF2D9;
+  --bad: #BD3C48; --bad-bg: #FCE8EA;
+  --info: #2F55C7; --info-bg: #E9EDFF;
+
+  /* Terminal stays dark in either theme */
+  --term-bg: #0B1120;
+  --term-line: #26354D;
+  --term-tx: #D7E0EF;
+  --term-dim: #98A7BB;
+  --term-hi: #F7F7F2;
+  --term-ok: #50D6A0;
+  --term-warn: #F2BB62;
+  --term-bad: #FF8B86;
+
+  /* Shape, elevation, movement */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 5px;
+  --shadow: 0 1px 2px rgba(16, 24, 38, .04), 0 8px 24px rgba(16, 24, 38, .035);
+  --shadow-pop: 0 16px 48px rgba(16, 24, 38, .18);
+  --strip-h: 60px;
+  --pulse-c: #3E63F5;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0B1120;
+  --bg-elev: #101826;
+  --surface: #151F30;
+  --surface-2: #1B283B;
+  --surface-3: #24334A;
+  --line: #29374C;
+  --line-2: #3A4B64;
+  --tx: #F7F7F2;
+  --tx2: #C0C9D7;
+  --tx3: #98A7BB;
+  --ink: #F7F7F2;
+  --ink-inv: #101826;
+  --track: #263349;
+  --scroll: #35445B;
+  --scroll-hover: #50617B;
+  --accent: #7890FF;
+  --accent-tx: #B5C2FF;
+  --accent-bg: #202C50;
+  --chip: #202C50;
+  --ring: 0 0 0 3px rgba(120, 144, 255, .32);
+  --ok: #50D6A0; --ok-bg: #102F27; --ok-dot: #50D6A0;
+  --warn: #F2BB62; --warn-bg: #35270F;
+  --bad: #FF8B86; --bad-bg: #381A22;
+  --info: #91A9FF; --info-bg: #1A284D;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .32);
+  --shadow-pop: 0 16px 48px rgba(0, 0, 0, .42);
+  --term-bg: #070C17;
+  --term-line: #202F49;
+  --term-tx: #D7E0EF;
+  --term-dim: #8D9EB8;
+  --term-hi: #F7F7F2;
+  --term-ok: #50D6A0;
+  --term-warn: #F2BB62;
+  --term-bad: #FF8B86;
+  --pulse-c: #7890FF;
+}
+
+/* New semantic aliases for components gradually migrated to semantic naming. */
+:root { --color-brand-ink: var(--brand-ink); --color-brand-primary: var(--brand-cobalt); --color-brand-highlight: var(--brand-lime); --color-brand-alert: var(--brand-coral); }

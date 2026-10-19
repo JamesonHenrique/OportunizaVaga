@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title desc"><title id="title">Símbolo OportunizaVaga</title><desc id="desc">Um sinal circular aberto em azul com uma rota e um ponto chartreuse.</desc><g fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M 46.5 13.6 A 26.8 26.8 0 1 0 52.8 39.2" stroke="#3E63F5" stroke-width="8.5"/>
+  <path d="M 41.9 16.8 L 50.9 10.4 L 53.0 21.4" stroke="#D7F36A" stroke-width="6.7"/>
+  <path d="M 18.8 44.8 L 32.9 30.7" stroke="#D7F36A" stroke-width="6.8"/>
+  <circle cx="35.4" cy="28.2" r="5.8" fill="#D7F36A" stroke="none"/>
+</g></svg>

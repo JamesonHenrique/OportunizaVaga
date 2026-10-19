@@ -1,0 +1,131 @@
+{
+  "schemaVersion": "1.0.0",
+  "brand": "OportunizaVaga",
+  "notes": "SVGs are canonical vector assets. The concept board is an art-direction reference and is not the source of truth for exact copy or geometry.",
+  "assets": [
+    {
+      "path": "branding/logos/logo-horizontal-claro.svg",
+      "type": "logo",
+      "format": "SVG",
+      "background": "light",
+      "use": "Header, documentation, product marketing on light surfaces"
+    },
+    {
+      "path": "branding/logos/logo-horizontal-escuro.svg",
+      "type": "logo",
+      "format": "SVG",
+      "background": "dark",
+      "use": "Header, README hero, product marketing on dark surfaces"
+    },
+    {
+      "path": "branding/logos/logo-empilhado.svg",
+      "type": "logo",
+      "format": "SVG",
+      "background": "light",
+      "use": "Square-ish layouts, cover page and social cards"
+    },
+    {
+      "path": "branding/logos/logo-monocromatico.svg",
+      "type": "logo",
+      "format": "SVG",
+      "background": "light",
+      "use": "Printing, constrained one-color contexts"
+    },
+    {
+      "path": "branding/logos/simbolo.svg",
+      "type": "symbol",
+      "format": "SVG",
+      "background": "transparent",
+      "use": "Small mark, avatars, navigation if contrast is adequate"
+    },
+    {
+      "path": "branding/icons/app-icon.svg",
+      "type": "application-icon",
+      "format": "SVG",
+      "background": "dark",
+      "use": "Desktop/mobile app icon; derive raster sizes from this source"
+    },
+    {
+      "path": "branding/icons/favicon.svg",
+      "type": "favicon",
+      "format": "SVG",
+      "background": "dark",
+      "use": "Website and dashboard favicon"
+    },
+    {
+      "path": "branding/patterns/trilhas.svg",
+      "type": "pattern",
+      "format": "SVG",
+      "background": "transparent",
+      "use": "Subtle editorial backdrops, banners and README imagery; never behind dense data tables"
+    },
+    {
+      "path": "branding/reference/prancha-conceitual.png",
+      "type": "moodboard",
+      "format": "PNG",
+      "background": "mixed",
+      "use": "Art-direction inspiration only; not a canonical logo master"
+    },
+    {
+      "path": "branding/tokens.json",
+      "type": "design-tokens",
+      "format": "JSON",
+      "use": "Canonical machine-readable token definitions"
+    },
+    {
+      "path": "branding/tokens.css",
+      "type": "design-tokens",
+      "format": "CSS",
+      "use": "CSS custom properties and compatibility aliases for existing dashboard styles"
+    },
+    {
+      "path": "branding/icons/app-icon-512.png",
+      "type": "application-icon-export",
+      "format": "PNG",
+      "background": "dark",
+      "use": "Raster export 512x512 for platforms that require PNG; SVG remains canonical"
+    },
+    {
+      "path": "branding/icons/app-icon-192.png",
+      "type": "application-icon-export",
+      "format": "PNG",
+      "background": "dark",
+      "use": "Raster export 192x192"
+    },
+    {
+      "path": "branding/icons/favicon-32.png",
+      "type": "favicon-export",
+      "format": "PNG",
+      "background": "dark",
+      "use": "Raster fallback for hosting systems that require PNG"
+    },
+    {
+      "path": "branding/logos/logo-horizontal-claro.png",
+      "type": "logo-export",
+      "format": "PNG",
+      "background": "transparent",
+      "use": "Raster convenience export; SVG remains canonical"
+    },
+    {
+      "path": "branding/logos/logo-horizontal-escuro.png",
+      "type": "logo-export",
+      "format": "PNG",
+      "background": "transparent",
+      "use": "Raster convenience export; SVG remains canonical"
+    },
+    {
+      "path": "branding/social/og-banner.svg",
+      "type": "social-preview",
+      "format": "SVG",
+      "background": "dark",
+      "use": "Open Graph / GitHub social preview source"
+    },
+    {
+      "path": "branding/social/og-banner.png",
+      "type": "social-preview",
+      "format": "PNG",
+      "background": "dark",
+      "use": "1200×630 raster cover for social preview and repository presentation"
+    }
+  ]
+}
