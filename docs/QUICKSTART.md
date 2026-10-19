@@ -129,6 +129,17 @@ Detalhes em `browser/README.md`. A blocklist de domínios está em
 `--blocked-origins` do seu `~/.config/opencode/opencode.jsonc` (modelo em
 `config/opencode.jsonc.example`).
 
+**OpenCode 2:** a V2 manda a 1ª requisição ao modelo antes do MCP do navegador
+conectar (a rodada começaria sem as ferramentas `browser_*`). Copie o plugin que
+segura o 1º prompt até o MCP aparecer (só em rodadas do robô; desiste em 45 s):
+
+```bash
+mkdir -p ~/.config/opencode/plugins && cp config/opencode-plugins/espera-mcp.ts ~/.config/opencode/plugins/
+```
+
+Com `OV_OPENCODE_ENXUTO=1`, `bot/opencode-enxuto.py` detecta a V2 e gera o formato
+nativo (`codemode: false` no navegador, `execute`/`question` negados).
+
 ## 5. Teste manual (1 rodada)
 
 ### Linux

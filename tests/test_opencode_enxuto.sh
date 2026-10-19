@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 PY="${PYTHON:-python3}"
 
-TOTAL=7
+TOTAL=9
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -18,6 +18,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 export ROOT OV_OPENCODE_USER_CONFIG="$ROOT/config/opencode.jsonc.example"
 unset OPENCODE_CONFIG OV_BROWSER_MCP OV_ENXUTO_NEGAR OV_OPENCODE_ENXUTO
+export OV_OPENCODE_MAJOR=1   # V1 shape unless a case asks for V2: never depend on the opencode installed here
 # 0 — opt-in in the public repo: without OV_OPENCODE_ENXUTO=1 nothing changes (empty output, exit 0).
 S0="$("$PY" bot/opencode-enxuto.py 2>/dev/null)"; R0=$?
 [ -z "$S0" ] && [ "$R0" = 0 ]
@@ -92,5 +93,39 @@ relata $? "OV_ENXUTO_NEGAR troca a lista de ferramentas negadas"
 grep -q 'OC_CFG="\$OV_OPENCODE_CONFIG_CONTENT"' bot/loop.sh && grep -q 'opencode-enxuto' bot/followup.sh \
   && grep -q 'opencode-enxuto' bot/loop.ps1 && grep -q 'opencode-enxuto' bot/followup.ps1
 relata $? "loop/followup (sh e ps1) chamam opencode-enxuto e o override explicito vence"
+
+# 8/9 — opencode 2 (issue #21): formato nativo, codemode desligado no navegador, execute/question negados,
+# servidor desligado com definicao completa + disabled, sem header copiado, escrita so em /tmp.
+OV_OPENCODE_MAJOR=2 "$PY" bot/opencode-enxuto.py > "$TMP/v2.json" 2>"$TMP/err2"
+"$PY" - "$TMP/v2.json" <<'PYEOF'
+import json, sys
+raw = open(sys.argv[1]).read()
+c = json.loads(raw)
+s = c["mcp"]["servers"]
+nav = s["playwright-chrome-real"]
+assert nav["codemode"] is False and nav["type"] == "local" and "vision" not in json.dumps(nav["command"]), nav
+for nome in ("context7", "github", "ai-memory", "playwright-firefox"):
+    assert s[nome]["disabled"] is True and ("url" in s[nome] or "command" in s[nome]), (nome, s[nome])
+assert "Authorization" not in raw and "headers" not in raw and "GITHUB_TOKEN" not in raw
+assert "permission" not in c and "mcp" in c and "enabled" not in raw
+PYEOF
+relata $? "opencode 2: servers nativos, codemode false, desligado com definicao + disabled, sem header"
+"$PY" - "$TMP/v2.json" <<'PYEOF'
+import json, sys
+p = json.load(open(sys.argv[1]))["permissions"]
+def efeito(acao, recurso):
+    import fnmatch
+    e = None
+    for r in p:   # last matching rule wins
+        if fnmatch.fnmatch(acao, r["action"]) and fnmatch.fnmatch(recurso, r["resource"]):
+            e = r["effect"]
+    return e
+assert efeito("execute", "x") == "deny" and efeito("question", "x") == "deny"
+assert efeito("edit", "/srv/repo/a.py") == "deny" and efeito("edit", "/tmp/cv_spec.json") == "allow"
+assert efeito("edit", "/tmp/x/../etc/passwd") == "deny"
+assert efeito("subagent", "*") == "deny" and efeito("glob", "*") == "deny" and efeito("webfetch", "*") == "allow"
+assert efeito("playwright-chrome-real_browser_close", "*") == "deny" and efeito("skill", "*") == "deny"
+PYEOF
+relata $? "opencode 2: ultima regra vence; execute/question negados; edit so em /tmp; task vira subagent"
 
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
