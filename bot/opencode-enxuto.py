@@ -89,13 +89,55 @@ def enxuto(user_cfg, navegador):
     return cfg
 
 
+def opencode_v2():
+    """True when the opencode the robot runs is major 2 (`opencode v2.0.31`; V1 prints a bare `1.19.3`).
+    OV_OPENCODE_MAJOR overrides the probe (tests, or forcing a shape by hand)."""
+    m = os.environ.get("OV_OPENCODE_MAJOR")
+    if m:
+        return m.strip() == "2"
+    import subprocess
+    binario = os.environ.get("OPENCODE_BIN") or os.path.join(os.path.expanduser("~"), ".opencode", "bin", "opencode")
+    try:
+        v = subprocess.run([binario, "--version"], capture_output=True, text=True, timeout=20).stdout
+    except Exception:
+        return False
+    m = re.search(r"(\d+)\.\d+\.\d+", v or "")
+    return bool(m) and m.group(1) == "2"
+
+
+def v2(cfg, user_cfg):
+    """The same lean config in opencode 2's native shape (issue #21). V2 still reads the V1 shape, but two things
+    only exist natively:
+      - `codemode: false`: by default V2 hides MCP tools behind one `execute` tool that runs JS, while the prompt
+        assumes direct browser_* tools; `execute` and `question` are also denied (nobody answers a robot);
+      - `edit` covers write/patch in V2, so denying it like V1 would also block write: writes go to /tmp only.
+    A disabled server needs its full definition plus `disabled: true` (a bare {"disabled": true} is rejected as
+    malformed and the server keeps connecting). Rules: the last one that matches wins, as in V1."""
+    mcps = user_cfg.get("mcp") or {}
+    servers = {}
+    for nome, s in cfg["mcp"].items():
+        if s.get("enabled") is False:
+            base = {k: v for k, v in (mcps.get(nome) or {}).items() if k in ("type", "url", "command")}
+            servers[nome] = (base or {"type": "remote", "url": "http://127.0.0.1:9/"}) | {"disabled": True}
+        else:
+            servers[nome] = {k: v for k, v in s.items() if k != "enabled"} | {"codemode": False}
+    regra = lambda a, r, e: {"action": a, "resource": r, "effect": e}  # noqa: E731
+    acao = {"task": "subagent", "bash": "shell"}
+    perms = [regra("*", "*", "allow")]
+    perms += [regra(acao.get(t, t), "*", e) for t, e in cfg["permission"].items() if t not in ("*", "edit")]
+    perms += [regra("edit", "*", "deny"), regra("edit", "/tmp/*", "allow"), regra("edit", "/tmp/*/../*", "deny"),
+              regra("execute", "*", "deny"), regra("question", "*", "deny")]
+    return {"mcp": {"servers": servers}, "permissions": perms}
+
+
 def main():
     if os.environ.get("OV_OPENCODE_ENXUTO", "0") != "1":   # opt-in in the public repo (denies tools)
         return 0
     try:
         with open(caminho_config(), encoding="utf-8") as fh:
             user = carregar_jsonc(fh.read())
-        print(json.dumps(enxuto(user, os.environ.get("OV_BROWSER_MCP") or "playwright-chrome-real"), ensure_ascii=False))
+        cfg = enxuto(user, os.environ.get("OV_BROWSER_MCP") or "playwright-chrome-real")
+        print(json.dumps(v2(cfg, user) if opencode_v2() else cfg, ensure_ascii=False))
     except Exception as e:   # fail-open: print nothing, the robot keeps its current config
         print(f"opencode-enxuto: {type(e).__name__}: {e}; config enxuta nao aplicada", file=sys.stderr)
     return 0
