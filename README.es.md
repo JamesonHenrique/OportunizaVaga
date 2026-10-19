@@ -28,7 +28,7 @@ ejecutándose en tu propia PC a **costo cero** (modelos de IA gratuitos + portal
 ## Demo
 
 <p align="center">
-  <img src="assets/demo.gif" alt="Monitor de OportunizaVaga: barra de estado, postulaciones del día, lo que necesita de ti y pestañas de detalle" width="820">
+  <img src="assets/demo.gif" alt="Monitor de OportunizaVaga: barra lateral de secciones, indicadores, lo que necesita de ti, monitor de la automatización y tema oscuro" width="820">
   <br><em>▶️ El monitor con <b>datos ficticios</b>. ¿Una ronda simulada sin postular a nada? <code>./bot/dry-run.sh</code></em>
 </p>
 
