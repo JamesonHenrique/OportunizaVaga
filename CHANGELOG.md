@@ -7,7 +7,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Added
 - **Identidade visual v1.0.0** (“Sua busca, em movimento.”): masters em `branding/` (tokens JSON/CSS, logos e
-  ícones vetoriais, padrão, banner social), docs em `docs/marca/` e o kit original em `assets/`. O monitor adota a
+  ícones vetoriais, padrão, banner social), docs em `docs/marca/`. O monitor adota a
   paleta (noturno, cobalto, chartreuse), Manrope + IBM Plex Mono e o favicon vetorial (o anterior era PNG em
   Base64); sucesso continua verde semântico. Contraste WCAG AA conferido nos dois temas; `--tx3` claro escurecido
   para `#5D6B7F`. README com logo claro/escuro e `assets/demo.gif` regravado. `AGENTS.md` e `.opencode/` (agentes
