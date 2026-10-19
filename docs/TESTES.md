@@ -33,7 +33,7 @@ Lint e pytest locais (mesmas versões da CI, sem instalar nada no sistema):
 
 ```bash
 uvx ruff@0.17.0 check .            # ou: pipx run ruff==0.17.0 check .
-uvx --from pytest==9.1.1 pytest -q tests/
+uvx --from pytest==9.1.1 pytest -q tests/   # inclui check_ats (exit 0/1/2, termos curtos) e fila corrompida
 ```
 
 ## 2. Windows — espelho Pester
@@ -97,6 +97,7 @@ Todas em `tests/`, saída TAP, offline e sem tocar em estado/Chrome/opencode rea
 | `test_vigia_vida.sh` | dead man's switch: loop parado (2 checagens), heartbeat velho/ausente (servidor local), `MONITOR_URL` opcional, estado ilegível |
 | `test_canario_fontes.sh` | contrato dos parsers (LinkedIn busca/vaga, Gupy) contra fixtures sintéticas + canário acusando parser quebrado |
 | `test_vaga_check.sh` | triagem pela descrição: 10 casos de referência, regras por perfil, CLI, descoberta offline |
+| `test_cv_pronto.sh` | portão ATS antes do anexo: `gerar_cv.py` com dados fictícios de `examples/`, `ANEXAR` só com exit 0, PDF ausente = exit 2, veredito no log |
 
 Os espelhos PowerShell (`chrome-lock.ps1`, `ctl.ps1`, `vigia-vida.ps1`, ajustes de `loop.ps1`/`followup.ps1` para a cascata adaptativa e a config enxuta) não têm teste automatizado:
 o CI Windows só roda o PSScriptAnalyzer; valide numa máquina Windows antes de confiar.
