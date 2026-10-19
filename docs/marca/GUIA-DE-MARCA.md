@@ -1,8 +1,8 @@
 # Guia de marca — OportunizaVaga
 
-**Versão:** 1.0.0  
+**Versão:** 2.0.0  
 **Status:** direção proposta para adoção no produto  
-**Assinatura pública:** *Sua busca, em movimento.*
+**Assinatura pública:** *Sinal que vira movimento.*
 
 ## 1. Essência
 
@@ -42,7 +42,7 @@ A marca não deve ser desenhada como um alvo completo, maleta, pessoa, check de 
 ## 3. Assinatura
 
 - Nome oficial: **OportunizaVaga** (sem espaço, respeitando a capitalização).
-- Assinatura principal: **Sua busca, em movimento.**
+- Assinatura principal: **Sinal que vira movimento.**
 - Descritor técnico quando necessário: **Busca e monitoramento de vagas**.
 - Em contextos de software livre: “Projeto open-source” ou “Código aberto”, apenas nos canais em que isso seja factual.
 

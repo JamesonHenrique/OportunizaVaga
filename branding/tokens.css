@@ -1,115 +1,142 @@
-/* OportunizaVaga Design Tokens v1.0.0
-   Canonical source: branding/tokens.json
-   Compatibility aliases retain existing monitor/app/globals.css selectors.
+/* OportunizaVaga Design Tokens v2.0.0 — "Sinal que vira movimento"
+   Canonical source: branding/tokens.json. monitor/app/globals.css carries these same blocks verbatim.
+   v2 removed the v1 aliases (--brand-ink, --brand-blue, --brand-lime, --brand-green, --brand-grad, --strip-h).
 */
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root,
 [data-theme="light"] {
   color-scheme: light;
+
   --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Brand */
-  --brand-ink: #101826;
+  /* brand core — identical in both themes */
   --brand-navy: #101826;
-  --brand-cobalt: #3E63F5;
-  --brand-blue: #3E63F5;
-  --brand-lime: #D7F36A;
-  --brand-coral: #FF725E;
-  --brand-offwhite: #F7F7F2;
-  --brand-ice: #E6EAF0;
-  --brand-green: #167A57; /* compatibility alias: semantic success, not brand lime */
-  --brand-grad: linear-gradient(110deg, #3E63F5 0%, #5875FF 100%);
+  --brand-cobalt: #3e63f5;
+  --brand-cobalt-hover: #3154e7;
+  --brand-chartreuse: #d7f36a;
+  --brand-chartreuse-ink: #27320a;
+  --brand-off-white: #f7f7f2;
+  --brand-mist: #e6eaf0;
+  --brand-coral: #ff725e;
 
-  /* Light surfaces */
-  --bg: #F7F7F2;
-  --bg-elev: #EEF1F5;
-  --surface: #FFFFFF;
-  --surface-2: #F7F9FC;
-  --surface-3: #E9EEF5;
-  --line: #DCE2EA;
-  --line-2: #C6D0DD;
+  /* surfaces */
+  --bg: #f7f7f2;
+  --bg-elev: #f1f3f6;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --surface-3: #e6eaf0;
+  --line: #d9dfe8;
+  --line-2: #c5cedb;
+
+  /* text — every level ≥ 4.5:1 on --surface and --bg */
   --tx: #101826;
-  --tx2: #4B596D;
-  --tx3: #5D6B7F; /* darkened from #68768A: WCAG AA on bg/surface-3 */
+  --tx2: #536176;
+  --tx3: #5f6c80;
   --ink: #101826;
-  --ink-inv: #FFFFFF;
-  --track: #E4E9F0;
-  --scroll: #C9D2DE;
-  --scroll-hover: #A8B5C5;
+  --ink-inv: #ffffff;
+  --track: #e6eaf0;
+  --scroll: #c5cedb;
+  --scroll-hover: #a3afc0;
 
-  /* Interaction */
-  --accent: #3E63F5;
-  --accent-tx: #2F4ED0;
-  --accent-bg: #E9EDFF;
-  --chip: #EEF1FF;
-  --ring: 0 0 0 3px rgba(62, 99, 245, .24);
+  /* interaction */
+  --accent: #3e63f5;
+  --accent-hover: #3154e7;
+  --accent-tx: #2546cc;
+  --accent-bg: #eaf0ff;
+  --chip: #eaf0ff;
 
-  /* Semantic states: never rely on color alone */
-  --ok: #167A57; --ok-bg: #E4F5EC; --ok-dot: #167A57;
-  --warn: #9A5B0B; --warn-bg: #FFF2D9;
-  --bad: #BD3C48; --bad-bg: #FCE8EA;
-  --info: #2F55C7; --info-bg: #E9EDFF;
+  /* semantic */
+  --ok: #18794e;     --ok-bg: #e8f5ec;   --ok-dot: #18794e;
+  --warn: #8a5200;   --warn-bg: #fff3d7;
+  --bad: #b42318;    --bad-bg: #fdecea;
+  --info: #2546cc;   --info-bg: #eaf0ff;
 
-  /* Terminal stays dark in either theme */
-  --term-bg: #0B1120;
-  --term-line: #26354D;
-  --term-tx: #D7E0EF;
-  --term-dim: #98A7BB;
-  --term-hi: #F7F7F2;
-  --term-ok: #50D6A0;
-  --term-warn: #F2BB62;
-  --term-bad: #FF8B86;
+  /* navy shell + dark panels (sidebar, automation monitor, terminal) */
+  --side-bg: #101826;
+  --side-line: #222f44;
+  --side-hover: #1a2538;
+  --side-tx: #f7f7f2;
+  --side-tx2: #b8c2d3;
+  --side-dim: #8e9bb0;
+  --side-accent: #8ca0ff;
+  --night-bg: #101826;
+  --night-2: #172235;
+  --night-line: #2c3a50;
+  --night-tx: #f7f7f2;
+  --night-tx2: #c0c9d7;
+  --night-dim: #8e9bb0;
+  --night-ok: #d7f36a;
+  --night-warn: #ffd080;
+  --night-bad: #ff9b91;
 
-  /* Shape, elevation, movement */
-  --radius: 12px;
-  --radius-sm: 8px;
-  --radius-xs: 5px;
-  --shadow: 0 1px 2px rgba(16, 24, 38, .04), 0 8px 24px rgba(16, 24, 38, .035);
-  --shadow-pop: 0 16px 48px rgba(16, 24, 38, .18);
-  --strip-h: 60px;
-  --pulse-c: #3E63F5;
+  /* shape & depth */
+  --radius-xs: 4px;
+  --radius-sm: 7px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow: 0 1px 2px rgba(16, 24, 38, 0.04);
+  --shadow-pop: 0 12px 32px rgba(16, 24, 38, 0.12);
+  --ring: 0 0 0 3px rgba(62, 99, 245, 0.24);
+
+  /* terminal — always dark, in both themes */
+  --term-bg: #101826;
+  --term-line: #22304a;
+  --term-tx: #d7e0ef;
+  --term-dim: #98a7bb;
+  --term-hi: #f7f7f2;
+  --term-ok: #d7f36a;
+  --term-warn: #ffd080;
+  --term-bad: #ff9b91;
+
+  --side-w: 240px;
+  --gutter: 36px;
+  --topbar-h: 60px;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0B1120;
-  --bg-elev: #101826;
-  --surface: #151F30;
-  --surface-2: #1B283B;
-  --surface-3: #24334A;
-  --line: #29374C;
-  --line-2: #3A4B64;
-  --tx: #F7F7F2;
-  --tx2: #C0C9D7;
-  --tx3: #98A7BB;
-  --ink: #F7F7F2;
-  --ink-inv: #101826;
-  --track: #263349;
-  --scroll: #35445B;
-  --scroll-hover: #50617B;
-  --accent: #7890FF;
-  --accent-tx: #B5C2FF;
-  --accent-bg: #202C50;
-  --chip: #202C50;
-  --ring: 0 0 0 3px rgba(120, 144, 255, .32);
-  --ok: #50D6A0; --ok-bg: #102F27; --ok-dot: #50D6A0;
-  --warn: #F2BB62; --warn-bg: #35270F;
-  --bad: #FF8B86; --bad-bg: #381A22;
-  --info: #91A9FF; --info-bg: #1A284D;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .32);
-  --shadow-pop: 0 16px 48px rgba(0, 0, 0, .42);
-  --term-bg: #070C17;
-  --term-line: #202F49;
-  --term-tx: #D7E0EF;
-  --term-dim: #8D9EB8;
-  --term-hi: #F7F7F2;
-  --term-ok: #50D6A0;
-  --term-warn: #F2BB62;
-  --term-bad: #FF8B86;
-  --pulse-c: #7890FF;
-}
 
-/* New semantic aliases for components gradually migrated to semantic naming. */
-:root { --color-brand-ink: var(--brand-ink); --color-brand-primary: var(--brand-cobalt); --color-brand-highlight: var(--brand-lime); --color-brand-alert: var(--brand-coral); }
+  --bg: #0d1420;
+  --bg-elev: #131e2f;
+  --surface: #131d2d;
+  --surface-2: #172235;
+  --surface-3: #1d2a3d;
+  --line: #2c3a50;
+  --line-2: #40506a;
+
+  --tx: #f7f7f2;
+  --tx2: #c0c9d7;
+  --tx3: #9ba8bb;
+  --ink: #f7f7f2;
+  --ink-inv: #101826;
+  --track: #1d2a3d;
+  --scroll: #34445c;
+  --scroll-hover: #50617b;
+
+  --accent: #6b86ff;
+  --accent-hover: #8ca0ff;
+  --accent-tx: #a9b8ff;
+  --accent-bg: #202e56;
+  --chip: #202e56;
+
+  --ok: #7cd9a3;     --ok-bg: #17372a;   --ok-dot: #7cd9a3;
+  --warn: #ffd080;   --warn-bg: #3a2c14;
+  --bad: #ff9b91;    --bad-bg: #43201f;
+  --info: #a9b8ff;   --info-bg: #202e56;
+
+  /* shell gets darker than the canvas; the automation card lighter, so neither melts into it */
+  --side-bg: #090e17;
+  --side-line: #1c2738;
+  --side-hover: #141e2e;
+  --night-bg: #172235;
+  --night-2: #101826;
+  --night-line: #34445c;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.32);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.42);
+
+  --term-bg: #0a101b;
+  --term-line: #1f2c43;
+}
