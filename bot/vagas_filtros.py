@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sys
+import time
 import unicodedata
 import urllib.parse
 from pathlib import Path
@@ -84,7 +85,16 @@ def salvar_fila(path, base, meu):
     import jsonlock   # bot/jsonlock.py (same lock estado.py uses for aplicadas.json)
     path = str(path)
     with jsonlock.travado(path):
-        save_json(path, mesclar(base, meu, load_json(path, {})))
+        atual = load_json(path, _AUSENTE)
+        if atual is _AUSENTE and os.path.exists(path):
+            # 19/10 (audit): an unreadable queue used to be merged as {} and overwritten with only this process's
+            # changes — the whole history gone, with no rotating backup. Keep the broken file for recovery.
+            lado = "%s.corrompido-%s" % (path, time.strftime("%Y%m%d-%H%M%S"))
+            os.replace(path, lado)
+            print("AVISO: %s ilegivel; guardado em %s antes de regravar" % (path, lado), file=sys.stderr)
+        if atual is _AUSENTE:
+            atual = {}
+        save_json(path, mesclar(base, meu, atual))
 
 
 # Paths shared by DIFFERENT jobs (a recruiter profile posts many): never an identity.
