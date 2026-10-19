@@ -30,7 +30,7 @@ rodando no seu próprio PC a **custo zero** (modelos de IA gratuitos + sites de 
 ## Demo
 
 <p align="center">
-  <img src="assets/demo.gif" alt="Monitor do OportunizaVaga: faixa de status, candidaturas do dia, o que precisa de você e abas de detalhe" width="820">
+  <img src="assets/demo.gif" alt="Monitor do OportunizaVaga: sidebar com as seções, indicadores, o que precisa de você, monitor da automação e tema escuro" width="820">
   <br><em>▶️ O monitor com <b>dados fictícios</b>. Quer uma rodada simulada sem se candidatar a nada? <code>./bot/dry-run.sh</code></em>
 </p>
 
