@@ -45,6 +45,8 @@ python3 -c "import websocket" 2>/dev/null && ok "websocket-client (leitores por 
   || warn "websocket-client ausente — pip install websocket-client (sem ele gupy-status/sonda-sites ficam desligados)"
 command -v pdftotext >/dev/null 2>&1 && ok "pdftotext (check_ats.py mede cobertura)" \
   || warn "pdftotext ausente (poppler-utils) — check_ats.py cai no fallback pypdf"
+command -v jq >/dev/null 2>&1 && ok "jq" \
+  || warn "jq ausente — sudo apt install jq (o setup-wizard.sh exige; sem ele, edite os JSONs à mão)"
 [ -x "$HOME/.opencode/bin/opencode" ] && ok "opencode" || { warn "opencode ausente em ~/.opencode/bin (https://opencode.ai)"; HAVE_ALL=0; }
 command -v google-chrome-stable >/dev/null 2>&1 && ok "google-chrome-stable" || { warn "Chrome ausente (necessário p/ browser/chrome-real.sh)"; HAVE_ALL=0; }
 echo

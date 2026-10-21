@@ -30,6 +30,11 @@ else
 fi
 if command -v python3 >/dev/null 2>&1; then
   ok "python3 ($(python3 --version 2>&1))"
+  if python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
+    ok "python3 >= 3.10 (bot/*.py usam match/case)."
+  else
+    falha "python3 < 3.10" "bot/*.py usam 'match/case' (Python 3.10+); o loop real nao vai rodar."
+  fi
 else
   falha "python3 ausente" "instale Python 3 (validate/dry-run precisam dele)."
 fi
@@ -56,6 +61,35 @@ if [ -n "$CHROME_BIN" ]; then
   ok "chrome ($CHROME_BIN)"
 else
   falha "Chrome ausente" "instale o Chrome (necessario p/ browser/chrome-real.sh)."
+fi
+if command -v jq >/dev/null 2>&1; then
+  ok "jq"
+else
+  aviso "jq ausente" "so o setup-wizard.sh usa; instale (apt install jq) se quiser o wizard."
+fi
+# Bibliotecas Python externas (reportlab gera PDF por vaga; websocket-client
+# alimenta gupy-status e sonda-sites). reflect: pypdf e fallback de pdftotext.
+if python3 -c 'import reportlab' 2>/dev/null; then
+  ok "python: reportlab"
+else
+  aviso "python: reportlab ausente" "pip3 install reportlab (geracao de CV por vaga fica de fora)."
+fi
+if python3 -c 'import websocket' 2>/dev/null; then
+  ok "python: websocket-client"
+else
+  aviso "python: websocket-client ausente" "pip3 install websocket-client (gupy-status/sonda-sites ficam de fora)."
+fi
+# OpenCode 2 dispara a 1a requisicao antes do MCP conectar; este plugin segura
+# o run ate o MCP emergir. Sem ele, a 1a rodada falha com 'tool not found'.
+if [ -f "$HOME/.config/opencode/plugins/espera-mcp.ts" ]; then
+  ok "plugin espera-mcp (\$HOME/.config/opencode/plugins/)."
+else
+  aviso "plugin espera-mcp ausente" "copie config/opencode-plugins/espera-mcp.ts p/ \$HOME/.config/opencode/plugins/ (veja docs/QUICKSTART.md)."
+fi
+if [ -f "$HOME/.config/opencode/opencode.jsonc" ]; then
+  ok "\$HOME/.config/opencode/opencode.jsonc existe (config de modelos/MCPs)."
+else
+  aviso "opencode.jsonc ausente" "copie config/opencode.jsonc.example p/ \$HOME/.config/opencode/opencode.jsonc (veja docs/QUICKSTART.md)."
 fi
 echo
 

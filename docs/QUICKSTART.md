@@ -1,252 +1,362 @@
-# QUICKSTART — do zero à primeira rodada em ~20 min
+# QUICKSTART — do zero à primeira rodada
 
-> Você precisa de: Google Chrome, Node 20+, Python 3, [opencode](https://opencode.ai)
-> com algum provider gratuito configurado, e uma conta Google (p/ Gupy/LinkedIn).
-> **Linux** (testado) ou **Windows 10/11** — veja as abas abaixo.
+Este guia leva você de máquina recem-formatada até o robô rodando a primeira
+candidatura. Antes de tudo, identifique **o seu perfil** — o caminho muda pouco,
+mas a ordem e o nível de explicação mudam bastante:
 
-## Linux | Windows
+| Você é... | Tem terminal? | O que pular | Sua seção |
+|---|---|---|---|
+| **Leigo** (nunca abriu um terminal de propósito) | Não | Nada — este guia explica cada comando | **Seções 1, 2... 8, na ordem** |
+| **Usuário básico** (roda `cd`, `sudo apt`, copia/cola sem medo) | Sim | As explicações "o que é isso"; atenção só nos avisos | **Seção "Caminho rápido" + seção 5 (config do opencode)** |
+| **Dev** (vive no terminal) | Sim | Quase tudo | **Caminho rápido + minutos 5 e 6 (MCP e plugin da V2)** |
 
-- **Linux (recomendado, caminho principal):** siga o guia como está (bash + cron).
-- **Windows — opção A, WSL2 (recomendado):** instale o WSL2 + Ubuntu e siga o guia
-  Linux dentro do WSL. O Chrome pode ficar no Windows (CDP em `:9222`) ou no WSL.
-- **Windows — opção B, PowerShell nativo (alternativo):** use os espelhos `.ps1`
-  (mesma lógica dos `.sh`) + Task Scheduler (`config/TaskScheduler.md`).
-  Limitações conhecidas: carimbos em hora local com offset -03:00 documentado (o Node no
-  Windows ignora TZ IANA). O watchdog de stall/early-abort é espelhado, mas a leitura do log
-  interno do opencode é fail-open (sem log, só vale o critério de stall). Detalhes no cabeçalho
-  de `bot/loop.ps1`.
+> ⚠️ **Antes de começar, leia:** automatizar candidaturas pode violar os Termos
+> de Uso dos portais (LinkedIn, Gupy, Indeed...) e você assume o risco de
+> bloqueio/suspensão das suas contas. Veja [`USO-ETICO.md`](USO-ETICO.md).
+> O robô nunca inventa dados, nunca envia nada além das candidaturas que você
+> configurou e guarda tudo no seu PC — sem nuvem além do monitor opcional.
 
-## 1. Clone e setup
+**Pré-requisitos de verdade** (o que o código exige, não o que "seria bom ter"):
 
-### Linux
+| Ferramenta | Versão mínima | Por quê | Como instalar (Linux/WSL) |
+|---|---|---|---|
+| Bash + utilitários core | bash 4+ | loop, guardião, adaptadores (`flock`, `timeout`) | já vem no Linux/WSL |
+| Python | **3.10+** | `bot/*.py` usam `match/case` (sintaxe 3.10+): CV por vaga, validação, estado | Ubuntu 22.04+ já traz; `apt install python3` |
+| Node.js | 20+ | o loop usa o publisher do monitor (`publish-once.mjs`) em cada rodada — **é obrigatório pro robô**, não só pro painel | Veja seção 1 |
+| Google Chrome / Chromium | atual | navegador real controlado via CDP `:9222` | Veja seção 1 |
+| [opencode](https://opencode.ai) | 2.x | o cérebro das rodadas (roda os modelos grátis) | Veja seção 1 |
+| jq | qualquer | só o `setup-wizard.sh` usa (venientemente ignorável se você editar JSON à mão) | `sudo apt install jq` |
+| poppler-utils (`pdftotext`) | qualquer | opcional: medir a cobertura ATS do CV | `sudo apt install poppler-utils` |
+<!-- Caminhos Windows: Chrome = instalador normal; veja espelhos .ps1 (seção 4 e 6). -->
+
+## Caso 1 — Leigo: o guia com tudo explicado 🐣
+
+> Siga **na ordem**. Cada passo termina com uma verificação — cole o comando e
+> compare com a saída esperada. Se travou, vá para **Primeiros socorros** no fim.
+
+### Seção 1 — instale as ferramentas
+
+Abra o terminal (Linux: busque "Terminal"; WSL2 no Windows: menu Iniciar → Ubuntu).
+
+Cole bloco por bloco, esperando terminar antes do próximo:
 
 ```bash
-git clone <sua-fork> oportunizavaga && cd oportunizavaga
-./scripts/setup.sh
+# Chrome (navegador real que o robô controla)
+wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo apt install -y ./google-chrome-stable_current_amd64.deb
+
+# Python 3.10+ (checagens e geradores do robô) + poppler (opcional, ATS)
+sudo apt update && sudo apt install -y python3 python3-pip poppler-utils jq
+python3 -m pip install --user reportlab websocket-client
+
+# Node 20+ (o robô publica o status da rodada — obrigatório, não é só p/ painel)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# opencode (o cérebro que roda os modelos grátis)
+curl -fsSL https://opencode.ai/install | bash
 ```
 
-O setup copia os exemplos, valida dependências e imprime o crontab sugerido.
+**Verificação** (cole; o que deve aparecer está ao lado):
 
-### Windows (PowerShell nativo)
-
-```powershell
-git clone <sua-fork> oportunizavaga; cd oportunizavaga
-powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+```bash
+google-chrome-stable --version   # qualquer número >= 115 ok
+python3 --version                # Python 3.10.x ou maior
+node --version                   # v20 ou maior
+ls ~/.opencode/bin/opencode      # caminho do binário do opencode
 ```
 
-O setup copia os exemplos, valida dependências e imprime os comandos `schtasks`
-(equivalentes ao crontab). Guia completo em `config/TaskScheduler.md`.
+> Se `python3 --version` mostrou 3.9 ou menos (Ubuntu 20.04), atualize o sistema
+> ou use outra máquina — os scripts usam sintaxe que **exige** 3.10+.
+> Se `node` não for achado, feche e reabra o terminal (o PATH só é relido assim).
 
-## 2. Preencha SEUS dados (nunca commite!)
+### Seção 2 — pergunte ao robô o que está faltando
+
+```bash
+git clone https://github.com/JamesonHenrique/OportunizaVaga ~/oportunizavaga
+cd ~/oportunizavaga
+./scripts/setup.sh     # copia exemplos, valida dependências, imprime o cron sugerido
+./bot/doctor.sh        # checklist de ambiente com dicas por item
+```
+
+No `doctor.sh`, você quer o final `doctor: essencial OK`. Imprimiu `[FALHA]`?
+Cada linha já traz a correção. Se você vê `command not found` em qualquer
+comando acima, veja **Primeiros socorros** (fim desta página).
+
+### Seção 3 — seus dados (30 min, a parte mais importante)
+
+O robô não sabe nada sobre você ainda: preencha por **perguntas** (recomendado)
+ou editando o arquivo:
+
+```bash
+sudo apt install -y jq      # o wizard usa jq
+./scripts/setup-wizard.sh   # pergunta nome, e-mail, stack, pretensão, portais...
+```
+
+Ou, na mão:
 
 ```bash
 cp examples/dados_candidato.example.json bot/dados_candidato.json
 cp examples/cv_base.example.md bot/cv_base.md
 cp examples/aplicadas.example.json bot/aplicadas.json
+# edite os 3 arquivos (gedit bot/dados_candidato.json)
 ```
 
-Edite `bot/dados_candidato.json`: nome, e-mail, stack real (`experiencia.tecnologias`),
-similares (`experiencia.stacks_similares`), pretensão (`SEU_VALOR_BASE`),
-respostas padrão de formulário. **Campo vazio = o robô registra "bloqueado" em vez
-de inventar.** Edite `bot/cv_base.md` com seu currículo mestre (é dele que sai o PDF
-por vaga da regra `c1`; ver `docs/PROMPTS.md`). Veja `docs/PROMPTS.md` para adaptar
-`bot/prompt_loop.md` ao seu stack.
+Regras de ouro:
 
-## Múltiplos perfis
+- **Campo vazio no JSON = o robô registra "bloqueado" em vez de inventar.** É
+  de propósito: prefira deixar em branco a mentir.
+- **Nunca** commite nada disso: `bot/dados_candidato.json`, `bot/cv_base.md`,
+  `bot/aplicadas.json` estão no `.gitignore` — não desative.
+- Em `experiencia.tecnologias` vá de dado real (ex.: `Python, SQL, Excel`),
+  candidatos a `experiencia.stacks_similares` são o que você domina por
+  vizinhança (ex.: você conhece Laravel, entra Django), não chutes.
 
-Exemplos em `config/perfis/` para níveis e áreas diferentes:
+### Seção 4 — chave de modelos grátis (5 min)
 
-| Arquivo | Níveis | Área |
+O robô começa num modelo gratuito sem chave (Zen). Para ganhar uma segunda
+opção diária de rate limit, crie uma conta em [openrouter.ai](https://openrouter.ai)
+e guarde a chave **fora do repo**:
+
+```bash
+mkdir -p ~/.config/opencode && touch ~/.config/opencode/cron.env
+chmod 600 ~/.config/opencode/cron.env
+echo 'OPENROUTER_API_KEY=sua-chave-aqui' >> ~/.config/opencode/cron.env
+```
+
+Sem isso o robô funciona igual: ele só perde a 2ª opção da cascata.
+
+### Seção 5 — ensine o opencode a falar com o navegador (o passo que mais trava!)
+
+O robô usa **duas camadas**: o opencode (modelos) controla um Chrome de verdade
+pelo protocolo CDP. Essas duas camadas precisam de um arquivo de configuração
+copiado para `~/.config/opencode/opencode.jsonc`. Copia e termina:
+
+```bash
+mkdir -p ~/.config/opencode
+cp config/opencode.jsonc.example ~/.config/opencode/opencode.jsonc
+```
+
+E o plugin da versão 2 do opencode (explicação na seção [Caso 3](#caso-3--dev--cada-detahle))
+— **este é o passo mais esquecido de todos e o erro nº 1 de primeira rodada**:
+
+```bash
+mkdir -p ~/.config/opencode/plugins
+cp config/opencode-plugins/espera-mcp.ts ~/.config/opencode/plugins/
+```
+
+Alternativa sem config manual (não recomendado p/ iniciante): `OV_OPENCODE_ENXUTO=1`
+faz o próprio robô gerar um config nativo da V2 em cada rodada.
+
+### Seção 6 — o navegador (login 1x, vale para todos os sites)
+
+```bash
+./browser/chrome-real.sh &    # & = roda em segundo plano
+```
+
+- Abre um Chrome dedicado, com nota do filtro: um perfil **só do robô**
+  (`~/.config/oportunizavaga-chrome-real`), fora do seu Chrome pessoal.
+- **Logue 1x** em cada portal que quer usar (LinkedIn, Gupy...): abra abas
+  normais e finalise o login à mão. O perfil guarda as sessões — depois o robô
+  reusa tudo sem digitar senha.
+- Alterou algo? A blocklist de agregadores gringos fica em `config/sites_permitidos.json`.
+
+> **Aviso ético:** o robô respeita limite e cadência de pedidos, mas automação
+> ainda pode resultar em bloqueio de conta pelo portal. Leia
+> [`USO-ETICO.md`](USO-ETICO.md). Assuma o risco dos termos de uso.
+
+### Seção 7 — ensaio geral: doctor + dry-run (nada é enviado)
+
+```bash
+./bot/doctor.sh        # precisa terminar em "essencial OK"
+./bot/dry-run.sh       # imprime o plano da rodada; lê arquivos, não se candidata, não abre browser
+```
+
+Leia a saída do dry-run: são os sites e URLs exatos que a rodada real vai
+visitar. Corrigiu algo? Rode de novo. Satisfeito? Siga.
+
+### Checklist antes da 1ª rodada real ✅
+
+Marque todos:
+
+- [ ] `doctor.sh` termina em `essencial OK` (exit 0)
+- [ ] `dry-run.sh` mostra sites/URLs que fazem sentido p/ seu perfil
+- [ ] Chrome do robô aberto com CDP `:9222` e login feito nos portais
+- [ ] `~/.config/opencode/opencode.jsonc` existe (cópia do example)
+- [ ] Plugin `espera-mcp.ts` em `~/.config/opencode/plugins/` (opencode 2.x)
+- [ ] `bot/dados_candidato.json` e `bot/cv_base.md` preenchidos
+- [ ] Perfil `bot/perfil.json` no nível/área certa (ou o default histórico)
+
+### Seção 8 — a primeira rodada real (e como parar dela)
+
+```bash
+./bot/loop.sh
+```
+
+O que acontece: uma rodada abre uma sessão nova do opencode no perfil ativo,
+visita **1 site por rodada** (rodízio circular, 20 min entre rodadas), aplica
+nas vagas compatíveis e preenche `bot/aplicadas.json` + `bot/loop.log`.
+
+Para **parar**: `Ctrl+C` no terminal encerra o loop; nenhuma candidatura fica
+pela metade (o robô marca "desconhecida" só se o navegador caiu no meio do envio —
+veja o follow-up semanal). Depois da 1ª rodada "ok", você já pode automatizar.
+
+### Seção 9 — deixe o robô rodando sozinho
+
+```bash
+crontab -e          # abra o editor; cole o conteúdo de config/crontab.example
+                    # ajustando BOT_DIR para /home/VOCE/oportunizavaga
+```
+
+O cron sobe o guardião a cada 5 min (`bot/guardiao.sh`): se o loop ou o Chrome
+caírem, ele sobe de novo. O follow-up semanal atualiza status às segundas 09:00.
+
+*(Windows? Use os `schtasks` prontos de `config/TaskScheduler.md` — seção
+Windows do Caso 2 abaixo.)*
+
+### Caso 1: checklist de tudo que instalou
+
+Chrome + Python 3.10+ + Node 20+ (via nodesource) + opencode + jq +
+`reportlab`/`websocket-client` (pip) + poppler + o clone do repo + config +
+plugin. Só isso. Tempo típico se nada der errado: **~20–35 min**.
+
+## Caso 2 — Usuário básico: o caminho rápido 🚶
+
+```bash
+# 0. Ferramentas (WSL2/Ubuntu 22.04+)
+wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo apt install -y ./google-chrome-stable_current_amd64.deb python3 python3-pip poppler-utils jq
+python3 -m pip install --user reportlab websocket-client
+node --version || { curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -; sudo apt install -y nodejs; }
+curl -fsSL https://opencode.ai/install | bash
+ls ~/.opencode/bin/opencode   # tem que existir
+
+# 1. Clonar + setup (não precisa fork: você está só rodando, não contribuindo)
+git clone https://github.com/JamesonHenrique/OportunizaVaga ~/oportunizavaga
+cd ~/oportunizavaga && ./scripts/setup.sh
+
+# 2. Seus dados (wizard interativo; ou copie os .example e edite)
+./scripts/setup-wizard.sh
+
+# 3. Chave grátis opcional (OpenRouter) — fora do repo, chmod 600
+mkdir -p ~/.config/opencode && touch ~/.config/opencode/cron.env && chmod 600 ~/.config/opencode/cron.env
+echo 'OPENROUTER_API_KEY=sua-chave' >> ~/.config/opencode/cron.env
+
+# 4. Config + plugin do opencode (o passo mais esquecido!)
+cp config/opencode.jsonc.example ~/.config/opencode/opencode.jsonc
+mkdir -p ~/.config/opencode/plugins
+cp config/opencode-plugins/espera-mcp.ts ~/.config/opencode/plugins/
+
+# 5. Navegador + login manual nos portais
+./browser/chrome-real.sh &
+
+# 6. Ensaio geral, depois rodada real
+./bot/doctor.sh          # essencial OK?
+./bot/dry-run.sh         # plano sem risco
+./bot/loop.sh            # Ctrl+C após a primeira rodada "ok"
+
+# 7. Automatizar
+crontab -e               # cole config/crontab.example, ajustando BOT_DIR
+```
+
+**Windows — saiba qual caminho:**
+
+- **WSL2 (recomendado):** siga o bloco acima dentro do Ubuntu. Chrome pode ficar
+  no Windows (CDP `:9222` funciona igual); use `chromium` do WSL só se preferir.
+- **PowerShell nativo (alternativo):** espelhos `.ps1` com a mesma lógica —
+  `scripts\setup.ps1`, `scripts\setup-wizard.ps1`, `browser\chrome-real.ps1`,
+  `bot\doctor.ps1`, `bot\loop.ps1`. Setup pip: `python -m pip install reportlab websocket-client`. Limitações: TZ IANA ignorada pelo Node no Windows (carimbos
+  em hora local), leitura de log interno do opencode fail-open. Detalhes no
+  cabeçalho de `bot/loop.ps1`; agendamento em `config/TaskScheduler.md`.
+
+## Caso 3 — Dev: cada detalhe 🔧
+
+```bash
+# 1 linha (Linux/macOS/WSL2): clone em $HOME/oportunizavaga + setup.sh
+curl -fsSL https://raw.githubusercontent.com/JamesonHenrique/OportunizaVaga/main/install.sh | bash
+
+# ou com destino próprio / modo manual
+curl -fsSL https://raw.githubusercontent.com/JamesonHenrique/OportunizaVaga/main/install.sh -o install.sh && bash install.sh ~/meu-bot
+# equivalente Windows (PowerShell):
+irm https://raw.githubusercontent.com/JamesonHenrique/OportunizaVaga/main/install.ps1 | iex
+```
+
+O que o instalador faz (e não faz): clona o repo, roda `scripts/setup.sh`
+(copia JSONs de exemplo para os arquivos de estado em `bot/`, valida
+dependências, `bash -n` nos scripts críticos). **Nunca** sobrescreve JSON
+existente (sai `[pq] mantido`), nunca faz commit, nunca agenda nada por conta
+própria — cron/Task Scheduler ficam por sua conta após o dry-run.
+
+Detalhes valentes se você mexe:
+
+- **Config opencode:** `config/opencode.jsonc.example` → `~/.config/opencode/opencode.jsonc`
+  define model padrão (Zen), `small_model` e os MCPs. O **MCP `playwright-chrome-real`**
+  conecta ao Chrome do robô: `npx -y @playwright/mcp --cdp-endpoint http://127.0.0.1:9222`
+  + `--blocked-origins` espelhado na blocklist de `config/sites_permitidos.json`.
+- **OpenCode 2 dispara a 1ª requisição ao modelo antes do MCP conectar** → a
+  rodada começaria sem `browser_*` e falharia com `tool not found`. O plugin
+  `config/opencode-plugins/espera-mcp.ts` copiado para `~/.config/opencode/plugins/`
+  segura o 1º prompt até o MCP emergir (45 s de desistência). Copie e pronto.
+- **Escada de modelos é do robô, não do opencode:** dentro de `bot/loop.sh`,
+  com o modelo corrente disponível, o loop faz **cascata automática** —
+  Zen → USAR_OPENROUTER=1 → NVIDIA → Groq → Cerebras → HF — ao bater rate
+  limit, e **volta ao preferido sozinho** quando a cota zera. Você **não**
+  precisa trocar à mão com `omodel`. A comparação dos modelos vive em
+  `docs/MODELOS.md` (`eval-modelos` testa as opções). `USAR_OPENROUTER=1`
+  é o switch principal (com `OPENROUTER_API_KEY=` em ~/.config/opencode/cron.env).
+- **Perfil personalizado:** `bot/perfil.json` ← copie de `config/perfis/*.json`
+  (junior-backend, pleno-dados, senior-techlead, estagio-qa, pleno-marketing,
+  pleno-saude, pleno-administrativo, estagio-direito...). O loop injeta
+  `{{NIVEIS}}`, `{{AREA}}`, `{{TERMOS}}`... no prompt e cria estado isolado em
+  `bot/state/<perfil>/`. Confirme com `python3 bot/perfil_render.py info bot/perfil.json`.
+- **Dry-run com perfil específico:** `BOT_PERFIL=config/perfis/junior-backend.example.json ./bot/dry-run.sh --json`
+  · `--site indeed` isola 1 adaptador · `--reconhecimento` pontua mas não candidata.
+- **TZ/fuso:** o loop fixa `TZ=America/Fortaleza` por legado — sobrescreva por
+  rodada com `OV_TZ=America/Sao_Paulo ./bot/loop.sh` (ou fixe no `cron.env`).
+- **Validação de schema:** `bash scripts/validate.sh`; **estado:** `python3 bot/estado.py resumo`;
+  **funil:** `./scripts/funnel.sh --csv`.
+- **Contribuição:** `CONTRIBUTING.md`, [`ADAPTERS.md`](ADAPTERS.md) e os
+  testes (`tests/test_*.sh`, Pester nos espelhos `.ps1`). O CI roda `shellcheck`,
+  `bash -n`, Pester e testes Python de tudo que está no `git ls-files`.
+
+## Seção 10 — Monitor (opcional, todo perfil)
+
+Painel Next.js que publica o status das rodadas em tempo real (Vercel free,
+sem banco, telemetria agregada por padrão):
+
+```bash
+cd monitor && npm install && npm run dev   # http://localhost:3000
+# ou: npm run demo (dados fictícios) / deploy na Vercel (monitor/README.md)
+export MONITOR_URL=https://sua-url.vercel.app   # aponte o bot pra ele
+```
+
+Sem `MONITOR_URL`, o robô funciona normalmente — só não publica status.
+O `monitor/` é a **única** peça que exige Node moderno além do básico (a
+instalação padrão do monitor já pede Node 20+ para o Next).
+
+## Seção 11 — Funil
+
+Depois de algumas rodadas, meça o retorno: `./scripts/funnel.sh` (com
+`--csv`/`--markdown`/`--json`). Vista → aplicada → respondida → convite →
+entrevista, com taxas contra a etapa anterior. Detalhes: [`README.md`](../README.md).
+
+## Primeiros socorros 🩹
+
+Erros mais comuns de primeira instalação, em ordem de frequência:
+
+| Erro que você vê | Causa | Correção |
 |---|---|---|
-| `junior-backend.example.json` | trainee, júnior | tecnologia (backend) |
-| `pleno-frontend.example.json` | pleno | tecnologia (frontend) |
-| `pleno-dados.example.json` | pleno, sênior | tecnologia (dados e BI) |
-| `senior-techlead.example.json` | sênior, especialista, líder | tecnologia (liderança técnica) |
-| `estagio-qa.example.json` | estágio, trainee | tecnologia (QA) |
-| `pleno-marketing.example.json` | pleno, sênior | marketing digital |
-| `pleno-vendas.example.json` | pleno, especialista | vendas e comercial |
-| `pleno-saude.example.json` | pleno, especialista | saúde (enfermagem, nutrição, fisioterapia) |
-| `pleno-administrativo.example.json` | pleno | administrativo e financeiro |
-| `estagio-direito.example.json` | estágio | jurídico |
+| `command not found: node` / `: python3` / `: git` | ferramenta não instalada **ou** terminal reaberto sem recarregar o PATH | instale (tabela de pré-requisitos) e feche/reabra o terminal |
+| `opencode nao encontrado em $HOME/.opencode/bin/opencode` | instalador do opencode não rodou ou `~/.opencode/bin` não está no PATH | rode o instalador de novo; no cron, o loop cuida do PATH sozinho |
+| `ERRO: node nao encontrado (fnm ausente e 'node' nao esta no PATH)` | Node veio do fnm mas o alias `default` não existe | recrie o alias do fnm ou instale via nodesource/apt (seção 1) |
+| `tool not found: browser_*` na 1ª rodada (opencode 2.x) | plugin `espera-mcp.ts` ausente em `~/.config/opencode/plugins/` | `mkdir -p ~/.config/opencode/plugins && cp config/opencode-plugins/espera-mcp.ts ~/.config/opencode/plugins/` |
+| Chrome abre e CDP falha / doctor avisa "CDP 9222 inacessível" | seu Chrome particular está aberto com o mesmo perfil, sem CDP | feche o Chrome particular e rode `./browser/chrome-real.sh &` de novo; o guardião sobe sozinho se cair |
+| `wizard` trava/"jq não encontrado" | jq ausente | `sudo apt install jq` |
+| `Failed to parse JSON` / candidaturas todas "bloqueado" | `bot/dados_candidato.json` ou `bot/perfil.json` inválido | `bash scripts/validate.sh` aponta o arquivo e a linha; campo vazio é normal (vira "bloqueado", não erro) |
+| Logs e datas com fuso errado | TZ fixa em America/Fortaleza por padrão | `OV_TZ=America/Sao_Paulo ./bot/loop.sh` (ou fixe no `cron.env` / no cron) |
 
-Estrutura: `nome_perfil`, `niveis[]`, `area`, `termos[]`, `pular_tipos[]` e, opcionais,
-`modelos[]` (`remoto`, `hibrido`, `presencial`; padrão só remoto), `cidades[]` (onde híbrido/presencial
-vale), `experiencia_max_anos` e `sites_pular` (schema em `config/perfil.schema.json`).
-O `./scripts/setup-wizard.sh` já gera esse arquivo por perguntas.
-
-```bash
-cp config/perfis/senior-techlead.example.json bot/perfil.json  # ou qualquer outro
-# edite niveis/area/termos/pular_tipos: o loop injeta tudo no prompt ({{NIVEIS}}, {{AREA}}, {{TERMOS}}...)
-python3 bot/perfil_render.py info bot/perfil.json  # confere o que o robô vai aceitar/recusar
-```
-
-Aponte o perfil no loop via `$BOT_PERFIL` (caminho do JSON do perfil ativo) ou
-deixe `bot/perfil.json` no lugar. O loop resolve o perfil sozinho e cria um
-estado isolado em `bot/state/<perfil>/aplicadas.json` — cada perfil mantém o
-próprio rodízio, bloqueados e candidaturas, sem misturar histórico.
-
-Para validar o plano sem se candidatar:
-
-```bash
-BOT_PERFIL=config/perfis/junior-backend.example.json ./bot/dry-run.sh --json
-./bot/dry-run.sh --json --site indeed       # plano só do Indeed
-OV_RECONHECIMENTO=1 ./bot/dry-run.sh --json # modo reconhecimento (não aplica)
-```
-
-## 3. Chaves de API (fora do repo)
-
-### Linux
-
-```bash
-touch ~/.config/opencode/cron.env && chmod 600 ~/.config/opencode/cron.env
-# Ex.: OPENROUTER_API_KEY=... (só se USAR_OPENROUTER=1 em bot/loop.sh)
-```
-
-### Windows (PowerShell nativo)
-
-```powershell
-$null = New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\opencode"
-notepad "$env:USERPROFILE\.config\opencode\cron.env"  # OPENROUTER_API_KEY=... (só se USAR_OPENROUTER=1)
-```
-
-## 4. Browser
-
-### Linux
-
-```bash
-./browser/chrome-real.sh &   # CDP em :9222; faça login 1x nos sites (vale p/ tudo)
-```
-
-### Windows (PowerShell nativo)
-
-```powershell
-powershell -ExecutionPolicy Bypass -File browser\chrome-real.ps1
-# CDP em :9222; faça login 1x nos sites (vale p/ tudo). Perfil em %LOCALAPPDATA%\oportunizavaga-chrome-real
-```
-
-Detalhes em `browser/README.md`. A blocklist de domínios está em
-`config/sites_permitidos.json` (`bloqueados_no_browser`) e deve espelhar o
-`--blocked-origins` do seu `~/.config/opencode/opencode.jsonc` (modelo em
-`config/opencode.jsonc.example`).
-
-**OpenCode 2:** a V2 manda a 1ª requisição ao modelo antes do MCP do navegador
-conectar (a rodada começaria sem as ferramentas `browser_*`). Copie o plugin que
-segura o 1º prompt até o MCP aparecer (só em rodadas do robô; desiste em 45 s):
-
-```bash
-mkdir -p ~/.config/opencode/plugins && cp config/opencode-plugins/espera-mcp.ts ~/.config/opencode/plugins/
-```
-
-Com `OV_OPENCODE_ENXUTO=1`, `bot/opencode-enxuto.py` detecta a V2 e gera o formato
-nativo (`codemode: false` no navegador, `execute`/`question` negados).
-
-## 5. Teste manual (1 rodada)
-
-### Linux
-
-```bash
-./bot/loop.sh   # Ctrl+C após a primeira rodada "ok" — confira bot/loop.log e aplicadas.json
-```
-
-### Windows (PowerShell nativo)
-
-```powershell
-powershell -ExecutionPolicy Bypass -File bot\loop.ps1  # Ctrl+C após a primeira rodada "ok"
-```
-
-## 6. Automação (cron | Task Scheduler)
-
-### Linux (cron)
-
-```bash
-crontab -e   # cole o conteúdo de config/crontab.example, ajustando BOT_DIR
-```
-
-- `bot/guardiao.sh` (`*/5` + `@reboot`): mantém loop + Chrome de pé.
-- `bot/followup.sh` (seg 09:00): atualiza o status das vagas aplicadas.
-- `scripts/monitor-keepalive.sh` (opcional): heartbeat do painel `monitor/`.
-
-### Windows (Task Scheduler)
-
-```powershell
-# comandos prontos em config/TaskScheduler.md (ajuste BOT_DIR):
-# Guardião a cada 5min + no logon, follow-up seg 09:00, keepalive/pull opcionais
-```
-
-- `bot\guardiao.ps1` (5min + logon): mantém loop + Chrome de pé.
-- `bot\followup.ps1` (seg 09:00): atualiza o status das vagas aplicadas.
-- `scripts\monitor-keepalive.ps1` (opcional): heartbeat do painel `monitor/`.
-
-## 7. Monitor (opcional)
-
-```bash
-cd monitor && npm install && npm run dev   # ou deploy na Vercel (veja monitor/README.md)
-export MONITOR_URL=https://sua-url.vercel.app
-```
-
-Sem `MONITOR_URL`, o bot funciona normalmente — só não publica status.
-
-## Teste sem risco (dry-run)
-
-Antes de ligar o loop real, simule o plano sem se candidatar (só lê arquivos —
-não abre browser, não aplica em nada):
-
-```bash
-./bot/dry-run.sh            # plano humano: todos os sites, termos e URLs
-./bot/dry-run.sh --json    # saída máquina (sites, perfil, limites, telemetria)
-./bot/dry-run.sh --json --site indeed
-./bot/dry-run.sh --json --reconhecimento
-```
-
-Windows (PowerShell nativo):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1
-powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1 -json
-powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1 -json -Site indeed
-```
-
-## Diagnosticando (doctor)
-
-Checklist de ambiente com dicas de correção por item (saída colável em issue):
-
-```bash
-./bot/doctor.sh
-```
-
-Windows (PowerShell nativo):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File bot\doctor.ps1
-```
-
-## Acompanhando o resultado (funil)
-
-Depois de algumas rodadas, veja em que etapa as candidaturas estão:
-
-```bash
-./scripts/funnel.sh                 # vistas → aplicadas → respondidas → convites → entrevistas
-./scripts/funnel.sh --csv           # exporta CSV (planilha / relatório)
-./scripts/funnel.sh --markdown      # exporta tabela Markdown
-./scripts/funnel.sh --json          # saída máquina (contagens, taxas e diagnósticos)
-```
-
-As etapas são cumulativas (entrevista ⊆ convites ⊆ respondidas ⊆ aplicadas) e a taxa
-de cada uma é contra a etapa imediatamente anterior. "Respondeu" = o status saiu de
-`enviada`; `sem_resposta` é ausência de resposta e não entra. `encerrada` e
-`sem_retorno_verificavel` ficam de fora (não dá para saber se houve retorno) e saem
-como diagnóstico, junto com os status desconhecidos.
-
-Windows:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\funnel.ps1
-powershell -ExecutionPolicy Bypass -File scripts\funnel.ps1 -Csv funil.csv
-```
-
-A regra de contagem vive em [`bot/funil.py`](../bot/funil.py) — os dois espelhos
-`.sh`/`.ps1` só repassam flags, então não divergem.
-
-Exit 0 = essencial ok (`[??]` são só avisos); exit 1 = falta algo essencial
-(veja os itens `[FALHA]`). Validação fina dos JSONs contra os schemas em
-`config/`: `bash scripts/validate.sh` (ou `scripts\validate.ps1`).
+O `./bot/doctor.sh` valida **tudo** o que esta página pede (versões, CDP,
+JSONs, config do opencode, plugin, segredos fora do git, libs Python, disco,
+estado). Dúvida que não seja erro de instalação: [`FAQ.md`](FAQ.md).
+Saída do doctor colável em issue: copie do título para o fim e confirme que
+não há dados pessoais no trecho.

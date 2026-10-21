@@ -1,5 +1,28 @@
 # FAQ
 
+**Por onde começo? (primeira ajuda / instalação do zero)**
+Guia completo, com trajetos separados para leigo, usuário básico e dev:
+[`docs/QUICKSTART.md`](QUICKSTART.md). Caminho rápido (básico):
+`./scripts/setup.sh` → `./scripts/setup-wizard.sh` → `./bot/doctor.sh` →
+`./bot/dry-run.sh` → `./bot/loop.sh`. Se algo falha, o QUICKSTART tem uma
+seção "Primeiros socorros" com os 8 erros mais comuns.
+
+**Instalei tudo, mas dá "command not found: node" / "opencode nao encontrado"**
+Geralmente é só o PATH: feche e reabra o terminal. Se persistir, o
+`./bot/doctor.sh` aponta exatamente o que falta e como instalar. Casos comuns
+e as correções: seção "Primeiros socorros" do [`QUICKSTART.md`](QUICKSTART.md).
+
+**Como testo sem candidatar de verdade?**
+`./bot/dry-run.sh` — plano da rodada sem risco: só lê arquivos, não abre
+browser, não envia nada. Com `--reconhecimento`, o loop pontua vagas sem se
+candidatar (`OV_RECONHECIMENTO=1`). Faça o dry-run até o plano parecer
+certo antes da 1ª rodada real (`./bot/loop.sh`).
+
+**A 1ª rodada real falha com "tool not found: browser_*"**
+É o opencode 2.x mandando a 1ª requisição antes do MCP do navegador conectar.
+Copie o plugin: `mkdir -p ~/.config/opencode/plugins && cp config/opencode-plugins/espera-mcp.ts ~/.config/opencode/plugins/`.
+Detalhes: [`QUICKSTART.md`](QUICKSTART.md) (Caso 3).
+
 **Automatizar candidatura é permitido?**
 Depende do portal. LinkedIn, Gupy, Indeed e outros **podem proibir automação** nos
 Termos de Uso — sua conta pode ser suspensa. Este projeto é para estudo e automação

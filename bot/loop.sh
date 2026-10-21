@@ -6,7 +6,8 @@ cd "$BOT_ROOT/bot" || exit 1
 
 # Ajuste TZ ao seu fuso (ex.: America/Sao_Paulo). Sem isto, logs e datas gravadas saem
 # com offset errado — foi o que fez candidaturas da noite virarem o dia seguinte.
-export TZ=America/Fortaleza
+# Override sem editar o codigo: OV_TZ=America/Sao_Paulo ./bot/loop.sh (ou no cron.env).
+export TZ="${OV_TZ:-America/Fortaleza}"
 
 # Binarios resolvidos explicitamente. O cron tem PATH minimo (/usr/bin:/bin) e NAO acha
 # opencode (~/.opencode/bin) nem node (fnm): quando o guardiao reinicia este loop pelo
@@ -15,13 +16,16 @@ export TZ=America/Fortaleza
 # porque o processo atual herdou o PATH interativo; um restart pelo cron quebraria.
 export PATH="$HOME/.opencode/bin:$HOME/.local/share/fnm/aliases/default/bin:$HOME/.local/bin:$PATH"
 OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+# Node costuma vir do fnm (caminho acima), mas quem instala node via apt/nvm/nodesource
+# so tem o binario no PATH — use esse fallback em vez de abortar o loop.
 NODE_BIN="$HOME/.local/share/fnm/aliases/default/bin/node"
+[ -x "$NODE_BIN" ] || NODE_BIN="$(command -v node 2>/dev/null || true)"
 [ -x "$OPENCODE_BIN" ] || { echo "[$(date '+%F %T')] ERRO: opencode nao encontrado em $OPENCODE_BIN" >> loop.log; exit 1; }
 # OpenCode 2's `run` attaches to a shared background service by default, so this loop's env (OPENCODE_CONFIG_CONTENT,
 # plugin switches) would not reach the tools. --standalone = private server in this process tree; --auto = no
 # permission prompt that nobody would answer. OpenCode 1 has neither flag.
 OC_RUN=(); case "$("$OPENCODE_BIN" --version 2>/dev/null)" in *v2.*) OC_RUN=(--standalone --auto) ;; esac
-[ -x "$NODE_BIN" ]     || { echo "[$(date '+%F %T')] ERRO: node nao encontrado em $NODE_BIN" >> loop.log; exit 1; }
+[ -x "$NODE_BIN" ]     || { echo "[$(date '+%F %T')] ERRO: node nao encontrado (fnm ausente e 'node' nao esta no PATH). Instale: https://nodejs.org" >> loop.log; exit 1; }
 
 # Chaves de provedores que exigem env (OpenRouter): o cron nao herda o ambiente
 # interativo, entao sem isto o segundo poco :free morre com erro de auth no cron.

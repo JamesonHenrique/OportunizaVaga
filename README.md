@@ -127,25 +127,37 @@ oportunizavaga/
 
 ## Setup resumido
 
+> 👋 **Novo por aqui? (leigo)** — não precisa fork: copie o repo e preencha seus
+> dados pelo assistente. Guia completo com tudo explicado: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
+
 ### Linux
 
 ```bash
-git clone <sua-fork> oportunizavaga && cd oportunizavaga
+# 1 linha (baixa, clona em ~/oportunizavaga e roda o setup):
+curl -fsSL https://raw.githubusercontent.com/JamesonHenrique/OportunizaVaga/main/install.sh | bash
+
+# ou modo manual:
+git clone https://github.com/JamesonHenrique/OportunizaVaga oportunizavaga && cd oportunizavaga
 ./scripts/setup.sh          # copia exemplos, valida deps, imprime crontab
 ./scripts/setup-wizard.sh   # preenche bot/dados_candidato.json por perguntas (nunca commite!)
 ./browser/chrome-real.sh &  # login 1x nos sites
-./bot/loop.sh               # teste 1 rodada (Ctrl+C após o primeiro "ok")
+./bot/dry-run.sh            # ensaio geral: plano da rodada sem se candidatar
+./bot/loop.sh               # teste 1 rodada real (Ctrl+C após o primeiro "ok")
 crontab -e                  # cole config/crontab.example
 ```
 
 ### Windows (PowerShell nativo — alternativo; WSL2 recomendado)
 
 ```powershell
-git clone <sua-fork> oportunizavaga; cd oportunizavaga
+irm https://raw.githubusercontent.com/JamesonHenrique/OportunizaVaga/main/install.ps1 | iex   # 1 linha
+
+# ou modo manual:
+git clone https://github.com/JamesonHenrique/OportunizaVaga oportunizavaga; cd oportunizavaga
 powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 powershell -ExecutionPolicy Bypass -File scripts\setup-wizard.ps1  # preenche dados por perguntas (nunca commite!)
 powershell -ExecutionPolicy Bypass -File browser\chrome-real.ps1  # login 1x nos sites
-powershell -ExecutionPolicy Bypass -File bot\loop.ps1             # teste 1 rodada (Ctrl+C após o primeiro "ok")
+powershell -ExecutionPolicy Bypass -File bot\dry-run.ps1          # ensaio geral sem candidatura
+powershell -ExecutionPolicy Bypass -File bot\loop.ps1             # teste 1 rodada real (Ctrl+C após o primeiro "ok")
 # agende com os comandos em config\TaskScheduler.md (equivale ao crontab.example)
 ```
 

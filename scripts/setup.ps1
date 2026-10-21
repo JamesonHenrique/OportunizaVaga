@@ -46,6 +46,8 @@ foreach ($bin in @('node', 'python', 'git')) {
 }
 if (python -c 'import reportlab' 2>$null) { Write-Ok 'reportlab (gera o PDF por vaga)' }
 else { Write-Bad 'reportlab ausente — pip install reportlab (sem ele o c1 nao gera CV)' }
+if (python -c 'import websocket' 2>$null) { Write-Ok 'websocket-client (leitores por CDP: gupy-status, sonda-sites)' }
+else { Write-Bad 'websocket-client ausente — pip install websocket-client (sem ele gupy-status/sonda-sites ficam desligados)' }
 if (Get-Command opencode -ErrorAction SilentlyContinue) { Write-Ok 'opencode' }
 else {
     Write-Bad 'opencode ausente — instale via winget (se publicado) ou https://opencode.ai:'
