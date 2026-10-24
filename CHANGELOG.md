@@ -55,6 +55,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
   (trava + escrita atômica). `tests/test_backup.sh` (10).
 
 ### Fixed
+- **LinkedIn guest busca morta (`bot/descobrir.py`)**: a API `jobs-guest/jobs/api/seeMoreJobPostings/search`
+  (busca deslogada) passou a devolver uma página vazia de 26 bytes (sem 429): o coletor lia "0 vagas" e a pausa
+  exponencial ia a 24h sem ganhar nada. Live check 24/10: a página guest `/jobs/search` responde os MESMOS
+  parâmetros (`keywords`, `geoId`, `f_TPR`, `start`) com os cards que o `parse_linkedin` já lê — só a URL mudou.
+  Mocks dos testes atualizados (`tests/test_canario_fontes.sh`); contrato `tests/test_descobrir.sh` intacto.
 - **`bot/guardiao.sh` matava às cegas quem segurava o lock (`fuser -k`)**: agora só `sleep` órfão ou processo além de
   `OV_GUARDIAO_ORFAO_S` (1500 s); órfão ainda trabalhando adia a subida do loop. `tests/test_guardiao.sh` (3).
 - **Alertas (`scripts/notificar.sh`/`.ps1`)**: a deduplicação usava o hash exato, então o mesmo alerta com outra hora ou
