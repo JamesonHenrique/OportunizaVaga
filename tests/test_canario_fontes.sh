@@ -39,7 +39,7 @@ def carrega_canario():
     c = importlib.util.module_from_spec(s); s.loader.exec_module(c)
     return c
 def rede_boa(url, timeout=20):
-    if "seeMoreJobPostings" in url: return rd("linkedin_search.html")
+    if "jobs/search?" in url: return rd("linkedin_search.html")
     if "jobPosting" in url: return rd("linkedin_vaga.html")
     if "gupy.io" in url: return rd("gupy_busca_desc.html")
     raise AssertionError("url inesperada: " + url)
@@ -78,7 +78,7 @@ f = c.checar()
 assert "LinkedIn busca: 0 vagas" in f and "Gupy busca: 0 vagas" in f, f
 # LinkedIn search ok, job page without description/level; Gupy without description
 def meio(url, timeout=20):
-    if "seeMoreJobPostings" in url: return rd("linkedin_search.html")
+    if "jobs/search?" in url: return rd("linkedin_search.html")
     if "jobPosting" in url: return "<html><div>mudou</div></html>"
     return '<script id="__NEXT_DATA__">{"props": {"pageProps": {"initialJobList": {"data": [{"id": 1, "name": "Dev Jr", "jobUrl": "https://x.example/1"}]}}}}</script>'
 c.d.get = meio

@@ -195,9 +195,11 @@ def linkedin(ctx, termo):
     def pagina(start):
         q = urllib.parse.urlencode({"keywords": termo, "geoId": ctx.cfg["linkedin_geo_id"],
                                     "f_TPR": f"r{int(ctx.cfg['linkedin_dias']) * 86400}", "start": str(start)})
-        # f_WT is appended by hand: urlencode would escape the "%2C" separator twice.
-        return parse_linkedin(get("https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?"
-                                  + q + (f"&f_WT={wt}" if wt else "")))
+        # 24/10 live check: the guest jobs-api "seeMoreJobPostings" endpoint returns an EMPTY page (26 bytes,
+        # no 429) for guest fetches; the guest /jobs/search HTML answers the SAME keywords/geoId/f_TPR/start
+        # params with full cards the parser reads (60 on page 1). Same params, same parser: only the URL changes
+        # (f_WT stayed appended by hand: urlencode would escape the "%2C" separator twice).
+        return parse_linkedin(get("https://www.linkedin.com/jobs/search?" + q + (f"&f_WT={wt}" if wt else "")))
     # Incremental paging (01/10: 100+ jobs per term in 7 days, 10 per page, good ones down to page 15): page 1
     # always (fresh jobs), plus linkedin_paginas-1 pages from this term's cursor, which survives between
     # collections in the queue file; an empty page or linkedin_max_start wraps the cursor to the start.
