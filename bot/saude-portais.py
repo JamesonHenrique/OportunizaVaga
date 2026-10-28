@@ -90,7 +90,9 @@ def avaliar(state_dir, agora=None, aplicadas_path=None):
         if pausa and pausa > agora:
             cands.append(("sem_vagas_compativeis",
                           f"{r.get('vazias_seguidas', '?')} rodadas sem vaga nova; pausado ate {r.get('pausado_ate')}", None))
-        positivos = [(f"sonda ok", _quando(s.get("em"))) if s.get("estado") == "ok" else None,
+        positivos = [("garimpo logado: %s cards" % li.get("lidas"), _quando(li.get("em")))
+                     if isinstance(li, dict) and li.get("lidas") and li.get("em") else None,
+                     (f"sonda ok", _quando(s.get("em"))) if s.get("estado") == "ok" else None,
                      ("canario ok", _quando(c.get("em"))) if c.get("ok") else None,
                      ("varredura do robo", _quando(r.get("ultima_varredura"))),
                      ("candidatura enviada", _quando(r.get("ultima_aplicada"))),
