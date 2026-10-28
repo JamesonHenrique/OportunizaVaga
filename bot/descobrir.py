@@ -132,19 +132,32 @@ class Ctx:
             self.score_re = vf.regex_lista(sorted(ws))
 
 
-def get(url, timeout=20):
+def get(url, timeout=20, tentativas=3):
+    """28/10 P2: um 5xx/timeout transitorio derrubava o termo inteiro (e a rodada). Agora 5xx/rede
+    tentam 2s/4s; 4xx (inclusive 429) nunca tentam de novo — significam "pare"."""
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9"})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        # 27/10: o 429 do LinkedIn manda Retry-After em segundos; antes era ignorado e a pausa local
-        # (3h, 6h, 12h, 24h) podia ser mais curta que o pedido do servidor — batia de novo e renovava o bloqueio.
+    for i in range(tentativas):
         try:
-            e.retry_after = int(e.headers.get("Retry-After") or 0)
-        except (TypeError, ValueError):
-            e.retry_after = 0
-        raise
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            if e.code in (500, 502, 503, 504) and i + 1 < tentativas:
+                time.sleep(2 ** i)
+                continue
+            # 27/10: o 429 do LinkedIn manda Retry-After em segundos; antes era ignorado e a pausa local
+            # (3h, 6h, 12h, 24h) podia ser mais curta que o pedido do servidor — batia de novo e renovava
+            # o bloqueio.
+            try:
+                e.retry_after = int(e.headers.get("Retry-After") or 0)
+            except (TypeError, ValueError):
+                e.retry_after = 0
+            raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if i + 1 < tentativas:
+                time.sleep(2 ** i)
+                continue
+            raise
+    return ""
 
 
 # ---------------------------------------------------------------- parsers (pure, unit-tested)
