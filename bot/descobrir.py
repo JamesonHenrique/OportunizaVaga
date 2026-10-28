@@ -451,12 +451,23 @@ def motivo_filtro(ctx, v, pular_empresas, hoje=None):
     return None
 
 
+# 28/10: familias alvo que nao sao "dev" (o perfil pede suporte, QA, dados, cloud/ops tambem). O score era
+# so-dev: "Analista de Suporte" valia 0 e nunca passava do piso do portao, por isso 24 vagas ficaram paradas.
+# Frases, nao palavras soltas: "dados" sozinho premiou "Estagio em Contabilidade: Dados e IA".
+FAMILIAS_PADRAO = ("suporte", "support", "service desk", "help desk", "qa", "quality assurance",
+                   "analista de teste", "testes", "analista de dados", "data analyst", "engenharia de dados",
+                   "power bi", "infraestrutura", "infrastructure", "cloud", "devops", "sre",
+                   "sustentacao", "aplicacoes", "applications")
+
+
 def score(ctx, v, hoje=None):
     s = 0
     nt = vf.norm(v["titulo"])
     if ctx.score_re and ctx.score_re.search(nt):
         s += 2
     if ctx.bom and ctx.bom.search(nt):
+        s += 1
+    if any(f in nt for f in (ctx.cfg.get("score_familias") or FAMILIAS_PADRAO)):
         s += 1
     if v.get("simplificada"):
         s += 1   # 10/10: Easy Apply was 3 of the 4 LinkedIn sends since 01/10 (no ATS, no account)
