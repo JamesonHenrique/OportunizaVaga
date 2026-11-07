@@ -384,7 +384,7 @@ def _evidence_references(profile: dict[str, Any], keywords: dict[str, Any]) -> d
     for term in terms:
         normalized = _normalized(term)
         pattern = re.compile(
-            r"(?<![\w+#.])" + re.escape(normalized).replace(r"\ ", r"\s+") + r"(?![\w+#]|\.(?=\w))",
+            r"(?<![\w+#])" + re.escape(normalized).replace(r"\ ", r"\s+") + r"(?![\w+#]|\.(?=\w))",
             re.IGNORECASE,
         )
         found = [label for label, text in sources if pattern.search(_normalized(text))]
