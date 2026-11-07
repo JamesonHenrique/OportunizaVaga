@@ -144,30 +144,14 @@ run_snippet && relata 0 "coletar monta a fila e classifica o resto (offline)" ||
 
 # 6 — prompt conta ofertas; marcar expira apos max_ofertas e fecha o que foi registrado.
 cat > "$SNIPPET" <<'PYSNIP'
-import io, contextlib, hashlib, os
+import io, contextlib
 ctx = d.Ctx()
 d.coletar(ctx, force=True)
-fila = json.load(open(ctx.fila_path, encoding="utf-8"))
-alvo = next(v for v in fila["vagas"].values() if v["status"] == "nova")
-alvo["resume_matcher_compatibility"] = {
-    "schema_version": 1, "status": "ANALYZED", "title": alvo["titulo"],
-    "analyzed_at": "2026-11-07T12:00:00-03:00",
-    "job_url_sha256": hashlib.sha256(alvo["url"].encode("utf-8")).hexdigest(),
-    "profile_sha256": "a" * 64,
-    "score": {"keyword_match_percentage": 67.5}}
-assert d.compatibilidade_resume_matcher(dict(alvo, url="https://jobs.example.test/other"), ctx.fila_path) == ""
-os.environ["OV_DISCOVERY_PROFILE_SHA256"] = "a" * 64
-assert d.compatibilidade_resume_matcher(alvo, ctx.fila_path) == ""  # advisory reports need a verified local input sidecar
-assert d.compatibilidade_resume_matcher(dict(alvo, resume_matcher_compatibility={**alvo["resume_matcher_compatibility"], "profile_sha256": "b" * 64}), ctx.fila_path) == ""
-assert d.compatibilidade_resume_matcher(dict(alvo, resume_matcher_compatibility={k: v for k, v in alvo["resume_matcher_compatibility"].items() if k != "profile_sha256"}), ctx.fila_path) == ""
-os.environ.pop("OV_DISCOVERY_PROFILE_SHA256", None)
-json.dump(fila, open(ctx.fila_path, "w", encoding="utf-8"))
 buf = io.StringIO()
 with contextlib.redirect_stdout(buf):
     d.prompt(ctx, 1)
 out = buf.getvalue()
 assert "VAGAS PRÉ-FILTRADAS" in out and "DADOS" in out, out   # aviso de conteudo de terceiros
-assert "RM heurístico 67.5%" not in out, out  # manually injected or stale reports are hidden
 fila = json.load(open(ctx.fila_path, encoding="utf-8"))["vagas"]
 assert sorted(v.get("mostrada", 0) for v in fila.values() if v["status"] == "nova") == [0, 1]   # shown, not yet an offer
 for _ in range(2):
@@ -362,7 +346,7 @@ run_snippet && relata 0 "paginacao: LinkedIn incremental por cursor, Gupy ate o 
 
 # 14 — coleta: triagem por descricao comeca pelo maior score (max_descricoes); prazo estourado nao abre busca e GRAVA a fila.
 cat > "$SNIPPET" <<'PYSNIP'
-import io, contextlib, hashlib
+import io, contextlib
 json.dump({"fontes": ["linkedin"], "max_descricoes": 1, "intervalo_min": 0}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
 ctx = d.Ctx()
 json.dump({"vagas": {}}, open(ctx.fila_path, "w")); json.dump({"aplicadas": []}, open(ctx.paths["aplicadas"], "w"))
@@ -384,7 +368,7 @@ run_snippet && relata 0 "coleta: triagem pelo maior score; prazo estourado grava
 
 # 15 — triar (05/10): link de perfil, vaga encerrada e descricao incompativel saem da fila antes da sessao; falha de rede nao corta.
 cat > "$SNIPPET" <<'PYSNIP'
-import io, contextlib, hashlib
+import io, contextlib
 json.dump({}, open(os.environ["OV_DESCOBERTA_CONFIG"], "w"))
 ctx = d.Ctx(); json.dump({"aplicadas": []}, open(ctx.paths["aplicadas"], "w"))
 nova = lambda i, url, fonte="telegram": {"id": i, "fonte": fonte, "titulo": "Desenvolvedor Java Junior", "empresa": "E" + i,
@@ -402,20 +386,7 @@ f = json.load(open(ctx.fila_path))["vagas"]
 assert f["a"]["status"] == "filtrada" and "url" in f["a"]["motivo"], f["a"]
 assert f["b"]["status"] == "filtrada" and "encerrada" in f["b"]["motivo"], f["b"]
 assert f["c"]["status"] == "nova" and f["c"].get("desc_checada"), f["c"]
-cached = d.compatibilidade_fila.description_path_for(ctx.fila_path, "c")
-assert f["c"].get("job_description_id") == d.compatibilidade_fila.description_cache_id("c"), f["c"]
-assert f["c"].get("job_description_sha256") == hashlib.sha256(cached.read_bytes()).hexdigest(), f["c"]
-assert cached.read_text(encoding="utf-8").strip().startswith("Vaga remota para desenvolvedor Java junior"), cached
 assert f["e"]["status"] == "nova" and f["e"].get("triagem_falhou"), f["e"]
-old_sha = f["c"]["job_description_sha256"]
-f["c"]["resume_matcher_compatibility"] = {"schema_version": 1, "status": "ANALYZED"}
-json.dump({"vagas": f}, open(ctx.fila_path, "w"))
-corpo += " Atualização fictícia da descrição."
-with contextlib.redirect_stdout(io.StringIO()):
-    assert d.triar(ctx, 8, force_refresh=True, only_key="c") == 0
-refreshed = json.load(open(ctx.fila_path))["vagas"]["c"]
-assert refreshed["job_description_sha256"] != old_sha, refreshed
-assert "resume_matcher_compatibility" not in refreshed, refreshed
 PYSNIP
 run_snippet && relata 0 "triar: perfil, encerrada e descricao ruim saem antes da sessao; rede fora nao corta" || relata 1 "triar: perfil, encerrada e descricao ruim saem antes da sessao; rede fora nao corta"
 

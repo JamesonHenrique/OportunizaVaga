@@ -242,46 +242,14 @@ c2) TWO-TIER (opcional): para economizar quota do modelo forte, rode antes a
    "sim"/"talvez" (~10, ≤14 dias) com este prompt no modelo forte. O "nao"
    soma em descartes_listagem, nunca em bloqueados.
 
-d) SELEÇÃO DE CV COM RESUME-MATCHER: depois de gerar e revisar o PDF para a vaga
-   exata, selecione-o antes de gravar a intenção final usando o helper público:
-   Antes, faça a revisão factual final do PDF com `bot/cv_content_review.py`: gere proposal/template numa pasta privada nova,
-   confira CADA linha extraída contra as fontes atuais, marque cada alegação factual `SUPPORTED` com referências exatas
-   e títulos/etiquetas `NON_FACTUAL`; `UNSUPPORTED`, `UNCONFIRMED`, erro ou dúvida bloqueiam. Aprove somente depois de
-   confirmar datas, métricas, tipo de experiência, identidade da vaga e revisão visual. Rode `approve` e depois `verify`
-   com o mesmo anúncio, PDF, `cv_base.md` e `dados_candidato.json`. Os caminhos da revisão devem permanecer privados.
-   Também gere e revise a avaliação tipada e o recibo para a descrição/título exatos com `job_requirement_review.py`;
-   o antigo booleano `--requirements-reviewed` não é aceito. Exija `APPROVED`, zero barreiras obrigatórias e passe todos
-   os artefatos de ambas as revisões ao helper:
-   `python3 $BOT_ROOT/bot/attach_cv.py --announcement /caminho/anuncio.txt --pdf /caminho/cv.pdf --application-key CHAVE --company 'EMPRESA OFICIAL' --title 'TÍTULO OFICIAL' --url-prefix 'https://ats.example/application/123' --selector 'input[type=file][name=resume]' --requirements-profile /caminho/perfil.json --requirements-assessment /caminho/avaliacao.json --requirements-receipt /caminho/recibo.json --content-cv-base /caminho/cv_base.md --content-candidate-data /caminho/dados_candidato.json --content-proposal /caminho/content-proposal.json --content-assessment /caminho/content-assessment.json --content-receipt /caminho/content-receipt.json --select`
-   Copie todos os campos `cv_*` da mesma saída JSON para a intenção. O helper força o gate ATS + Resume-Matcher,
-   confere manifesto/hashes, exige exatamente uma aba e um input correspondentes e verifica o hash selecionado. Rode sob o
-   lock compartilhado do Chrome, sem lock aninhado. Ele não clica em enviar nem fecha/navega a aba; o input pode iniciar upload
-   automático conforme o portal. As revisões factual e de requisitos são checagens locais, não declarações automáticas de elegibilidade.
-   `portal_receipt_verified` permanece falso até confirmação visível do portal. Se houver arquivo
-   diferente já selecionado, ambiguidade, timeout ou falha, não substitua nem anexe por rota alternativa.
-
 d0) IMEDIATAMENTE ANTES do clique final de envio (Enviar/Candidatar-se/Submit), em QUALQUER canal, grave a intenção:
    `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE intencao CHAVE '{"empresa":"...","vaga":"...","url":"https://..."}'`
-   Se o currículo desta vaga passou pelo Resume-Matcher e o resultado contém `manifest_id`, `job_description_sha256`
-   e `pdf_sha256`, inclua também `cv_manifest_id`, `cv_job_sha256`, `cv_pdf_sha256`, `cv_announcement_path`,
-   `cv_attachment_path`, `cv_browser_url_prefix`, `cv_browser_input_selector`, `cv_job_key`, `cv_job_company` e
-   `cv_job_title`, `cv_requirements_profile_path`, `cv_requirements_assessment_path` e
-   `cv_requirements_receipt_path`, `cv_content_cv_base_path`, `cv_content_candidate_data_path`,
-   `cv_content_proposal_path`, `cv_content_assessment_path` e `cv_content_receipt_path` da MESMA saída do `attach_cv.py`.
-   A chave deve ser `CHAVE` e empresa/título devem corresponder à candidatura.
-   O prefixo/seletor devem apontar para a aba e o input de arquivo desta candidatura. `estado.py` exige novamente `APPROVED` com o gate local
-   e confirma por hash, sem alterar o formulário, que esse arquivo está selecionado. Falha, timeout ou ausência de
-   aprovação bloqueiam a intenção e o envio. Caminhos da revisão, seletor e prefixo são transitórios; o estado
-   conserva hashes do manifesto, das revisões tipadas e da revisão factual, status e contagens. Caminhos de assessment,
-   receipt, currículo mestre, dados do candidato, seletor e prefixo são transitórios. Um PDF de currículo anexado sem
-   referência completa e aprovação factual hash-bound é recusado; não use upload legado como fallback.
    (a MESMA chave que irá no add-aplicada). Exit 1 = já aplicada ou envio de rodada anterior com resultado
    desconhecido: NÃO clique; verifique no portal ("você já se candidatou"/minhas candidaturas) ou no e-mail.
    Saiu = add-aplicada; comprovadamente não saiu = `estado.py cancelar-intencao CHAVE "motivo"`.
    Envio que falhou na tela (erro de formulário, sem confirmação) também = cancelar-intencao.
 
-d1) Para fluxos sem PDF personalizado, siga o canal atual (por exemplo, Gupy usa o CV do perfil). Qualquer PDF
-    personalizado exige os gates ATS, Resume-Matcher, requisitos e revisão factual; não há fallback de upload manual.
+d) Anexe com o input file oculto via CDP quando necessário (input[name=Filedata] no Gmail).
 
 e) Registre CADA candidatura enviada via
    `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE add-aplicada '<json>'` com estes campos:

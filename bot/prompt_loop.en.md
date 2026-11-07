@@ -232,44 +232,14 @@ c2) TWO-TIER (optional): to save strong-model quota, first run the cheap
    "sim"/"talvez" items (~10, ≤14 days) with this prompt on the strong model. "nao"
    adds to descartes_listagem, never to bloqueados.
 
-d) RESUME-MATCHER CV SELECTION: after generating and reviewing a PDF for the exact vacancy,
-   select it before recording the final intent with the public helper:
-   First run final factual review with `bot/cv_content_review.py`: create proposal/template in a new private directory,
-   compare EVERY extracted line with current sources, mark each factual claim `SUPPORTED` with exact references and
-   headings/labels `NON_FACTUAL`; `UNSUPPORTED`, `UNCONFIRMED`, errors, or doubt block attachment. Approve only after
-   checking dates, metrics, experience type, job identity, and visual rendering. Run `approve` then `verify` with the same
-   job, PDF, `cv_base.md`, and `dados_candidato.json`. Keep all review artifacts private.
-   Also generate and review the typed assessment and receipt for the exact description/title with `job_requirement_review.py`;
-   the old boolean `--requirements-reviewed` flag is unsupported. Require `APPROVED`, zero mandatory barriers, and pass
-   both reviews' artifacts to the helper:
-   `python3 $BOT_ROOT/bot/attach_cv.py --announcement /absolute/job.txt --pdf /absolute/cv.pdf --application-key KEY --company 'OFFICIAL COMPANY' --title 'OFFICIAL TITLE' --url-prefix 'https://ats.example/application/123' --selector 'input[type=file][name=resume]' --requirements-profile /absolute/profile.json --requirements-assessment /absolute/assessment.json --requirements-receipt /absolute/receipt.json --content-cv-base /absolute/cv_base.md --content-candidate-data /absolute/candidate.json --content-proposal /absolute/content-proposal.json --content-assessment /absolute/content-assessment.json --content-receipt /absolute/content-receipt.json --select`
-   Copy every `cv_*` field from the same JSON output into the intent. The helper forces the ATS + Resume-Matcher
-   gate, checks the manifest/hashes, requires exactly one matching tab and input, and verifies the selected hash. Run it under the
-   shared Chrome lock without nesting a lock. It never submits, navigates, or closes the tab; the input may trigger an automatic
-   upload depending on the portal. Factual and requirement reviews are local checks, not automatic eligibility decisions.
-   `portal_receipt_verified` stays false until the portal visibly confirms receipt. If another file
-   is already selected, or the tab/input is ambiguous, times out, or fails, do not replace it or use an alternate attachment path.
-
 d0) RIGHT BEFORE the final submit click (Send/Apply/Submit), on ANY channel, record the intent:
    `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE intencao KEY '{"empresa":"...","vaga":"...","url":"https://..."}'`
-   If this job's CV passed the Resume-Matcher gate and its output includes `manifest_id`,
-   `job_description_sha256`, and `pdf_sha256`, also pass `cv_manifest_id`, `cv_job_sha256`, `cv_pdf_sha256`,
-   `cv_announcement_path`, `cv_attachment_path`, `cv_browser_url_prefix`, `cv_browser_input_selector`, `cv_job_key`,
-   `cv_job_company`, `cv_job_title`, `cv_requirements_profile_path`, `cv_requirements_assessment_path`, and
-   `cv_requirements_receipt_path`, `cv_content_cv_base_path`, `cv_content_candidate_data_path`,
-   `cv_content_proposal_path`, `cv_content_assessment_path`, and `cv_content_receipt_path` from the same `attach_cv.py` output.
-   The key must be `KEY` and company/title must match
-   the application. The prefix/selector must identify this application's tab and file input. `estado.py` reruns the local gate and read-only hashes
-   the selected browser file; any failure blocks the intent and send. Assessment/receipt, profile-source paths, URL prefix,
-   and selector are transient; only manifest and review hashes/status/counts are persisted. A custom PDF without a complete
-   manifest and hash-bound factual approval is refused; do not use a legacy upload fallback.
    (the SAME key that will go into add-aplicada). Exit 1 = already applied, or a send from an earlier round with an
    unknown result: do NOT click; check the portal ("you already applied"/my applications) or the e-mail.
    It went out = add-aplicada; verifiably did not = `estado.py cancelar-intencao KEY "reason"`.
    A send that failed on screen (form error, no confirmation) is also cancelar-intencao.
 
-d1) For flows that do not attach a custom PDF, use the existing channel flow (e.g. Gupy uses the profile CV). Any
-    custom PDF requires ATS, Resume-Matcher, requirements, and factual-review gates; there is no manual upload fallback.
+d) Attach with the hidden file input via CDP when needed (input[name=Filedata] in Gmail).
 
 e) Log EACH sent application via
    `python3 $BOT_ROOT/bot/estado.py --file $APLICADAS_FILE add-aplicada '<json>'` with these fields:

@@ -49,8 +49,6 @@ __pycache__/
 **/telegram_canais.json
 **/descoberta.json
 **/vagas_fila.json
-bot/job-descriptions/
-bot/.resume-matcher-compatibility/
 **/telegram_vagas.json
 **/termo_idx
 **/pago_dia

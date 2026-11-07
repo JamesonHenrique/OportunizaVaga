@@ -57,8 +57,7 @@ Fluxo do agente (detalhado em `bot/prompt_loop.md` -> `c1`):
    `categorias_ordem`/`so_categorias` (3-7 subseções das Habilidades técnicas relevantes à vaga)
    e `palavras_chave_vaga` (só skills reais);
 2. `python3 bot/gerar_cv.py /tmp/cv_spec.json <saida.pdf>` — reordena seções, negrita keywords,
-   filtra qualquer keyword fora do perfil e só retorna exit 0 quando o PDF cabe no limite declarado
-   (1 página por padrão; 2 apenas com `max_paginas: 2` explícito e revisão visual de ambas);
+   filtra qualquer keyword fora do perfil e **só retorna exit 0 com 1 página**;
 3. `python3 bot/check_ats.py /tmp/anuncio.txt <saida.pdf>` — cobertura dos termos do perfil >= 75%
    antes de anexar;
 4. anexa. Nome do arquivo sem a palavra "ATS". No Gupy **não** se gera PDF (o Gupy usa o CV do perfil).
