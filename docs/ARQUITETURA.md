@@ -51,7 +51,7 @@
 | `bot/prompt_cond.py` | Blocos condicionais do prompt (`<!--se:site=X-->…<!--/se-->`, `<!--se:telegram-->`; fail-open) e cerca `<<<DADOS_EXTERNOS>>>` para texto de terceiros; usado por `loop.sh`/`loop.ps1` |
 | `bot/redact-logs.py` | Varredor que mascara segredos nos logs (chamado com `--forcar` ao fim de cada rodada + cron/Task Scheduler) |
 | `bot/podar-sessoes.py` | (opt-in) Poda sessões antigas do robô no opencode, com filtro título+pasta; DB em 600 |
-| `bot/gerar_cv.py` | Gera o PDF por vaga (regra `c1`) só a partir de `bot/cv_base.md` + `dados_candidato.json`; 1 página ou exit 2 |
+| `bot/gerar_cv.py` | Gera o PDF por vaga (regra `c1`) só a partir de `bot/cv_base.md` + `dados_candidato.json`; 1 página por padrão, até 2 somente com `max_paginas: 2` explícito |
 | `bot/check_ats.py` | Mede a cobertura dos termos do anúncio no CV (meta >= 75%) antes de anexar |
 | `bot/rodizio-saude.py` | Pausa site SECO (4 rodadas sem nenhuma vaga nova registrada — bloqueio conta como site vivo) por 12h, dobrando até 48h, nunca abaixo de 3 sites ativos; reordena o rodízio 1x/dia pelo rendimento (com `rodizio_produtivos`/`rodizio_exploracao`: produtivos em dobro + 1 explorador do dia); credita uma candidatura a um site só quando o `como` dela o nomeia (`de_site()`, a mesma regra da nota); `pos-so-fila` carimba `ultima_aplicada` para a promoção D1 sem tocar em streak; hooks `pre`/`pos`/`pos-so-fila` no `loop.sh` |
 | `bot/vaga_check.py` | Triagem determinística pela descrição + nível oficial do LinkedIn (conservadora, dirigida pelo perfil); usada por `descobrir.py` e pelo passo c0 do prompt. Ver `docs/OPERACAO.md` |

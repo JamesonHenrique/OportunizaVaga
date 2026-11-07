@@ -240,12 +240,17 @@ def h2(titulo, S, flow):
                            spaceBefore=0, spaceAfter=2.5))
 
 
+def rotulo_secao_pdf(nome):
+    """Use the concise skills heading recognized by common ATS parsers."""
+    return "Habilidades" if norm(nome) == "habilidades tecnicas" else nome
+
+
 def linha_secao(bloco, S, flow, kwset=None, com_sub=True):
     if com_sub and bloco.get("sub"):
         flow.append(Paragraph(esc(bloco["sub"]), S["sub"]))
     for ln in bloco["lines"]:
         if ln.startswith(("- ", "* ")) and not (ln.startswith("*") and ln.endswith("*") and not ln.startswith("* ")):
-            flow.append(Paragraph(esc(ln[2:]), S["item"], bulletText="•"))
+            flow.append(Paragraph(esc(ln[2:]), S["item"], bulletText="-"))
         elif ln.startswith("*") and ln.endswith("*") and len(ln) > 2:
             flow.append(Paragraph(esc(ln.strip("*")), S["nota"]))
         else:
@@ -305,9 +310,8 @@ def _extrair_texto(path):
 def _checar_texto(path, titulo, sections):
     """Extrai o texto do PDF e confere nome + secoes na ordem. Devolve problemas."""
     txt = _extrair_texto(path)
-    if not txt:
-        print("aviso: sem extrator de texto (pdftotext/pypdf); auto-checagem pulada")
-        return []
+    if not txt or not txt.strip():
+        return ["texto do PDF nao pode ser extraido; verificacao automatica inconclusiva"]
     probs = []
     m = PROIBIDO_NO_CV.search(txt)
     if m:
@@ -318,7 +322,7 @@ def _checar_texto(path, titulo, sections):
         probs.append("nome nao encontrado no texto extraido do PDF")
     idx = -1
     for nome in sections:
-        alvo = norm(nome)
+        alvo = norm(rotulo_secao_pdf(nome))
         # headings sao linhas proprias no texto extraido (evita falso positivo
         # de "Experiencia" dentro do resumo)
         i = next((j for j, l in enumerate(linhas) if l == alvo), None)
@@ -335,6 +339,10 @@ def gerar(spec_path, saida):
     spec = json.load(open(spec_path, encoding="utf-8"))
     dados = json.load(open(DADOS_JSON, encoding="utf-8"))
     titulo, meta, sections = parse_base(BASE_MD)
+    max_paginas = spec.get("max_paginas", 1)
+    if isinstance(max_paginas, bool) or not isinstance(max_paginas, int) or max_paginas not in (1, 2):
+        print('ERRO: max_paginas deve ser 1 ou 2; use 2 somente como excecao revisada.', file=sys.stderr)
+        sys.exit(2)
 
     allow = carregar_allowlist(dados, sections)
     kw_ok, kw_caiu = filtrar_kw(spec.get("palavras_chave_vaga"), allow)
@@ -411,7 +419,7 @@ def gerar(spec_path, saida):
         for nome, blocos in sections.items():
             if norm(nome) == "resumo":
                 continue
-            h2(nome, S, flow)
+            h2(rotulo_secao_pdf(nome), S, flow)
             if norm(nome) in ("habilidades tecnicas", "competencias"):
                 classificados = [(i, norm(b.get("sub") or ""), b)
                                  for i, b in enumerate(blocos)]
@@ -427,8 +435,8 @@ def gerar(spec_path, saida):
                     linha_secao(b, S, flow, kwset)
         return flow
 
-    # 10pt (faixa legivel p/ ATS/leitor humano); se estourar 1 pagina, cai ate
-    # 8.8pt; se mesmo assim estourar, falha alto pedindo so_categorias.
+    # Prefer one A4 page by default. A spec may explicitly allow a second page
+    # when essential content cannot remain legible within one page.
     for tam in (10.0, 9.5, 9.0, 8.8):
         doc = SimpleDocTemplate(saida, pagesize=A4, leftMargin=1.5 * cm,
                                 rightMargin=1.5 * cm, topMargin=1.1 * cm,
@@ -437,15 +445,18 @@ def gerar(spec_path, saida):
         doc.build(montar(tam))
         pag = _pdf_paginas(saida)
         if pag is None:
-            print("aviso: pdfinfo indisponivel; nao foi possivel confirmar 1 pagina")
-            break
-        if pag == 1:
-            print("1 pagina (corpo %.0fpt)" % tam)
+            print("ERRO: nao foi possivel confirmar o numero de paginas (instale pdfinfo ou pypdf)", file=sys.stderr)
+            sys.exit(1)
+        if pag <= max_paginas:
+            if pag == 1:
+                print("1 pagina (corpo %.0fpt)" % tam)
+            else:
+                print("2 paginas (corpo %.1fpt; max_paginas explicito)" % tam)
             break
     else:
-        print("ERRO: PDF ficou com mais de 1 pagina mesmo em 8.8pt. Reduza para "
-              "3-5 subsecoes usando o campo so_categorias do spec e rode de novo.",
-              file=sys.stderr)
+        print("ERRO: PDF excede max_paginas=%d mesmo em 8.8pt. Reduza conteúdo não essencial; "
+              "se o essencial não couber legivelmente em uma página, defina max_paginas=2 "
+              "explicitamente no spec e revise ambas as páginas." % max_paginas, file=sys.stderr)
         sys.exit(1)
 
     probs = _checar_texto(saida, titulo, sections)

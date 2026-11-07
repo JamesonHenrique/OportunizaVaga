@@ -10,6 +10,7 @@ short line.
   estado.py [--file F] add-aplicada JSON          append to aplicadas (needs "chave"); also records "ats" coverage
                                                   when "cv" names a CV_*.pdf and the posting saved in step c1 is fresh
   estado.py [--file F] intencao CHAVE JSON        BEFORE the final submit click: envios_pendentes[CHAVE] (empresa, vaga, url);
+                                                  optional CV manifest fields rerun the required local gate and verify the selected browser file;
                                                   exit 1 = already applied or unknown result from an earlier round: do NOT submit
   estado.py [--file F] cancelar-intencao CHAVE MOTIVO  the pending send verifiably did NOT go out (form error, no confirmation)
   estado.py [--file F] add-bloqueado CHAVE JSON   set bloqueados[CHAVE] (JSON object or plain motivo)
@@ -39,6 +40,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jsonlock import gravar, travado  # noqa: E402
+from cv_intent_gate import (  # noqa: E402
+    ARTIFACT_PATH_FIELDS as CV_ARTIFACT_PATH_FIELDS,
+    BROWSER_FIELDS as CV_BROWSER_FIELDS,
+    CONTENT_REVIEW_AUDIT_FIELDS as CV_CONTENT_REVIEW_AUDIT_FIELDS,
+    CONTENT_REVIEW_PATH_FIELDS as CV_CONTENT_REVIEW_PATH_FIELDS,
+    JOB_BINDING_FIELDS as CV_JOB_BINDING_FIELDS,
+    MANIFEST_FIELDS as CV_MANIFEST_FIELDS,
+    REQUIREMENT_AUDIT_FIELDS as CV_REQUIREMENT_AUDIT_FIELDS,
+    REQUIREMENT_REVIEW_PATH_FIELDS as CV_REQUIREMENT_REVIEW_PATH_FIELDS,
+    check_preflight as check_cv_preflight,
+    content_review_audit_fields as cv_content_review_audit_fields,
+    manifest_fields as cv_manifest_fields,
+    requirement_audit_fields as cv_requirement_audit_fields,
+    verify_cv_attachment,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT = str(SCRIPT_DIR / "aplicadas.json")
@@ -116,6 +132,7 @@ def vencidos(d, hoje=None):
 
 
 EVENTOS_MAX = 2 * 1024 * 1024   # bytes; one rotated generation (eventos.jsonl.1) is kept
+_CV_INTENT_PREFLIGHT = None
 
 
 def registrar_evento(path, ev):
@@ -363,6 +380,16 @@ def main(argv):
         if not isinstance(rec, dict) or not rec.get("chave"):
             print("erro: JSON precisa ser objeto com 'chave'")
             return 2
+        cv_reference = cv_manifest_fields(rec)
+        if cv_reference is None:
+            print("erro: referencia do CV invalida; informe cv_manifest_id, cv_job_sha256 e cv_pdf_sha256 consistentes")
+            return 2
+        if any(field in rec for field in (
+            *CV_ARTIFACT_PATH_FIELDS, *CV_BROWSER_FIELDS, *CV_REQUIREMENT_REVIEW_PATH_FIELDS,
+            *CV_CONTENT_REVIEW_PATH_FIELDS,
+        )):
+            print("erro: caminhos e dados transitórios do navegador não podem ser gravados no estado")
+            return 2
         if any(a.get("chave") == rec["chave"] for a in d.setdefault("aplicadas", [])):
             print(f"ja existe em aplicadas: {rec['chave']}")
             return 1
@@ -375,8 +402,25 @@ def main(argv):
         if os.environ.get("OV_RODADA") and not rec.get("rodada"):
             rec["rodada"] = os.environ["OV_RODADA"]   # which loop round wrote it (logs/rodada-<id>.log)
         medir_ats(rec)
-        d["aplicadas"].append(rec)
         intencao = pendentes(d).pop(rec["chave"], None)   # the unknown result is now a confirmed send
+        if isinstance(intencao, dict):
+            pending_cv = cv_manifest_fields(intencao)
+            if pending_cv is None:
+                print("erro: intenção pendente tem referência de CV inválida; nada gravado")
+                return 2
+            if pending_cv:
+                if cv_reference and (
+                    any(cv_reference.get(field) != pending_cv.get(field) for field in CV_MANIFEST_FIELDS)
+                    or any(
+                        field in cv_reference and cv_reference.get(field) != pending_cv.get(field)
+                        for field in CV_JOB_BINDING_FIELDS
+                    )
+                ):
+                    print("erro: registro de envio diverge da referência de CV pendente; nada gravado")
+                    return 2
+                rec.update(pending_cv)
+                cv_reference = pending_cv
+        d["aplicadas"].append(rec)
         if intencao is not None and not d["envios_pendentes"]:
             d.pop("envios_pendentes")
         # d0 adherence, measurable per record: a robot send that skipped `intencao` had no crash protection.
@@ -395,6 +439,26 @@ def main(argv):
         k = args[0]
         info = parse(args[1]) if len(args) > 1 else {}
         info = info if isinstance(info, dict) else {"vaga": str(info)}
+        cv_reference = cv_manifest_fields(info)
+        if cv_reference is None:
+            print("erro: referencia do CV invalida; informe cv_manifest_id, cv_job_sha256 e cv_pdf_sha256 consistentes")
+            return 2
+        cv_request_fields = (
+            *CV_ARTIFACT_PATH_FIELDS,
+            *CV_BROWSER_FIELDS,
+            *CV_REQUIREMENT_REVIEW_PATH_FIELDS,
+            *CV_REQUIREMENT_AUDIT_FIELDS,
+            *CV_CONTENT_REVIEW_PATH_FIELDS,
+            *CV_CONTENT_REVIEW_AUDIT_FIELDS,
+            *CV_JOB_BINDING_FIELDS,
+            "cv_compatibility_recommendation",
+        )
+        if not cv_reference and (
+            any(field in info for field in cv_request_fields)
+            or info.get("cv") not in (None, "")
+        ):
+            print("erro: arquivo, caminhos do CV, recomendação ou dados do navegador exigem uma referência completa do CV")
+            return 2
         if any(a.get("chave") == k for a in d.get("aplicadas", [])):
             print(f"ja existe em aplicadas: {k} -- NAO envie de novo")
             return 1
@@ -403,13 +467,57 @@ def main(argv):
         # inherit a killed attempt's click. Without the loop (manual runs) the owner is empty = always "other".
         dono = os.environ.get("OV_TENTATIVA") or rodada
         atual = pendentes(d).get(k)
+        if atual is not None and not isinstance(atual, dict):
+            print(f"intencao pendente invalida para {k}; verifique o estado antes de enviar")
+            return 2
         if isinstance(atual, dict) and (not dono or atual.get("tentativa", atual.get("rodada")) != dono):
             print(f"resultado desconhecido desde {atual.get('em')} (rodada {atual.get('rodada') or '?'}): {k} -- NAO "
                   "envie; verifique no portal/e-mail. Saiu = add-aplicada; nao saiu = cancelar-intencao CHAVE MOTIVO")
             return 1
+        if isinstance(atual, dict):
+            atual_cv = cv_manifest_fields(atual)
+            base_cv_fields = (*CV_MANIFEST_FIELDS, *CV_JOB_BINDING_FIELDS)
+            if atual_cv is None or (atual_cv or cv_reference) and any(
+                atual_cv.get(field) != cv_reference.get(field)
+                for field in base_cv_fields
+                if field in atual_cv or field in cv_reference
+            ):
+                print(f"intencao ja existe sem esta mesma referência de CV: {k} -- NAO envie")
+                return 1
+        if cv_reference:
+            valid, reason = check_cv_preflight(info, cv_reference, _CV_INTENT_PREFLIGHT, k)
+            if not valid:
+                print(f"erro: CV nao liberado para esta vaga; NADA gravado: {reason}")
+                return 2
+            requirements_review = _CV_INTENT_PREFLIGHT.get("requirements_review")
+            audit = cv_requirement_audit_fields(requirements_review or {}, required=True)
+            supplied_audit = cv_requirement_audit_fields(info)
+            if audit is None or supplied_audit is None or supplied_audit and supplied_audit != audit:
+                print("erro: revisão tipada de requisitos inválida ou divergente; NADA gravado")
+                return 2
+            cv_reference.update(audit)
+            if isinstance(atual, dict) and cv_requirement_audit_fields(atual) != audit:
+                print(f"intencao ja existe sem o mesmo recibo tipado de requisitos: {k} -- NAO envie")
+                return 1
+            content_review = _CV_INTENT_PREFLIGHT.get("content_review")
+            content_audit = cv_content_review_audit_fields(content_review or {}, required=True)
+            supplied_content_audit = cv_content_review_audit_fields(info)
+            if (
+                content_audit is None
+                or supplied_content_audit is None
+                or supplied_content_audit and supplied_content_audit != content_audit
+            ):
+                print("erro: revisão factual final inválida ou divergente; NADA gravado")
+                return 2
+            cv_reference.update(content_audit)
+            if isinstance(atual, dict) and cv_content_review_audit_fields(atual) != content_audit:
+                print(f"intencao ja existe sem o mesmo recibo de revisão factual final: {k} -- NAO envie")
+                return 1
         ev["chave"] = k
         if atual is None:   # same round calling again (retry of the click) keeps the first timestamp
             rec = {c: str(info[c])[:300] for c in ("empresa", "vaga", "url", "como") if info.get(c)}
+            if cv_reference:
+                rec.update(cv_reference)
             rec.update(em=_agora(), rodada=rodada, tentativa=dono)
             d.setdefault("envios_pendentes", {})[k] = rec
     elif cmd == "cancelar-intencao":
@@ -533,14 +641,32 @@ LEITURA = {"resumo", "get", "tem", "ja-visto", "dado", "resumo-candidato"}
 
 
 def main_travado(argv):
-    """Writes hold the exclusive state lock for the whole load -> modify -> save; reads take none."""
+    """Writes hold the state lock; the slow optional CV/browser checks run before it."""
     com_file = argv[:1] == ["--file"] and len(argv) > 1
     path = argv[1] if com_file else os.environ.get("APLICADAS_FILE", DEFAULT)
     resto = argv[2:] if com_file else argv
     if not resto or resto[0] in LEITURA:
         return main(argv)
-    with travado(path):
-        return main(argv)
+
+    command_args = [item for item in resto if item != "--forcar"]
+    preflight = None
+    if len(command_args) >= 3 and command_args[0] == "intencao":
+        info = parse(command_args[2])
+        if isinstance(info, dict):
+            reference = cv_manifest_fields(info)
+            if reference:
+                preflight, reason = verify_cv_attachment(info, reference, command_args[1])
+                if preflight is None:
+                    print(f"erro: CV nao liberado para esta vaga; NADA gravado: {reason}")
+                    return 2
+
+    global _CV_INTENT_PREFLIGHT
+    _CV_INTENT_PREFLIGHT = preflight
+    try:
+        with travado(path):
+            return main(argv)
+    finally:
+        _CV_INTENT_PREFLIGHT = None
 
 
 if __name__ == "__main__":

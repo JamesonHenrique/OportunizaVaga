@@ -6,7 +6,7 @@ the best ones into the prompt, so the round spends its time applying instead of 
 
   descobrir.py coletar [--force]   fetch sources (time-gated: at most every intervalo_min)
   descobrir.py prompt N            print the top-N block for the prompt (counts one offer each)
-  descobrir.py triar [N]           pre-read the next N jobs by script (closed / description / official level)
+  descobrir.py triar [N] [--refresh] [--key KEY]  pre-read descriptions; optionally refresh one selected job
   descobrir.py marcar              after a round: close jobs now registered / offered too often
   descobrir.py resumo              one-line counts (monitor/log)
 
@@ -23,6 +23,7 @@ Indeed is left out on purpose: it sits behind Cloudflare.
 Be polite: a handful of requests every ~90 min. See docs/USO-ETICO.md.
 """
 import copy
+import hashlib
 import html
 import itertools
 import json
@@ -40,6 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import perfil_render  # noqa: E402
 import vaga_check  # noqa: E402
 import vagas_filtros as vf  # noqa: E402
+import compatibilidade_fila  # noqa: E402
 try:   # imported at load time: the private wrapper restores sys.path right after loading this module
     import fontes_boards  # noqa: E402
 except ImportError:
@@ -369,6 +371,17 @@ def motivo_descricao(ctx, v):
             return None
         e = vaga_check.explicar(texto, v["titulo"], oficial_util(v, oficial), ctx.vaga_conf)   # same verdict as avaliar()
         v["desc_checada"] = True
+        if e["compativel"]:
+            try:
+                description_id, description_sha = compatibilidade_fila.cache_job_description(
+                    ctx.paths["state_dir"], v["id"], texto
+                )
+                v["job_description_id"] = description_id
+                v["job_description_sha256"] = description_sha
+            except compatibilidade_fila.QueueCompatibilityError:
+                # Discovery eligibility remains usable; Resume-Matcher stays unavailable for this source.
+                v.pop("job_description_id", None)
+                v.pop("job_description_sha256", None)
         # traceable, compact: which criteria were confirmed / unknown (never a hiring probability)
         v["criterios"] = {k: c["estado"] for k, c in e["criterios"].items()}
         v["cobertura"] = e["cobertura"]
@@ -789,6 +802,50 @@ def pendentes(fila, cfg=None, hoje=None):
     return sorted(vs, key=lambda v: (-v.get("score", 0), v.get("ofertas", 0), -dia(v)))
 
 
+def compatibilidade_resume_matcher(v, queue_path=None):
+    """Compact, explicitly advisory signal; it never participates in discovery ranking."""
+    report = v.get("resume_matcher_compatibility")
+    if not isinstance(report, dict) or report.get("schema_version") != 1:
+        return ""
+    if (
+        queue_path is None
+        or not compatibilidade_fila.report_is_current(queue_path, v.get("id"), v, report)
+    ):
+        return ""
+    expected_profile = os.environ.get("OV_DISCOVERY_PROFILE_SHA256", "").strip().lower()
+    if expected_profile and report.get("status") == "ANALYZED":
+        if not re.fullmatch(r"[0-9a-f]{64}", expected_profile):
+            return ""
+        if report.get("profile_sha256") != expected_profile:
+            return ""
+    url = str(v.get("url") or "")
+    url_digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
+    if report.get("title") != v.get("titulo") or report.get("job_url_sha256") != url_digest:
+        return ""
+    status = report.get("status")
+    analyzed_at = report.get("analyzed_at")
+    has_iso_timestamp = isinstance(analyzed_at, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}T.*", analyzed_at)
+    analyzed_date = analyzed_at[:10] if has_iso_timestamp else ""
+    date_tag = f" {analyzed_date}" if analyzed_date else ""
+    requirement_review = report.get("requirements_review")
+    if not isinstance(requirement_review, dict) or requirement_review.get("status") != "APPROVED":
+        requirement_tag = " — requisitos sem revisão"
+    elif requirement_review.get("recommendation") == "REVIEW_POSSIBLE_BARRIER":
+        count = requirement_review.get("required_barrier_count")
+        requirement_tag = f" — {count} possíveis barreiras obrigatórias" if isinstance(count, int) else " — revisar requisitos obrigatórios"
+    else:
+        requirement_tag = " — revisão de requisitos concluída; não é decisão de elegibilidade"
+    if status == "ANALYZED":
+        score_data = report.get("score")
+        score = score_data.get("keyword_match_percentage") if isinstance(score_data, dict) else None
+        if isinstance(score, (int, float)) and not isinstance(score, bool) and 0 <= score <= 100:
+            return f" [RM heurístico {score:g}%{date_tag}{requirement_tag} — fora do score da fila]"
+        return f" [RM analisado{date_tag}{requirement_tag} — heurístico]"
+    if status in ("INCOMPATIBLE", "UNVERIFIABLE"):
+        return f" [RM {status.lower()}{date_tag}]"
+    return ""
+
+
 def prompt(ctx, n):
     fila = vf.load_json(ctx.fila_path, {"vagas": {}})
     base_fila = copy.deepcopy(fila)   # salvar_fila applies only this run's changes
@@ -804,6 +861,7 @@ def prompt(ctx, n):
         v["oferta_aberta"] = True   # marcar(LOG) counts it as an offer only if the round log shows the job was opened
         titulo = re.sub(r"\s+", " ", v["titulo"])[:120]
         tag = (" [descrição ok]" if v.get("desc_checada") else "") + (" [candidatura simplificada]" if v.get("simplificada") else "")
+        tag += compatibilidade_resume_matcher(v, ctx.fila_path)
         print(f"  {i}) [score {v.get('score', 0)}]{tag} {(v.get('empresa') or '?')[:60]} — {titulo} | {v['fonte']} | "
               f"{(v.get('local') or '')[:40]} | publ. {v.get('publicada') or '?'} | {v['url']}")
     print("  " + (ctx.cfg["prompt_registro"] or "Registre CADA uma com o campo \"url\" acima: aplicou → estado.py "
@@ -837,7 +895,7 @@ def texto_generico(url):
     return html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", corpo))), fechada
 
 
-def triar(ctx, n=8):
+def triar(ctx, n=8, force_refresh=False, only_key=None):
     """Pre-read the next jobs the model would get (05/10, idea 3): description + official level + closed posting,
     by script, BEFORE the gate decides whether a model session is worth it.
 
@@ -846,10 +904,19 @@ def triar(ctx, n=8):
     posting to find "Sênior", "MID" or "no longer accepting applications" (05/10 14:48: 5 offered, 5 discarded).
     Fail open: a fetch error leaves the job as it was."""
     fila = vf.load_json(ctx.fila_path, {"vagas": {}})
+    if only_key and (
+        not isinstance(fila.get("vagas"), dict)
+        or not isinstance(fila["vagas"].get(only_key), dict)
+        or fila["vagas"][only_key].get("status") != "nova"
+    ):
+        print("descobrir: chave ausente ou não pendente na fila", file=sys.stderr)
+        return 2
     base_fila = copy.deepcopy(fila)   # salvar_fila applies only this run's changes
     vistos = cortados = 0
     _, blobs, _ = ids_conhecidos(ctx.paths["aplicadas"])
     for v in pendentes(fila, ctx.cfg):
+        if only_key and v.get("id") != only_key:
+            continue
         if vistos >= n:
             break
         # 05/10 measured: Telegram posts whose link is a recruiter PROFILE, and jobs the model already
@@ -862,8 +929,18 @@ def triar(ctx, n=8):
             v.update(status="processada", motivo="ja registrada (triagem)", visto_em=_stamp())
             cortados += 1
             continue
-        if v.get("desc_checada") or v.get("triagem_falhou"):
+        has_cached_description = bool(v.get("job_description_id") and v.get("job_description_sha256"))
+        if not force_refresh and v.get("desc_checada") and has_cached_description:
             continue
+        if not force_refresh and v.get("triagem_falhou"):
+            continue
+        if force_refresh or not has_cached_description:
+            # A refresh attempt invalidates the old advisory score before fetching the current posting.
+            v.pop("resume_matcher_compatibility", None)
+        if force_refresh:
+            v.pop("job_description_id", None)
+            v.pop("job_description_sha256", None)
+            v.pop("desc_checada", None)
         vistos += 1
         try:
             if v["fonte"] == "linkedin":
@@ -887,13 +964,31 @@ def triar(ctx, n=8):
             v["triagem_falhou"] = _stamp()
             continue
         ok, motivo = vaga_check.avaliar(texto, v["titulo"], oficial_util(v, oficial), ctx.vaga_conf)
-        v["desc_checada"], v["nivel_oficial"] = True, oficial or ""
         if not ok:
+            v["desc_checada"], v["nivel_oficial"] = True, oficial or ""
             v.update(status="filtrada", motivo="desc:" + motivo, visto_em=_stamp())
             cortados += 1
+            continue
+        try:
+            description_id, description_sha = compatibilidade_fila.cache_job_description(
+                ctx.paths["state_dir"], v["id"], texto
+            )
+        except compatibilidade_fila.QueueCompatibilityError:
+            # The deterministic gate still decides eligibility; without a safe local source file,
+            # Resume-Matcher scoring stays unavailable for this job.
+            description_id, description_sha = None, None
+        v["desc_checada"], v["nivel_oficial"] = True, oficial or ""
+        v.pop("triagem_falhou", None)
+        if description_id and description_sha:
+            v["job_description_id"] = description_id
+            v["job_description_sha256"] = description_sha
+        else:
+            v.pop("job_description_id", None)
+            v.pop("job_description_sha256", None)
         time.sleep(random.uniform(1.5, 3))   # polite
     vf.salvar_fila(ctx.fila_path, base_fila, fila)
-    print(f"descobrir: triagem leu {vistos}, cortou {cortados} (encerrada/descricao)")
+    suffix = " (descrições atualizadas)" if force_refresh else ""
+    print(f"descobrir: triagem leu {vistos}, cortou {cortados} (encerrada/descricao){suffix}")
     return 0
 
 
@@ -1031,7 +1126,27 @@ def main(argv):
     if cmd == "coletar":
         return coletar(ctx, "--force" in argv)
     if cmd == "triar":
-        return triar(ctx, int(argv[2]) if len(argv) > 2 else 8)
+        args = argv[2:]
+        force_refresh = "--refresh" in args
+        only_key = None
+        if "--key" in args:
+            key_index = args.index("--key")
+            if key_index + 1 >= len(args) or args[key_index + 1].startswith("-"):
+                print("uso: descobrir.py triar [N] [--refresh] [--key CHAVE]", file=sys.stderr)
+                return 2
+            only_key = args[key_index + 1]
+            del args[key_index:key_index + 2]
+        args = [item for item in args if item != "--refresh"]
+        numeric_items = [item for item in args if item.isdigit()]
+        if len(numeric_items) > 1 or any(item.startswith("-") for item in args) or any(not item.isdigit() for item in args):
+            print("uso: descobrir.py triar [N] [--refresh] [--key CHAVE]", file=sys.stderr)
+            return 2
+        return triar(
+            ctx,
+            int(numeric_items[0]) if numeric_items else 8,
+            force_refresh=force_refresh,
+            only_key=only_key,
+        )
     if cmd == "prompt":
         return prompt(ctx, int(argv[2]) if len(argv) > 2 else 5)
     if cmd == "marcar":
