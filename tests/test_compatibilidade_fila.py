@@ -543,6 +543,10 @@ def test_missing_revision_pin_blocks_before_scoring(tmp_path: Path, monkeypatch:
 def test_evidence_references_do_not_match_substrings_or_return_profile_text() -> None:
     profile = {
         "summary": "Built a synthetic JavaScript interface.",
+        "additional": {
+            "technicalSkills": [".NET", "Node.js", "C++"],
+            "certificationsTraining": ["Curso de Python."],
+        },
         "personalProjects": [{
             "name": "Synthetic project",
             "description": ["Documented software testing."],
@@ -555,11 +559,22 @@ def test_evidence_references_do_not_match_substrings_or_return_profile_text() ->
     }
     references = compatibility._evidence_references(
         profile,
-        {"required_skills": ["Java", "JavaScript"], "preferred_skills": ["testing"], "keywords": []},
+        {
+            "required_skills": ["Java", "JavaScript", ".NET", "NET", "Node.js", "Node", "C++", "C", "Python"],
+            "preferred_skills": ["testing"],
+            "keywords": [],
+        },
     )
     assert references == {
         "Java": ["customSections#1"],
         "JavaScript": ["summary"],
+        ".NET": ["additional.technicalSkills"],
+        "NET": [],
+        "Node.js": ["additional.technicalSkills"],
+        "Node": [],
+        "C++": ["additional.technicalSkills"],
+        "C": [],
+        "Python": ["additional.certificationsTraining"],
         "testing": ["personalProjects#1"],
     }
     assert "private custom heading" not in json.dumps(references)
