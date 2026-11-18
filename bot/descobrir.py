@@ -40,6 +40,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import perfil_render  # noqa: E402
 import vaga_check  # noqa: E402
 import vagas_filtros as vf  # noqa: E402
+import dedup  # noqa: E402
 try:   # imported at load time: the private wrapper restores sys.path right after loading this module
     import fontes_boards  # noqa: E402
 except ImportError:
@@ -749,6 +750,17 @@ def coletar(ctx, force=False, fontes=None):
     # mesmos 8. Guardado o que sobrou para a proxima coleta.
     if any(n == "linkedin" for n, _ in buscas) and li_rodados < n_t:
         fila["termo_idx"] = (i0 + li_rodados) % len(ctx.termos)
+
+    # Phase 1.5 — Cross-portal deduplication: if identical vacancies are found across multiple boards,
+    # keep the higher-priority portal (gupy > remotar > linkedin) and avoid redundant description checks.
+    if candidatas:
+        antes_dedup = {v["id"]: v for v in candidatas}
+        candidatas = dedup.deduplicar_vagas(candidatas)
+        mantidas_ids = {v["id"] for v in candidatas}
+        for vid, v in antes_dedup.items():
+            if vid not in mantidas_ids:
+                filtro["duplicada_cross_portal"] = filtro.get("duplicada_cross_portal", 0) + 1
+                vagas[vid] = {"status": "filtrada", "motivo": "duplicada cross-portal", "visto_em": _stamp()}
 
     # Phase 2 — description triage. Gupy descriptions come with the search (free); LinkedIn pages cost one request
     # each, so they go to the best-scored candidates first (01/10: 900+ listings, max_descricoes of them checked).
