@@ -69,6 +69,31 @@ def test_deduplicar_vagas_preserves_unique_jobs():
     assert len(deduped) == 3
 
 
+def test_normalizar_titulo_compounds_and_special_tech_tokens():
+    assert dedup.normalizar_titulo("Dev Back-End Node.js / C# / C++ Jr.") == "backend c# c++ junior node.js"
+    assert dedup.normalizar_titulo("Desenvolvedor(a) Full Stack Aprendiz") == "fullstack trainee"
+
+
+def test_deduplicar_vagas_ties_immutability_and_existing_alternativas():
+    v1 = {
+        "id": "board1:10", "fonte": "programathor", "empresa": "Gamma Ltda", "titulo": "Dev Python Jr",
+        "url": "https://programathor.com.br/jobs/10",
+        "fontes_alternativas": [{"fonte": "telegram", "id": "tg:1", "url": "https://t.me/vagas/1"}],
+    }
+    v2 = {
+        "id": "board2:20", "fonte": "geekhunter", "empresa": "Gamma S.A.", "titulo": "Desenvolvedor Python Júnior",
+        "url": "https://geekhunter.com.br/vagas/20",
+    }
+    orig_v1_alt = list(v1["fontes_alternativas"])
+
+    deduped = dedup.deduplicar_vagas([v1, v2])
+    assert len(deduped) == 1
+    assert deduped[0]["id"] == "board1:10"  # tie keeps first seen
+    assert len(deduped[0]["fontes_alternativas"]) == 2
+    assert v1["fontes_alternativas"] == orig_v1_alt  # input dict not mutated
+    assert "fontes_alternativas" not in v2
+
+
 if __name__ == "__main__":
     for f in list(locals().values()):
         if callable(f) and f.__name__.startswith("test_"):

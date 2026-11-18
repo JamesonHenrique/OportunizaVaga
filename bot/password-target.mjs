@@ -34,9 +34,19 @@ export function selectPasswordTarget(targets, input) {
 }
 
 export function buildFillExpression(hostname, selector, password) {
+  const escaped = hostname.replace(/\./g, '\\.');
+  const hrefPattern = `^https:\\/\\/${escaped}(?::443)?(?:[/?#]|$)`;
   return `(() => {
-    const matches = ${matchesHostname.toString()};
-    const safe = () => matches(location.href, ${JSON.stringify(hostname)});
+    // Use native Location properties when present (never call page-global URL, which a page can override).
+    const safe = () => {
+      if (typeof location.origin === 'string') {
+        return location.protocol === 'https:'
+          && location.hostname === ${JSON.stringify(hostname)}
+          && location.origin === ${JSON.stringify(`https://${hostname}`)};
+      }
+      return typeof location.href === 'string' && !/[\\s\\\\]/.test(location.href)
+        && new RegExp(${JSON.stringify(hrefPattern)}, 'i').test(location.href);
+    };
     if (!safe()) return 0;
     const els = [...document.querySelectorAll(${JSON.stringify(selector)})].filter(e => e.offsetParent !== null);
     if (!els.length || !safe()) return 0;

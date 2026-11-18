@@ -44,6 +44,8 @@ for (const url of [
   'https://evil.test/?next=https://careers.example.com',
   'https://evil.test/#careers.example.com',
   'https://careers.example.com@evil.test/signup',
+  'https://user:pass@careers.example.com/signup',
+  'https://careers.example.com:8443/signup',
   'http://careers.example.com/signup',
   'not a URL careers.example.com',
 ]) {
@@ -165,7 +167,7 @@ test('fills visible fields only on the unique exact HTTPS host, preserving custo
 
 test('keeps credential deduplication and unrelated rows', t => {
   const initial = `other.example\tother@example.com\tsynthetic-other\n${host}\tuser@example.com\tsynthetic-old\n${host}\tuser@example.com\tsynthetic-duplicate\n`;
-  const r = run(t, { targets: [page(`https://${host}/`)] }, { initial });
+  const r = run(t, { targets: [page(`https://${host}/`)] }, { domain: host.toUpperCase(), initial });
   assert.equal(r.status, 0);
   assert.match(r.stdout, /colapsadas em 1/);
   const rows = r.contents.trim().split('\n');
@@ -182,7 +184,7 @@ test('does not save credentials when there are no visible fields', t => {
   assert.equal(r.contents, null);
 });
 
-for (const domain of [`https://${host}`, `${host}/path`, `${host}:443`, `${host}@evil.test`]) {
+for (const domain of [`https://${host}`, `${host}/path`, `${host}:443`, `${host}@evil.test`, `${host}.`]) {
   test(`rejects a hostname argument containing URL components: ${domain}`, t => {
     const r = run(t, { targets: [] }, { domain });
     assert.equal(r.status, 2);

@@ -8,23 +8,18 @@ import { randomBytes } from 'node:crypto';
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { matchesHostname, parseHostname } from './password-target.mjs';
 
 const [DOMAIN, EMAIL, SELECTOR = 'input[type=password]'] = process.argv.slice(2);
 if (!DOMAIN || !EMAIL) { console.log('usage: nova-senha.mjs <dominio> <email> [seletor css]'); process.exit(2); }
 let hostname;
 try {
-  hostname = new URL(`https://${DOMAIN}`).hostname;
-  if (hostname !== DOMAIN.toLowerCase()) throw new Error('invalid hostname');
+  hostname = parseHostname(DOMAIN);
 } catch {
   console.log('erro: informe somente o hostname do site, sem URL, porta ou caminho');
   process.exit(2);
 }
-const matchesHost = (value) => {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' && url.hostname === hostname;
-  } catch { return false; }
-};
+const matchesHost = (value) => matchesHostname(value, hostname);
 
 const version = await (await fetch('http://127.0.0.1:9222/json/version')).json();
 const targets = await (await fetch('http://127.0.0.1:9222/json/list')).json();
@@ -113,24 +108,25 @@ const file = process.env.OV_CREDENTIALS_FILE || join(homedir(), '.config', 'opor
 mkdirSync(dirname(file), { recursive: true });
 let linhas = [];
 try { linhas = readFileSync(file, 'utf8').split('\n').filter(l => l.trim()); } catch {}
-const registro = `${DOMAIN}\t${EMAIL}\t${senha}`;
-const antes = linhas.filter(l => l.split('\t')[0] === DOMAIN).length;
-const i = linhas.findIndex(l => l.split('\t')[0] === DOMAIN);
+const registro = `${hostname}\t${EMAIL}\t${senha}`;
+const isSameDomain = (l) => l.split('\t')[0].toLowerCase() === hostname;
+const antes = linhas.filter(isSameDomain).length;
+const i = linhas.findIndex(isSameDomain);
 if (i >= 0) {
   // Collapse EVERY row for this domain, not just the first: the file on disk had programathor.com.br
   // twice with different passwords, and a lookup that takes the first match rotates the wrong one.
   // Insert back at the ORIGINAL index — after filter() the positions moved, so `linhas[i] = ...` would
   // land on whichever row happened to shift into slot i.
-  const restantes = linhas.filter(l => l.split('\t')[0] !== DOMAIN);
+  const restantes = linhas.filter(l => !isSameDomain(l));
   restantes.splice(Math.min(i, restantes.length), 0, registro);
   writeFileSync(file, restantes.join('\n') + '\n');
   console.log(antes > 1
-    ? `aviso: ${DOMAIN} estava em ${antes} linhas de credenciais.tsv; colapsadas em 1 (a senha nova e a que passa a valer localmente).`
-    : `aviso: ${DOMAIN} JA estava em credenciais.tsv; linha ${i + 1} ATUALIZADA (nao anexada). ` +
+    ? `aviso: ${hostname} estava em ${antes} linhas de credenciais.tsv; colapsadas em 1 (a senha nova e a que passa a valer localmente).`
+    : `aviso: ${hostname} JA estava em credenciais.tsv; linha ${i + 1} ATUALIZADA (nao anexada). ` +
       `Se a senha antiga ainda estiver valendo no site, o cadastro local deixou de bater com ele.`);
 } else {
   linhas.push(registro);
   writeFileSync(file, linhas.join('\n') + '\n');
 }
 try { chmodSync(file, 0o600); } catch {}
-console.log(`ok: senha ${i >= 0 ? 'atualizada' : 'nova'} em credenciais.tsv e preenchida em ${n} campo(s) de ${DOMAIN}`);
+console.log(`ok: senha ${i >= 0 ? 'atualizada' : 'nova'} em credenciais.tsv e preenchida em ${n} campo(s) de ${hostname}`);

@@ -81,13 +81,15 @@ def test_linkedin_logado_sem_colher_nao_e_funcionando():
 
 
 def test_linkedin_pausado_por_429_nao_e_funcionando():
-    r = _estado({
-        "aplicadas.json": {"aplicadas": [], "login_checagens": {"linkedin": {"em": H(1), "logado": "sim"}}},
-        "vagas_fila.json": {"ultima_coleta": H(1), "li_pausa": (AGORA + timedelta(hours=6)).isoformat(),
-                            "stats": {"erros": []}},
-    })
-    assert r["linkedin"]["estado"] == "indisponivel", r["linkedin"]
-    assert "429" in r["linkedin"]["evidencia"]
+    ate = (AGORA + timedelta(hours=6)).isoformat()
+    for li_pausa in ({"n": 2, "ate": ate}, ate):
+        r = _estado({
+            "aplicadas.json": {"aplicadas": [], "login_checagens": {"linkedin": {"em": H(1), "logado": "sim"}}},
+            "vagas_fila.json": {"ultima_coleta": H(1), "li_pausa": li_pausa,
+                                "stats": {"erros": []}},
+        })
+        assert r["linkedin"]["estado"] == "indisponivel", r["linkedin"]
+        assert "429" in r["linkedin"]["evidencia"] and ate[:16] in r["linkedin"]["evidencia"], r["linkedin"]
 
 
 def test_linkedin_colhendo_continua_funcionando():

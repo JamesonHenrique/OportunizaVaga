@@ -24,7 +24,7 @@ _STOP_TITULO = {
 _NIVEL = {
     "junior": "junior", "jr": "junior", "pleno": "pleno", "pl": "pleno", "senior": "senior", "sr": "senior",
     "estagio": "estagio", "estagiario": "estagio", "estagiaria": "estagio", "intern": "estagio",
-    "internship": "estagio", "trainee": "trainee"
+    "internship": "estagio", "trainee": "trainee", "aprendiz": "trainee"
 }
 _JUNTAR = [(re.compile(rf"\b{a}\s+{b}\b"), a + b) for a, b in (("back", "end"), ("front", "end"), ("full", "stack"))]
 _SUFIXO_EMPRESA = re.compile(r"(?:\s+(?:ltda|sa|s a|eireli|me|epp|inc|llc|ltd|corp|co))+$")   # only at the END
@@ -52,9 +52,13 @@ def normalizar_empresa(empresa: str) -> str:
     return _SUFIXO_EMPRESA.sub("", e).strip()
 
 
-def gerar_hash_vaga(empresa: str, titulo: str, local: str = "") -> str:
-    chave = f"{normalizar_empresa(empresa)}|{normalizar_titulo(titulo)}|{vf.norm(local)}"
+def _hash_chave(emp_norm: str, tit_norm: str, local_norm: str = "") -> str:
+    chave = f"{emp_norm}|{tit_norm}|{local_norm}"
     return hashlib.sha256(chave.encode("utf-8")).hexdigest()[:12]
+
+
+def gerar_hash_vaga(empresa: str, titulo: str, local: str = "") -> str:
+    return _hash_chave(normalizar_empresa(empresa), normalizar_titulo(titulo), vf.norm(local))
 
 
 def _prioridade(v):
@@ -70,7 +74,7 @@ def deduplicar_vagas(vagas: list[dict]) -> list[dict]:
         if not emp or not tit:
             saida.append(("solo", v))
             continue
-        k = gerar_hash_vaga(emp, tit)
+        k = _hash_chave(emp, tit)
         if k not in grupos:
             grupos[k] = []
             saida.append(("grupo", k))

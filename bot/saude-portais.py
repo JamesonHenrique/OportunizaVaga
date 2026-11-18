@@ -82,9 +82,11 @@ def avaliar(state_dir, agora=None, aplicadas_path=None):
         if isinstance(li, dict) and li.get("em") and recente(_quando(li.get("em"))) and not li.get("lidas"):
             cands.append(("falha_recente", "garimpo logado: 0 cards em %s rodada(s)" % li.get("zeros", 1),
                           _quando(li.get("em"))))
-        pausa_li = _quando(fila.get("li_pausa")) if p == "linkedin" else None
+        raw_pausa_li = fila.get("li_pausa") if p == "linkedin" else None
+        ate_li = raw_pausa_li.get("ate") if isinstance(raw_pausa_li, dict) else raw_pausa_li
+        pausa_li = _quando(ate_li)
         if pausa_li and pausa_li > agora:
-            cands.append(("indisponivel", "busca pausada por 429 ate %s" % str(fila.get("li_pausa"))[:16], None))
+            cands.append(("indisponivel", "busca pausada por 429 ate %s" % str(ate_li)[:16], None))
         r = sites_rod.get(p) if isinstance(sites_rod.get(p), dict) else {}
         pausa = _quando(r.get("pausado_ate"))
         if pausa and pausa > agora:

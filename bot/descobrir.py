@@ -68,6 +68,7 @@ DEFAULTS = {
     "stack_evitar": [],         # title words that reject a job (unless it also has stack_preferida)
     "stack_preferida": [],      # title words that rescue a job and add score (also used by vaga_check on the description)
     "score_palavras": [],       # title words worth +2 in the queue ranking; empty = stack_preferida (else profile terms)
+    "score_familias": [],       # target non-dev job family phrases worth +1 in score(); empty = FAMILIAS_PADRAO
     "linkedin_sufixo": "",      # appended to LinkedIn keywords without a remote word (e.g. "remoto"); "" = off
     "linkedin_cidade_fora": False,  # remote-only profile: LinkedIn card located in a city/state ("Sao Paulo, SP") = "modelo"
     "titulo_exige": [],         # title must have at least one of these words (area check for broad terms); [] = off
@@ -748,7 +749,7 @@ def coletar(ctx, force=False, fontes=None):
     # 27/10: o indice de termos so avanca sobre o que rodou de fato. Com o LinkedIn em pausa (429) a
     # coleta pulava a fonte e ainda queimava `termos_por_coleta` termos — a varredura nunca passava dos
     # mesmos 8. Guardado o que sobrou para a proxima coleta.
-    if any(n == "linkedin" for n, _ in buscas) and li_rodados < n_t:
+    if "linkedin" in fontes and li_rodados < len(escolhidos):
         fila["termo_idx"] = (i0 + li_rodados) % len(ctx.termos)
 
     # Phase 1.5 — Cross-portal deduplication: if identical vacancies are found across multiple boards,
