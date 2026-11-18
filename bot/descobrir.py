@@ -132,10 +132,32 @@ class Ctx:
             self.score_re = vf.regex_lista(sorted(ws))
 
 
-def get(url, timeout=20):
+def get(url, timeout=20, tentativas=3):
+    """28/10 P2: um 5xx/timeout transitorio derrubava o termo inteiro (e a rodada). Agora 5xx/rede
+    tentam 2s/4s; 4xx (inclusive 429) nunca tentam de novo — significam "pare"."""
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read().decode("utf-8", "replace")
+    for i in range(tentativas):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            if e.code in (500, 502, 503, 504) and i + 1 < tentativas:
+                time.sleep(2 ** i)
+                continue
+            # 27/10: o 429 do LinkedIn manda Retry-After em segundos; antes era ignorado e a pausa local
+            # (3h, 6h, 12h, 24h) podia ser mais curta que o pedido do servidor — batia de novo e renovava
+            # o bloqueio.
+            try:
+                e.retry_after = int(e.headers.get("Retry-After") or 0)
+            except (TypeError, ValueError):
+                e.retry_after = 0
+            raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if i + 1 < tentativas:
+                time.sleep(2 ** i)
+                continue
+            raise
+    return ""
 
 
 # ---------------------------------------------------------------- parsers (pure, unit-tested)
@@ -429,12 +451,23 @@ def motivo_filtro(ctx, v, pular_empresas, hoje=None):
     return None
 
 
+# 28/10: familias alvo que nao sao "dev" (o perfil pede suporte, QA, dados, cloud/ops tambem). O score era
+# so-dev: "Analista de Suporte" valia 0 e nunca passava do piso do portao, por isso 24 vagas ficaram paradas.
+# Frases, nao palavras soltas: "dados" sozinho premiou "Estagio em Contabilidade: Dados e IA".
+FAMILIAS_PADRAO = ("suporte", "support", "service desk", "help desk", "qa", "quality assurance",
+                   "analista de teste", "testes", "analista de dados", "data analyst", "engenharia de dados",
+                   "power bi", "infraestrutura", "infrastructure", "cloud", "devops", "sre",
+                   "sustentacao", "aplicacoes", "applications")
+
+
 def score(ctx, v, hoje=None):
     s = 0
     nt = vf.norm(v["titulo"])
     if ctx.score_re and ctx.score_re.search(nt):
         s += 2
     if ctx.bom and ctx.bom.search(nt):
+        s += 1
+    if any(f in nt for f in (ctx.cfg.get("score_familias") or FAMILIAS_PADRAO)):
         s += 1
     if v.get("simplificada"):
         s += 1   # 10/10: Easy Apply was 3 of the 4 LinkedIn sends since 01/10 (no ATS, no account)
@@ -620,6 +653,10 @@ def linkedin_pausa(ctx, fila):
         return
     n = int((fila.get("li_pausa") or {}).get("n", 0)) + 1
     horas = min(base * 2 ** (n - 1), float(ctx.cfg["linkedin_pausa_max_h"]))
+    pedido = float(getattr(ctx, "li_retry_after", 0) or 0) / 3600.0   # Retry-After do servidor, em horas
+    if pedido > horas:
+        print(f"descobrir: servidor pediu {pedido:.1f}h de espera (Retry-After), respeitando")
+        horas = min(pedido, float(ctx.cfg["linkedin_pausa_max_h"]))
     fila["li_pausa"] = {"n": n, "ate": (agora() + timedelta(hours=horas)).isoformat(timespec="seconds")}
     print(f"descobrir: linkedin 429, pausado por {horas:g}h (#{n})")
 
@@ -670,12 +707,15 @@ def coletar(ctx, force=False, fontes=None):
     t0, prazo = time.time(), float(ctx.cfg["tempo_max_s"])
     fora_do_prazo = lambda: time.time() - t0 > prazo
     candidatas, vistas_agora = [], set()
+    li_rodados = 0
     for nome, termo in buscas:
         if fora_do_prazo():
             stats["erros"].append(f"{nome}:prazo")
             continue
         if nome == "linkedin" and getattr(ctx, "li_429", False):
             continue   # 10/10: after a 429 the remaining LinkedIn searches only dig the throttle deeper
+        if nome == "linkedin":
+            li_rodados += 1
         pf = por_fonte.setdefault(nome, [0, 0, 0])
         pf[0] += 1
         try:
@@ -685,6 +725,7 @@ def coletar(ctx, force=False, fontes=None):
             pf[1] += 1
             if nome == "linkedin" and getattr(e, "code", None) == 429:
                 ctx.li_429 = True
+                ctx.li_retry_after = getattr(e, "retry_after", 0) or 0
             continue
         pf[2] += len(achadas)
         for v in achadas:
@@ -703,6 +744,12 @@ def coletar(ctx, force=False, fontes=None):
             v["score"], v["termo"] = score(ctx, v), termo
             candidatas.append(v)
         time.sleep(random.uniform(2, 5))  # polite: a handful of requests every ~90 min
+    # 27/10: o indice de termos so avanca sobre o que rodou de fato. Com o LinkedIn em pausa (429) a
+    # coleta pulava a fonte e ainda queimava `termos_por_coleta` termos — a varredura nunca passava dos
+    # mesmos 8. Guardado o que sobrou para a proxima coleta.
+    if any(n == "linkedin" for n, _ in buscas) and li_rodados < n_t:
+        fila["termo_idx"] = (i0 + li_rodados) % len(ctx.termos)
+
     # Phase 2 — description triage. Gupy descriptions come with the search (free); LinkedIn pages cost one request
     # each, so they go to the best-scored candidates first (01/10: 900+ listings, max_descricoes of them checked).
     li_ordem = sorted((v for v in candidatas if v["fonte"] == "linkedin"), key=lambda v: -v["score"])

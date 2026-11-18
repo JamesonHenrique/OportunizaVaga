@@ -68,6 +68,37 @@ def test_layout_privado_aplicadas_fora_do_dir():
         assert r["gupy"]["estado"] == "login_necessario" and r["indeed"]["estado"] == "funcionando", r
 
 
+
+def test_linkedin_logado_sem_colher_nao_e_funcionando():
+    """28/10: a sessao viva com 0 cards por dias aparecia como "funcionando" (login ok) no monitor."""
+    r = _estado({
+        "aplicadas.json": {"aplicadas": [], "login_checagens": {"linkedin": {"em": H(1), "logado": "sim"}}},
+        "vagas_fila.json": {"ultima_coleta": H(1), "stats": {"erros": [],
+                                                            "linkedin_logado": {"em": H(2), "lidas": 0, "zeros": 8}}},
+    })
+    assert r["linkedin"]["estado"] == "falha_recente", r["linkedin"]
+    assert "0 cards" in r["linkedin"]["evidencia"]
+
+
+def test_linkedin_pausado_por_429_nao_e_funcionando():
+    r = _estado({
+        "aplicadas.json": {"aplicadas": [], "login_checagens": {"linkedin": {"em": H(1), "logado": "sim"}}},
+        "vagas_fila.json": {"ultima_coleta": H(1), "li_pausa": (AGORA + timedelta(hours=6)).isoformat(),
+                            "stats": {"erros": []}},
+    })
+    assert r["linkedin"]["estado"] == "indisponivel", r["linkedin"]
+    assert "429" in r["linkedin"]["evidencia"]
+
+
+def test_linkedin_colhendo_continua_funcionando():
+    r = _estado({
+        "aplicadas.json": {"aplicadas": [], "login_checagens": {"linkedin": {"em": H(1), "logado": "sim"}}},
+        "vagas_fila.json": {"ultima_coleta": H(1), "stats": {"erros": [],
+                                                            "linkedin_logado": {"em": H(2), "lidas": 39, "zeros": 0}}},
+    })
+    assert r["linkedin"]["estado"] == "funcionando", r["linkedin"]
+
+
 if __name__ == "__main__":
     for nome, fn in sorted(globals().items()):
         if nome.startswith("test_") and callable(fn):
