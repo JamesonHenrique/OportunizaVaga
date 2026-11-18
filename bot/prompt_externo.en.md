@@ -13,6 +13,9 @@ c-Externo) NON-STANDARD ATS / SITE (rippling, greenhouse, lever, inhire.app, fac
       NEVER generate, type or read the password yourself (shell commands and fill_form go to the log). With
       the form open and the password fields visible, run:
       node $BOT_ROOT/bot/nova-senha.mjs <domain> <email_contas>
+      Use only the exact HTTPS tab hostname (e.g. company.inhire.app), without scheme, path,
+      query, userinfo or port; specify subdomains explicitly. Keep exactly one eligible tab open.
+      The helper rejects HTTP, non-default ports and changed origins; it saves only after confirming the fill.
       It generates the password, saves it to ~/.config/oportunizavaga/credenciais.tsv (chmod 600, OUTSIDE
       the repo; path overridable via OV_CREDENTIALS_FILE) and fills password + confirmation straight into
       the tab. Fill the other fields with fill_form, without touching the password fields. NEVER write a

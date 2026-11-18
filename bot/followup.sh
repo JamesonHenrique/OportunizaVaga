@@ -40,7 +40,16 @@ MODELOS=(
 )
 STALL_WATCHDOG_SECONDS="${OV_FOLLOWUP_STALL:-180}"
 NOTIFICAR_SH="$BOT_ROOT/scripts/notificar.sh"
-notify() { [ -x "$NOTIFICAR_SH" ] && "$NOTIFICAR_SH" "$1" >/dev/null 2>&1 || true; }
+notify() {
+  # Only fixed templates may cross the notification boundary; never forward logs or free text.
+  local message
+  case "${1:-}" in
+    0) message="📬 Follow-up semanal: concluído (status: sucesso)." ;;
+    75) message="⚠️ Follow-up semanal: não concluído (motivo: Chrome ocupado); tenta de novo amanhã." ;;
+    *) message="⚠️ Follow-up semanal: falhou (motivo: falha de execução); tenta de novo amanhã." ;;
+  esac
+  [ -x "$NOTIFICAR_SH" ] && "$NOTIFICAR_SH" "$message" >/dev/null 2>&1 || true
+}
 
 FLOG="logs/followup-$(date '+%Y%m%d-%H%M%S').log"
 echo "[$(date '+%F %T')] follow-up iniciado" >> followup.log
@@ -126,10 +135,10 @@ PY
   if [ "$STATUS" -eq 0 ]; then
     touch "$OK_MARK"
     echo "[$(date '+%F %T')] follow-up ok (modelo ${MODELO})" >> followup.log
-    notify "📬 Follow-up semanal: $(tail -n 12 "$FLOG" | tr -s '\n' ' ' | cut -c1-600)"
+    notify "$STATUS"
   else
     echo "[$(date '+%F %T')] follow-up FALHOU (status ${STATUS}); tenta de novo amanha" >> followup.log
-    notify "⚠️ Follow-up falhou (status ${STATUS}); tenta de novo amanhã"
+    notify "$STATUS"
   fi
 else
   echo "[$(date '+%F %T')] follow-up pulado: Chrome CDP fora" >> followup.log

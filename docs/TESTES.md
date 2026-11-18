@@ -1,6 +1,6 @@
 # TESTES — OportunizaVaga (Parte E)
 
-Três suites, sem instalar nada além do que o projeto já exige
+Suítes locais, sem instalar nada além do que o projeto já exige
 (bash + python3 no Linux, PowerShell no Windows, node 20+).
 
 ## 1. Linux / macOS / git-bash — suite TAP
@@ -68,11 +68,26 @@ com taxas, `descartes_listagem` sem `total` (soma campos), regra de resposta.
    host/pid/root.
 2. `MONITOR_INCLUDE_DETAILS=1` (opt-in): detalhes brutos aparecem.
 
+## Helper de senha — testes sintéticos (Node 20+)
+
+```bash
+node --check bot/nova-senha.mjs
+node --check bot/password-target.mjs
+node --test tests/password-target.test.mjs
+```
+
+O teste importa somente as funções puras de `bot/password-target.mjs`: parsing do
+hostname, seleção única de aba HTTPS e expressão de preenchimento em contexto
+JavaScript simulado. Cobre domínio em path/query, sufixos parecidos, HTTP,
+subdomínios, portas, zero/uma/duas abas, navegação após seleção/attach e durante
+focus, além de confirmação do preenchimento. Não abre browser, não acessa rede,
+não executa `nova-senha.mjs` e não lê credenciais.
+
 ## O que o CI cobre (`.github/workflows/ci.yml`)
 
 | Job | Steps de qualidade |
 |-----|--------------------|
-| `linux` (ubuntu) | `bash -n` nos scripts + adaptadores, shellcheck, `node --check`, JSON válido, `py_compile`, `scripts/validate.sh`, **ruff** (`ruff.toml`: só erros reais — sintaxe, nome indefinido, import/variável sem uso), **pytest** (`tests/*.py`), **toda `tests/test_*.sh`** e `tests/test_*.py`, **`node --test monitor/`**, `sanitize.sh` |
+| `linux` (ubuntu) | `bash -n` nos scripts + adaptadores, shellcheck, `node --check`, JSON válido, `py_compile`, `scripts/validate.sh`, **ruff** (`ruff.toml`: só erros reais — sintaxe, nome indefinido, import/variável sem uso), **pytest** (`tests/*.py`), **toda `tests/test_*.sh`** e `tests/test_*.py`, **`node --test monitor/*.test.mjs`**, **`node --test tests/password-target.test.mjs`**, `sanitize.sh` |
 | `windows` | PSScriptAnalyzer (só erros), `node --check`, JSON válido, `validate.ps1`, **`Pester tests/validate.Tests.ps1`**, `sanitize.sh` via git-bash |
 
 Dependabot (`.github/dependabot.yml`): npm em `monitor/` + github-actions, mensal.
