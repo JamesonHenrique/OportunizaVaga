@@ -5,25 +5,29 @@ import { Mark, Wordmark } from '@/components/brand/Brand';
 
 const ICONE = { inicio: House, candidaturas: Send, bloqueios: ShieldAlert, robo: Bot, linkedin: Users, telegram: MessageCircle };
 
-// Single navigation for every width: vertical rail on desktop, horizontal scroll strip below 1024px (CSS only).
-// itens: [{ id, rotulo, conta?, alerta? }]; `ativo` is 'inicio' while the overview is on screen, else the open tab.
+// One navigation for every width (CSS only switches the layout):
+// ≥1200px vertical rail with labels · 1024–1199px icon rail · <1024px fixed bottom tab bar
+// with equal-width cells and short labels, so no item is ever clipped or scrolled away.
+// itens: [{ id, rotulo, curto?, conta?, alerta? }]; `ativo` = the visible workspace.
 export default function Sidebar({ itens, ativo, onSelect, rodape }) {
   return (
-    <aside className="sidebar">
-      <a className="side-brand" href="#topo" onClick={(e) => { e.preventDefault(); onSelect('inicio'); }} aria-label="OportunizaVaga — voltar ao início">
+    <aside className="sidebar" style={{ '--nav-n': itens.length }}>
+      <a className="side-brand" href="#topo" onClick={(e) => { e.preventDefault(); onSelect('inicio'); }} aria-label="OportunizaVaga — Início">
         <Mark size={30} />
         <Wordmark />
       </a>
       <nav className="side-nav" aria-label="Seções do monitor">
         {itens.map(it => {
           const Ico = ICONE[it.id];
+          const on = ativo === it.id;
           return (
-            <button key={it.id} type="button" className={`side-item${ativo === it.id ? ' is-on' : ''}`}
-                    aria-current={ativo === it.id ? 'true' : undefined} title={it.rotulo} onClick={() => onSelect(it.id)}>
+            <button key={it.id} type="button" className={`side-item${on ? ' is-on' : ''}`}
+                    aria-current={on ? 'page' : undefined} title={it.rotulo} onClick={() => onSelect(it.id)}>
               {Ico && <Ico className="ico" aria-hidden="true" />}
               <span className="side-lbl">{it.rotulo}</span>
-              {it.conta != null && <em className="side-count">{it.conta}</em>}
-              {it.alerta && <span className="side-dot" role="img" aria-label="tem pendência" />}
+              <span className="side-short">{it.curto || it.rotulo}</span>
+              {it.conta != null && <em className="side-count"><span className="sr-only">, </span>{it.conta}</em>}
+              {it.alerta && <span className="side-dot"><span className="sr-only">, tem pendência</span></span>}
             </button>
           );
         })}

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Inbox } from 'lucide-react';
 import VagaLink from './VagaLink';
-import { Sparkbars } from './Charts';
+import { DailyChart } from './Charts';
 import { Seg, Tiles, Busca, Pager, paginar } from './ui';
 import { serieDias } from '@/lib/dashboard';
 
@@ -46,10 +46,7 @@ export default function InvitesPanel({ convites, bloqueios = [], convitesHoje = 
             { rotulo: 'Últimos 7 dias', valor: semana, sub: 'meta semanal 70' },
             { rotulo: 'Com nota', valor: convites.length ? `${Math.round((comNota / convites.length) * 100)}%` : '—', sub: `${comNota} convite(s)` },
           ]} />
-          <div className="bars-block">
-            <span className="bars-title">convites por dia · 14 dias</span>
-            <Sparkbars dados={serie} />
-          </div>
+          <DailyChart serie={serie} titulo="Convites por dia" unidade={['convite', 'convites']} compacto />
         </div>
       </section>
 

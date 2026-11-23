@@ -28,6 +28,11 @@ jobs:
       - name: node --check (monitor/*.mjs)
         run: |
           for f in monitor/*.mjs; do node --check "$f"; done
+      - name: password helper (syntax + synthetic tests, offline)
+        run: |
+          node --check bot/nova-senha.mjs
+          node --check bot/password-target.mjs
+          node --test tests/password-target.test.mjs
       - name: JSON válido (todo .json versionado, menos lockfile)
         run: |
           mapfile -t files < <(git ls-files '*.json' | grep -v 'package-lock\.json$')

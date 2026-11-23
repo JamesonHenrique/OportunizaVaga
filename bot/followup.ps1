@@ -15,6 +15,57 @@ Set-Location (Join-Path $BOT_ROOT 'bot')
 
 function Write-Stamp { return (Get-Date).ToString('yyyy-MM-dd HH:mm:ss') }
 
+function Invoke-FollowupModel {
+    param($Bin, $Model, $Title, $Prompt, $Config, [int]$TimeoutSeconds = 3300)
+
+    $job = $null
+    $result = [pscustomobject]@{ ExitCode = 1; Output = @('follow-up sem resultado valido') }
+    try {
+        $job = Start-Job -ScriptBlock {
+            param($bin, $mod, $ttl, $pr, $cfg)
+            if ($cfg) { $env:OPENCODE_CONFIG_CONTENT = $cfg }
+            # Native stderr is output, including on Windows PowerShell 5.1.
+            $ErrorActionPreference = 'Continue'
+            $PSNativeCommandUseErrorActionPreference = $false
+            $LASTEXITCODE = $null
+            $output = @(& $bin run -m $mod --title $ttl $pr 2>&1)
+            $nativeExitCode = $LASTEXITCODE
+            [pscustomobject]@{
+                Protocol = 'FollowupProcessResult/v1'
+                ExitCode = $nativeExitCode
+                Output = @($output | ForEach-Object { [string]$_ })
+            }
+        } -ArgumentList $Bin, $Model, $Title, $Prompt, $Config -ErrorAction Stop
+        $done = Wait-Job -Job $job -Timeout $TimeoutSeconds -ErrorAction Stop
+        if (-not $done) {
+            $result.ExitCode = 124
+            $result.Output = @('follow-up excedeu o timeout e foi abortado')
+        } elseif ($job.State -eq 'Completed') {
+            $records = @(Receive-Job -Job $job -ErrorAction Stop)
+            # No casts: missing/null/string exit codes must never become zero.
+            if ($records.Count -eq 1 -and
+                $records[0].Protocol -is [string] -and
+                $records[0].Protocol -ceq 'FollowupProcessResult/v1' -and
+                $records[0].ExitCode -is [int] -and
+                $null -ne $records[0].Output -and
+                @($records[0].Output | Where-Object { $_ -isnot [string] }).Count -eq 0) {
+                $result.ExitCode = $records[0].ExitCode
+                $result.Output = @($records[0].Output)
+            }
+        }
+    } catch {
+        $result.ExitCode = 1
+        $result.Output = @('follow-up falhou ao executar/receber o job: {0}' -f $_)
+    } finally {
+        if ($null -ne $job) {
+            Stop-Job -Job $job -ErrorAction SilentlyContinue
+            Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+        }
+    }
+    return $result
+}
+
+$ExitCode = 0
 $OpencodeCmd = Get-Command opencode -ErrorAction SilentlyContinue
 $OpencodeBin = $null
 if ($OpencodeCmd) { $OpencodeBin = $OpencodeCmd.Source }
@@ -122,25 +173,10 @@ if (Test-Cdp) {
 
             $STATUS = 1
             foreach ($MODELO in $MODELOS) {
-                $job = Start-Job -ScriptBlock {
-                    param($bin, $mod, $ttl, $pr, $cfg)
-                    if ($cfg) { $env:OPENCODE_CONFIG_CONTENT = $cfg }
-                    & $bin run -m $mod --title $ttl $pr 2>&1
-                } -ArgumentList $OpencodeBin, $MODELO, $title, $prompt, $OcCfg
                 # Sessao unica semanal: timeout de 55min por modelo, igual ao .sh.
-                $done = Wait-Job -Job $job -Timeout 3300
-                if ($done) {
-                    $out = Receive-Job -Job $job
-                    $out | Out-File -FilePath $FLOG -Encoding utf8
-                    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
-                    $STATUS = 0
-                    if ($job.State -eq 'Failed') { $STATUS = 1 }
-                } else {
-                    Stop-Job -Job $job -ErrorAction SilentlyContinue
-                    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
-                    Add-Content -Path $FLOG -Value 'follow-up excedeu o timeout e foi abortado'
-                    $STATUS = 124
-                }
+                $result = Invoke-FollowupModel -Bin $OpencodeBin -Model $MODELO -Title $title -Prompt $prompt -Config $OcCfg
+                $result.Output | Out-File -FilePath $FLOG -Encoding utf8
+                $STATUS = $result.ExitCode
                 $semCota = ($null -ne (Select-String -Path $FLOG -Pattern 'QUOTA_EXAUSTA|Rate limit|Model not found' -ErrorAction SilentlyContinue))
                 if ($semCota) {
                     Add-Content -Path 'followup.log' -Value ("[{0}] follow-up: {1} sem cota/indisponivel, proximo" -f (Write-Stamp), $MODELO)
@@ -149,6 +185,7 @@ if (Test-Cdp) {
                 }
                 break
             }
+            $ExitCode = $STATUS
             try {
                 Add-Content -Path 'followup.log' -Value ("--- saida do follow-up (completa em {0}) ---" -f $FLOG)
                 Get-Content $FLOG -Tail 20 -ErrorAction SilentlyContinue | Add-Content -Path 'followup.log'
@@ -175,3 +212,4 @@ try {
 } catch { }
 
 try { $LockStream.Close(); $LockStream.Dispose() } catch { }
+exit $ExitCode

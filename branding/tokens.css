@@ -1,15 +1,65 @@
-/* OportunizaVaga Design Tokens v2.0.0 — "Sinal que vira movimento"
-   Canonical source: branding/tokens.json. monitor/app/globals.css carries these same blocks verbatim.
-   v2 removed the v1 aliases (--brand-ink, --brand-blue, --brand-lime, --brand-green, --brand-grad, --strip-h).
+/* OportunizaVaga Design Tokens v3.0.0 — "Sinal que vira movimento" · direção "Instrumento de Precisão"
+   Canonical source: branding/tokens.json. monitor/app/globals.css carries the two token blocks below verbatim.
+   Consumers load Manrope and IBM Plex Mono. The monitor sets --font-manrope and --font-ibm-mono
+   with next/font/google. The font stacks also support the named families and system fallbacks.
+   v3: 7-step type scale (--fs-*), spacing (--space-*), motion (--motion-*), radius (--radius-*; cards 12px),
+   chart (--chart-*) and on-dark tint tokens; the --radius alias of v2 was removed (use --radius-md).
 */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap');
 
+/* ===== tokens:start ===== */
 :root,
 [data-theme="light"] {
   color-scheme: light;
 
-  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: var(--font-manrope, "Manrope"), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: var(--font-ibm-mono, "IBM Plex Mono"), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* type scale — 7 steps (px at 16px root): 12 · 13 · 14 · 16 · 20 · 28 · 48 */
+  --fs-micro: 0.75rem;
+  --fs-small: 0.8125rem;
+  --fs-body: 0.875rem;
+  --fs-h3: 1rem;
+  --fs-h2: 1.25rem;
+  --fs-h1: 1.75rem;
+  --fs-display: 3rem;
+  --lh-tight: 1.1;
+  --lh-snug: 1.35;
+  --lh-body: 1.55;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-heavy: 800;
+
+  /* spacing — 4px grid */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* radius — cards and panels use --radius-md */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* motion */
+  --motion-fast: 120ms;
+  --motion-normal: 180ms;
+  --motion-slow: 280ms;
+  --motion-ease: cubic-bezier(0.2, 0.75, 0.25, 1);
+
+  /* interaction sizing */
+  --target-min: 40px;
+  --nav-h: 64px;
 
   /* brand core — identical in both themes */
   --brand-navy: #101826;
@@ -36,6 +86,7 @@
   --tx3: #5f6c80;
   --ink: #101826;
   --ink-inv: #ffffff;
+  --on-accent: #ffffff;
   --track: #e6eaf0;
   --scroll: #c5cedb;
   --scroll-hover: #a3afc0;
@@ -53,6 +104,17 @@
   --bad: #b42318;    --bad-bg: #fdecea;
   --info: #2546cc;   --info-bg: #eaf0ff;
 
+  /* charts — bars ≥ 3:1 against --surface; "hoje" darker + labelled */
+  --chart-bar: #6a84f6;
+  --chart-bar-today: #2546cc;
+  --chart-bar-active: #3154e7;
+  --chart-zero: #c5cedb;
+  --chart-grid: #e6eaf0;
+  --chart-axis: #5f6c80;
+  --chart-today-band: #eaf0ff;
+  --chart-tip-bg: #101826;
+  --chart-tip-tx: #f7f7f2;
+
   /* navy shell + dark panels (sidebar, automation monitor, terminal) */
   --side-bg: #101826;
   --side-line: #222f44;
@@ -61,6 +123,8 @@
   --side-tx2: #b8c2d3;
   --side-dim: #8e9bb0;
   --side-accent: #8ca0ff;
+  --side-chip: rgba(247, 247, 242, 0.08);
+  --side-chip-on: rgba(255, 255, 255, 0.2);
   --night-bg: #101826;
   --night-2: #172235;
   --night-line: #2c3a50;
@@ -70,12 +134,13 @@
   --night-ok: #d7f36a;
   --night-warn: #ffd080;
   --night-bad: #ff9b91;
+  --night-ok-bg: rgba(215, 243, 106, 0.12);
+  --night-warn-bg: rgba(255, 208, 128, 0.12);
+  --night-bad-bg: rgba(255, 114, 94, 0.16);
+  --night-mute-bg: rgba(247, 247, 242, 0.08);
+  --chartreuse-ring: rgba(39, 50, 10, 0.28);
 
-  /* shape & depth */
-  --radius-xs: 4px;
-  --radius-sm: 7px;
-  --radius: 10px;
-  --radius-lg: 14px;
+  /* depth */
   --shadow: 0 1px 2px rgba(16, 24, 38, 0.04);
   --shadow-pop: 0 12px 32px rgba(16, 24, 38, 0.12);
   --ring: 0 0 0 3px rgba(62, 99, 245, 0.24);
@@ -91,7 +156,7 @@
   --term-bad: #ff9b91;
 
   --side-w: 240px;
-  --gutter: 36px;
+  --gutter: 32px;
   --topbar-h: 60px;
 }
 
@@ -111,6 +176,7 @@
   --tx3: #9ba8bb;
   --ink: #f7f7f2;
   --ink-inv: #101826;
+  --on-accent: #ffffff;
   --track: #1d2a3d;
   --scroll: #34445c;
   --scroll-hover: #50617b;
@@ -126,6 +192,16 @@
   --bad: #ff9b91;    --bad-bg: #43201f;
   --info: #a9b8ff;   --info-bg: #202e56;
 
+  --chart-bar: #5a73d6;
+  --chart-bar-today: #a9b8ff;
+  --chart-bar-active: #8ca0ff;
+  --chart-zero: #40506a;
+  --chart-grid: #1d2a3d;
+  --chart-axis: #9ba8bb;
+  --chart-today-band: #182544;
+  --chart-tip-bg: #f7f7f2;
+  --chart-tip-tx: #101826;
+
   /* shell gets darker than the canvas; the automation card lighter, so neither melts into it */
   --side-bg: #090e17;
   --side-line: #1c2738;
@@ -140,3 +216,4 @@
   --term-bg: #0a101b;
   --term-line: #1f2c43;
 }
+/* ===== tokens:end ===== */

@@ -401,14 +401,14 @@ def main(argv):
         rodada = os.environ.get("OV_RODADA") or ""
         # owner = the cascade attempt (loop.sh OV_TENTATIVA): the next model of the same round must not
         # inherit a killed attempt's click. Without the loop (manual runs) the owner is empty = always "other".
-        dono = os.environ.get("OV_TENTATIVA") or rodada
+        dono = os.environ.get("OV_TENTATIVA") or ""
         atual = pendentes(d).get(k)
-        if isinstance(atual, dict) and (not dono or atual.get("tentativa", atual.get("rodada")) != dono):
+        if isinstance(atual, dict) and (not dono or atual.get("tentativa") != dono):
             print(f"resultado desconhecido desde {atual.get('em')} (rodada {atual.get('rodada') or '?'}): {k} -- NAO "
                   "envie; verifique no portal/e-mail. Saiu = add-aplicada; nao saiu = cancelar-intencao CHAVE MOTIVO")
             return 1
         ev["chave"] = k
-        if atual is None:   # same round calling again (retry of the click) keeps the first timestamp
+        if atual is None:   # same invocation keeps the first timestamp
             rec = {c: str(info[c])[:300] for c in ("empresa", "vaga", "url", "como") if info.get(c)}
             rec.update(em=_agora(), rodada=rodada, tentativa=dono)
             d.setdefault("envios_pendentes", {})[k] = rec

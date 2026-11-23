@@ -5,7 +5,7 @@ import { buildSnapshot } from './snapshot.mjs';
 
 const endpoint = process.env.MONITOR_URL;
 if (!endpoint) throw new Error('Defina MONITOR_URL com a URL da Vercel.');
-const secret = process.env.MONITOR_SECRET || null;
+const secret = process.env.MONITOR_SECRET || process.env.MONITOR_INGEST_SECRET;
 
 const ACTIVE_MS = 15000;   // rodada em andamento: atualiza rapido
 const IDLE_MS = 60000;     // dormindo/quota: economiza requisicao (tudo no free tier)
@@ -16,10 +16,8 @@ let timer = null;
 let falhasSeguidas = 0;
 
 async function publish() {
-  const snapshot = buildSnapshot();
-  const ctrl = new AbortController();
-  const timeout = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
+    const snapshot = buildSnapshot();
     const response = await fetch(`${endpoint.replace(/\/$/, '')}/api/status`, {
       method: 'POST',
       headers: {
@@ -27,7 +25,7 @@ async function publish() {
         ...(secret ? { 'x-monitor-secret': secret } : {})
       },
       body: JSON.stringify(snapshot),
-      signal: ctrl.signal
+      signal: AbortSignal.timeout(TIMEOUT_MS)
     });
     if (!response.ok) throw new Error(`monitor HTTP ${response.status}`);
     falhasSeguidas = 0;
@@ -35,8 +33,6 @@ async function publish() {
   } catch (error) {
     falhasSeguidas += 1;
     throw error;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 

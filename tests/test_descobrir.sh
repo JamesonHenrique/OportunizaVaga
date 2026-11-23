@@ -515,8 +515,9 @@ fila = lambda: json.load(open(d.Ctx().fila_path))
 d.coletar(d.Ctx())
 p = fila()["li_pausa"]; assert p == {"n": 1, "ate": "2026-09-29T15:00:00-03:00"}, p
 n = len(chamadas); assert n == 1, chamadas          # the 429 already stopped the rest of this collection
+idx_pausa = fila()["termo_idx"]
 hora["t"] = "2026-09-29T14:00:00-03:00"; d.coletar(d.Ctx(), force=True)
-assert len(chamadas) == n                           # paused: not one LinkedIn request, even with --force
+assert len(chamadas) == n and fila()["termo_idx"] == idx_pausa  # paused: no LinkedIn request and no terms burned
 hora["t"] = "2026-09-29T15:30:00-03:00"; d.coletar(d.Ctx())
 p = fila()["li_pausa"]; assert p == {"n": 2, "ate": "2026-09-29T21:30:00-03:00"}, p   # 2nd 429 in a row: 6h...
 hora["t"] = "2026-09-29T21:31:00-03:00"; d.coletar(d.Ctx())

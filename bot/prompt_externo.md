@@ -13,6 +13,9 @@ c-Externo) ATS / SITE SEM PADRÃO (rippling, greenhouse, lever, inhire.app, fact
       NUNCA gere, digite ou leia a senha você mesmo (comando de shell e fill_form vão para o log). Com o form
       aberto e os campos de senha visíveis, rode:
       node $BOT_ROOT/bot/nova-senha.mjs <dominio> <email_contas>
+      Use apenas o hostname exato da aba HTTPS (ex.: empresa.inhire.app), sem scheme, caminho,
+      query, userinfo ou porta; subdomínios devem ser explícitos. Mantenha uma única aba elegível.
+      O helper recusa HTTP, portas não padrão e origem alterada; só grava após confirmar o preenchimento.
       Ele gera a senha, grava em ~/.config/oportunizavaga/credenciais.tsv (chmod 600, FORA do repositório;
       caminho configurável em OV_CREDENTIALS_FILE) e preenche senha + confirmação direto na aba. Preencha os
       demais campos com fill_form, sem tocar nos campos de senha. NUNCA escreva senha em aplicadas.json, log,

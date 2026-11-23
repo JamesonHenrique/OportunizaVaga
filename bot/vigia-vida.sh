@@ -30,10 +30,11 @@ fi
 
 # 2) heartbeat do monitor (opcional)
 if [ -n "$MONITOR_URL" ]; then
-  hb=$(curl -s --max-time 15 "${MONITOR_URL%/}/api/status?ping=1" | python3 -c "
+  hb=$(curl --fail --silent --max-time 15 "${MONITOR_URL%/}/api/status?ping=1" | python3 -c "
 import json,sys,datetime as D
 try:
-    u=json.load(sys.stdin).get('updatedAt')
+    payload=json.load(sys.stdin)
+    u=payload.get('receivedAt') or payload.get('updatedAt')
     print(int((D.datetime.now(D.timezone.utc)-D.datetime.fromisoformat(u.replace('Z','+00:00'))).total_seconds()//60) if u else 'sem')
 except Exception: print('erro')")
   case "$hb" in

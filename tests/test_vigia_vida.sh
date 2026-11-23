@@ -16,7 +16,7 @@ relata() { N=$((N + 1)); if [ "$1" -eq 0 ]; then echo "ok $N - $2"; else echo "n
 
 TMP="$(mktemp -d)"
 SRV=""
-cleanup() { [ -n "$SRV" ] && kill "$SRV" 2>/dev/null; [ -n "${SLP:-}" ] && kill "$SLP" 2>/dev/null; rm -rf "$TMP"; }
+cleanup() { [ -n "$SRV" ] && kill "$SRV" 2>/dev/null; [ -n "${SLP:-}" ] && { pkill -P "$SLP" 2>/dev/null; kill "$SLP" 2>/dev/null; }; rm -rf "$TMP"; }
 trap cleanup EXIT
 
 # Notificador falso: grava a mensagem recebida.
@@ -29,10 +29,16 @@ export NOTIF_OUT="$TMP/notif.txt" NOTIFY="$TMP/notify.sh" VIGIA_STATE="$TMP/falh
 cp examples/aplicadas.example.json "$TMP/aplicadas.json"
 export APLICADAS_FILE="$TMP/aplicadas.json" STATE_DIR="$TMP"
 unset MONITOR_URL HB_MAX_MIN
+# The fixture must remain on loopback even when the caller configures an HTTP proxy.
+export no_proxy=127.0.0.1 NO_PROXY=127.0.0.1
 
 # "Loop" falso: um processo com nome unico que o padrao do vigia encontra; padrao inexistente = loop parado.
-cp "$(command -v sleep)" "$TMP/loopfalso-$$"
-"$TMP/loopfalso-$$" 300 & SLP=$!
+cat > "$TMP/loopfalso-$$" <<'SH'
+#!/bin/bash
+sleep 300
+SH
+chmod +x "$TMP/loopfalso-$$"
+"$TMP/loopfalso-$$" & SLP=$!
 VIVO="loopfalso-$$"
 MORTO="loop-que-nao-existe-$$"
 
@@ -58,6 +64,9 @@ cat > "$TMP/srv.py" <<'PYEOF'
 import datetime as D, http.server, json, os, sys
 class H(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path != "/api/status?ping=1":
+            self.send_error(404)
+            return
         idade = int(open(os.environ["HB_FILE"]).read())
         u = (D.datetime.now(D.timezone.utc) - D.timedelta(minutes=idade)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
         body = json.dumps({"ok": True, "ping": True, "updatedAt": None if idade < 0 else u}).encode()

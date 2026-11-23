@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 
 BOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BOT)
+import jsonlock  # noqa: E402
 import vagas_filtros as vf  # noqa: E402
 
 JANELA_H = 48
@@ -56,6 +57,10 @@ def avaliar(state_dir, agora=None, aplicadas_path=None):
     # A name seen ONLY in login_checagens is not enough to call it a portal: that map also keeps account logins
     # (gmail/google) and fossils of misspelled channels written by a model (03/10: "solids").
     nomes = set(sonda) | set(canario) | set(sites_rod) | set(espera) | quebradas
+    # 28/10: the logged-in harvester leaves its own evidence (drought/429) even when the portal is not in
+    # sonda/canario — without this the sign of life was invisible exactly when it mattered.
+    if fila.get("li_pausa") or (fila.get("stats") or {}).get("linkedin_logado"):
+        nomes.add("linkedin")
     out = {}
     for p in sorted(nomes):
         cands = []   # (state, evidence, when)
@@ -72,12 +77,25 @@ def avaliar(state_dir, agora=None, aplicadas_path=None):
             cands.append(("falha_recente", f"canario: {str(c.get('falha'))[:80]}", _quando(c.get("em"))))
         if (p in quebradas or p in erros) and recente(coleta_em):
             cands.append(("falha_recente", "ultima coleta: busca falhou ou voltou vazia", coleta_em))
+        # 28/10: a live session that reads 0 cards for days is NOT "funcionando" (the monitor said
+        # LinkedIn was fine while the harvester had not extracted a single card since 20/10).
+        li = ((fila.get("stats") or {}).get("linkedin_logado") or {}) if p == "linkedin" else {}
+        if isinstance(li, dict) and li.get("em") and recente(_quando(li.get("em"))) and not li.get("lidas"):
+            cands.append(("falha_recente", "garimpo logado: 0 cards em %s rodada(s)" % li.get("zeros", 1),
+                          _quando(li.get("em"))))
+        raw_pausa_li = fila.get("li_pausa") if p == "linkedin" else None
+        ate_li = raw_pausa_li.get("ate") if isinstance(raw_pausa_li, dict) else raw_pausa_li
+        pausa_li = _quando(ate_li)
+        if pausa_li and pausa_li > agora:
+            cands.append(("indisponivel", "busca pausada por 429 ate %s" % str(ate_li)[:16], None))
         r = sites_rod.get(p) if isinstance(sites_rod.get(p), dict) else {}
         pausa = _quando(r.get("pausado_ate"))
         if pausa and pausa > agora:
             cands.append(("sem_vagas_compativeis",
                           f"{r.get('vazias_seguidas', '?')} rodadas sem vaga nova; pausado ate {r.get('pausado_ate')}", None))
-        positivos = [(f"sonda ok", _quando(s.get("em"))) if s.get("estado") == "ok" else None,
+        positivos = [("garimpo logado: %s cards" % li.get("lidas"), _quando(li.get("em")))
+                     if isinstance(li, dict) and li.get("lidas") and li.get("em") else None,
+                     (f"sonda ok", _quando(s.get("em"))) if s.get("estado") == "ok" else None,
                      ("canario ok", _quando(c.get("em"))) if c.get("ok") else None,
                      ("varredura do robo", _quando(r.get("ultima_varredura"))),
                      ("candidatura enviada", _quando(r.get("ultima_aplicada"))),
@@ -103,12 +121,20 @@ def main(argv):
     aplicadas = _opcao(argv, "--aplicadas")
     state_dir = _opcao(argv, "--dir")
     if not state_dir:
-        aplicadas = aplicadas or vf.resolve_paths()["aplicadas"]
-        state_dir = os.path.dirname(aplicadas)
-    res = avaliar(state_dir, aplicadas_path=aplicadas)
+        if aplicadas:
+            state_dir = os.path.dirname(aplicadas) or "."
+        else:
+            paths = vf.resolve_paths()
+            aplicadas, state_dir = paths["aplicadas"], paths["state_dir"]
     if "--gravar" in argv:
-        vf.save_json(os.path.join(state_dir, "saude_portais.json"),
-                     {"atualizado": datetime.now().astimezone().isoformat(timespec="minutes"), "portais": res})
+        os.makedirs(state_dir, exist_ok=True)
+        target = os.path.join(state_dir, "saude_portais.json")
+        with jsonlock.travado(target):
+            checked_at = datetime.now().astimezone()
+            res = avaliar(state_dir, agora=checked_at, aplicadas_path=aplicadas)
+            jsonlock.gravar(target, {"atualizado": checked_at.isoformat(timespec="seconds"), "portais": res}, indent=1)
+    else:
+        res = avaliar(state_dir, aplicadas_path=aplicadas)
     if "--json" in argv:
         print(json.dumps(res, ensure_ascii=False, indent=1))
     else:

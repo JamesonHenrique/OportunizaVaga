@@ -10,8 +10,10 @@ export default function Collapsible({ title, meta, defaultOpen = true, children 
   return (
     <section className={`panel collapsible ${open ? 'is-open' : 'is-collapsed'}`}>
       <div className="panel-head">
-        <h2>{title}</h2>
-        {meta && <span>{meta}</span>}
+        <div className="collapse-heading">
+          <h2>{title}</h2>
+          {meta && <span>{meta}</span>}
+        </div>
         <button
           type="button"
           className="collapse-btn"

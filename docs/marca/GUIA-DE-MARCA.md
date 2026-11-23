@@ -1,7 +1,9 @@
 # Guia de marca — OportunizaVaga
 
-**Versão:** 2.0.0  
-**Status:** direção proposta para adoção no produto  
+**Versão** 3.0.0
+
+**Direção do monitor** Instrumento de Precisão
+
 **Assinatura pública:** *Sinal que vira movimento.*
 
 ## 1. Essência
@@ -78,7 +80,7 @@ Fonte principal para wordmark textual, títulos, rótulos e textos de interface.
 
 Fonte técnica para terminal, timestamps, nomes de modelos, ids, números com necessidade de alinhamento e detalhes operacionais. Não use em parágrafos longos nem em toda a interface.
 
-Use fallbacks de sistema. O produto deve continuar utilizável caso a fonte externa não carregue. Não incluir arquivos de fonte no pacote.
+O monitor usa `next/font/google` no layout raiz. O Next.js baixa as duas famílias durante o build e as serve como arquivos estáticos. Os tokens `--font-sans` e `--font-mono` usam essas fontes com `display: swap` e alternativas do sistema. A escala de sete tamanhos vai de 12 a 48 px e sustenta a leitura de títulos, números, rótulos e detalhes técnicos.
 
 ## 6. Logo e área de proteção
 
@@ -127,4 +129,12 @@ Use capturas reais e sanitizadas da interface, diagramas simples do fluxo e scre
 
 ## 10. Marca dentro do produto
 
-A interface principal é uma ferramenta operacional, não uma página de publicidade. Preserve densidade informacional quando ela dá visibilidade ao trabalho. Dê destaque às exceções, aos próximos passos e à proveniência dos dados. Não esconder estado stale, cache, falhas, bloqueios ou ações pendentes.
+Na direção **Instrumento de Precisão**, cada destaque ajuda a tomar uma decisão. O **Operational Command Header** abre o Início com um título que reflete a situação do robô. Em seguida, responde a três perguntas.
+
+- **Está funcionando?** Mostre o estado com rótulo, ícone e um motivo breve.
+- **Quando foi a última atualização confirmada?** Mostre a hora e a idade do retrato. Aos 7 minutos de idade, o estado passa a **Sem sinal**. Avise quando a tela estiver exibindo o último retrato em cache.
+- **O que precisa de mim?** Mostre a contagem de itens visíveis que exigem ação e dê acesso às pendências.
+
+O Início também apresenta quatro indicadores com funções distintas: **Enviadas hoje**, **Precisa de você**, **Respostas de empresas** e **Novas vagas**. Um gráfico compartilhado de 14 dias dá contexto aos envios. Use `—` quando uma contagem estiver indisponível e identifique os modos público e demonstração.
+
+A navegação troca a área de trabalho entre Início, Candidaturas, Bloqueios e Automação, com LinkedIn e Telegram quando disponíveis. Use alvos interativos de pelo menos 40 px. A assinatura “Sinal que vira movimento.” permanece na comunicação da marca. O título do monitor comunica o estado da operação.

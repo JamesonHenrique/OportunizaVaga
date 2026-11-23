@@ -42,9 +42,9 @@ export default function TerminalPanel({ logTail }) {
       <div className="terminal" ref={scrollRef}>
         {linhas.length
           ? linhas.map((l, i) => <div key={`${aba}-${i}`} className={tomLinha(l) ? `tl-${tomLinha(l)}` : undefined}>{l}</div>)
-          : <span className="term-empty">sem linhas recebidas ainda — o próximo heartbeat traz o espelho do log (só com o secret).</span>}
+          : <span className="term-empty">sem linhas recebidas ainda — a próxima atualização traz o espelho do log (só com o secret).</span>}
       </div>
-      <p className="footnote">espelho das últimas 80 linhas de {aba === 'candidaturas' ? 'loop.log' : 'dia.log'}, renovado a cada heartbeat. Vermelho = erro · amarelo = limite/cascata · verde = envio.</p>
+      <p className="footnote">espelho das últimas 80 linhas de {aba === 'candidaturas' ? 'loop.log' : 'dia.log'}, renovado a cada atualização do robô. Vermelho = erro · amarelo = limite/cascata · verde = envio.</p>
     </section>
   );
 }

@@ -3,7 +3,10 @@
 // 1) modo aggregate (padrao): nenhum detalhe bruto sai;
 // 2) modo details (opt-in): aplicadas/bloqueadas/eventos aparecem;
 // 3) perfis isolados somam sem vazar conteudo entre si.
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { once } from 'node:events';
+import http from 'node:http';
+import { promisify } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -66,16 +69,19 @@ function makeRoot({ extras = false } = {}) {
   return root;
 }
 
-const runSnapshot = (root, includeDetails) => {
+const runSnapshot = (root, includeDetails, overrides = {}, now) => {
   const env = {
     ...process.env,
     CANDIDATURAS_ROOT: root,
     MONITOR_INCLUDE_DETAILS: includeDetails ? '1' : '0',
     MONITOR_TELEMETRY_MODE: 'aggregate',
-    BOT_TZ: 'America/Sao_Paulo'
+    BOT_TZ: 'America/Sao_Paulo',
+    STATE_DIR: '', APLICADAS_FILE: '', BOT_PERFIL: '',
+    ...overrides
   };
   const code = [
     "import { buildSnapshot } from './monitor/snapshot.mjs';",
+    now ? `Date = class extends Date { constructor(...args) { super(...(args.length ? args : [${now}])); } static now() { return ${now}; } };` : "",
     "const s = buildSnapshot();",
     "console.log(JSON.stringify(s));"
   ].join('\n');
@@ -218,15 +224,117 @@ test('buildSnapshot relê o estado a cada chamada (daemon de longa vida)', () =>
   }
 });
 
-test('portais: so nome e estado, lidos do saude_portais.json de cada perfil', () => {
+test('portais: legacy state map and full evidence from each profile', () => {
   const root = makeRoot();
   try {
     fs.writeFileSync(path.join(root, 'saude_portais.json'), JSON.stringify({ portais: { gupy: { estado: 'funcionando', evidencia: 'sonda ok' } } }));
     fs.writeFileSync(path.join(root, 'state', 'frontend', 'saude_portais.json'), JSON.stringify({ portais: { indeed: { estado: 'indisponivel', evidencia: 'Verify you are human' } } }));
     const s = runSnapshot(root, false);
     assert.deepEqual(s.portais, { gupy: 'funcionando', indeed: 'indisponivel' });
-    assert.equal(JSON.stringify(s).includes('Verify you are human'), false);
+    assert.deepEqual(s.saudePortais.indeed, {
+      state: 'indisponivel', evidence: 'Verify you are human', checkedAt: null, reason: null
+    });
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('profiles: queues without application history merge and portal health keeps newer evidence', t => {
+  const root = makeRoot();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const active = path.join(root, 'custom', 'active');
+  fs.mkdirSync(active, { recursive: true });
+  const write = (dir, file, data) => fs.writeFileSync(path.join(dir, file), JSON.stringify(data));
+  write(active, 'vagas_fila.json', { ultima_coleta: '2026-09-19T10:00:00-03:00', vagas: { a: { status: 'nova' } } });
+  write(path.join(root, 'state', 'frontend'), 'vagas_fila.json', {
+    ultima_coleta: '2026-09-18T10:00:00-03:00', vagas: { a: { status: 'expirada' }, b: { status: 'processada' } }
+  });
+  write(active, 'saude_portais.json', { portais: { gupy: {
+    state: 'funcionando', checkedAt: '2026-09-19T09:00:00-03:00', evidence: 'sonda ok', reason: 'sucesso'
+  } } });
+  write(path.join(root, 'state', 'frontend'), 'saude_portais.json', {
+    atualizado: '2026-09-20T11:00:00-03:00',
+    portais: { gupy: { estado: 'indisponivel', em: '2026-09-19T11:00:00Z', evidencia: 'sonda antiga' } }
+  });
+  const s = runSnapshot(root, false, { STATE_DIR: active });
+  assert.deepEqual(s.descoberta.porStatus, { nova: 1, processada: 1 });
+  assert.deepEqual(s.saudePortais.gupy, {
+    state: 'funcionando', evidence: 'sonda ok', checkedAt: '2026-09-19T09:00:00-03:00', reason: 'sucesso'
+  });
+  assert.equal(s.portais.gupy, 'funcionando');
+});
+
+test('profile file resolves the same slug as bot and default side files are read at the root', t => {
+  const root = makeRoot();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const profile = path.join(root, 'profile-fixture.json');
+  fs.writeFileSync(profile, JSON.stringify({ nome_perfil: 'Perfil Ágil #42' }));
+  const stateDir = path.join(root, 'state', 'perfil-gil-42');
+  fs.mkdirSync(stateDir);
+  fs.writeFileSync(path.join(stateDir, 'vagas_fila.json'), JSON.stringify({ vagas: { a: { status: 'nova' } } }));
+  fs.writeFileSync(path.join(root, 'vagas_fila.json'), JSON.stringify({ vagas: { b: { status: 'processada' } } }));
+  assert.deepEqual(runSnapshot(root, false, { BOT_PERFIL: profile }).descoberta.porStatus, { nova: 1, processada: 1 });
+});
+
+test('rounds and full model IDs follow the configured day across UTC midnight', t => {
+  const root = makeRoot();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const model = 'openrouter/nex-agi/nex-n2.5-pro:free';
+  fs.writeFileSync(path.join(root, 'loop.log'), [
+    '[2026-09-18 23:30:00] rodada iniciada',
+    `[2026-09-18 23:31:00] modelo ${model} no limite, cascateando para o proximo`,
+    '[2026-09-19 00:01:00] rodada iniciada',
+    `[2026-09-19 00:02:00] modelo ${model} no limite, cascateando para o proximo`,
+    `[2026-09-19 00:03:00] rodada usou o modelo ${model}`,
+  ].join('\n'));
+  const s = runSnapshot(root, false, {}, Date.parse('2026-09-19T03:05:00Z'));
+  assert.equal(s.loops.candidaturas.rodadasHoje, 1);
+  assert.equal(s.modelos.emUso, model);
+  assert.deepEqual(s.modelos.noTetoHoje, [model]);
+  assert.equal(s.modelos.escada.find(entry => entry.id === model).tetoHoje, 1);
+});
+
+test('details reads only the tail of a log with hundreds of thousands of lines', t => {
+  const root = makeRoot();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(root, 'loop.log'), 'irrelevant old line\n'.repeat(250000) + 'synthetic last line\n');
+  const { candidaturas } = runSnapshot(root, true).logTail;
+  assert.equal(candidaturas.length, 80);
+  assert.equal(candidaturas.at(-1), 'synthetic last line');
+});
+
+test('the one-shot publisher authenticates and sends a valid snapshot to a local HTTP endpoint', async t => {
+  const root = makeRoot();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const requests = [];
+  const server = http.createServer(async (request, response) => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    requests.push({
+      method: request.method, url: request.url, secret: request.headers['x-monitor-secret'],
+      snapshot: JSON.parse(Buffer.concat(chunks))
+    });
+    response.writeHead(request.headers['x-monitor-secret'] === 'synthetic-publisher' ? 200 : 401).end();
+  });
+  server.listen(0, '127.0.0.1');
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  await once(server, 'listening');
+  const env = {
+    ...process.env,
+    MONITOR_URL: `http://127.0.0.1:${server.address().port}/`,
+    MONITOR_SECRET: 'synthetic-publisher',
+    MONITOR_INGEST_SECRET: '',
+    CANDIDATURAS_ROOT: root,
+    STATE_DIR: '', APLICADAS_FILE: '', BOT_PERFIL: '',
+    HTTP_PROXY: '', HTTPS_PROXY: '', ALL_PROXY: '', http_proxy: '', https_proxy: '', all_proxy: '',
+    NO_PROXY: '127.0.0.1'
+  };
+  await promisify(execFile)(process.execPath, ['monitor/publish-once.mjs'], { cwd: REPO, env, timeout: 5000 });
+  assert.equal(requests.length, 1);
+  const [request] = requests;
+  assert.equal(request.method, 'POST');
+  assert.equal(request.url, '/api/status');
+  assert.equal(request.secret, 'synthetic-publisher');
+  assert.ok(Number.isFinite(Date.parse(request.snapshot.builtAt)));
+  assert.equal(request.snapshot.totals.candidaturas, 2);
 });

@@ -2,6 +2,8 @@
 import importlib.util
 import json
 import os
+import subprocess
+import sys
 import tempfile
 from datetime import datetime, timedelta
 
@@ -66,6 +68,59 @@ def test_layout_privado_aplicadas_fora_do_dir():
                   open(os.path.join(st, "sonda_sites.json"), "w"))
         r = sp.avaliar(st, AGORA, aplicadas_path=os.path.join(raiz, "aplicadas.json"))
         assert r["gupy"]["estado"] == "login_necessario" and r["indeed"]["estado"] == "funcionando", r
+
+
+
+def test_linkedin_logado_sem_colher_nao_e_funcionando():
+    """28/10: a sessao viva com 0 cards por dias aparecia como "funcionando" (login ok) no monitor."""
+    r = _estado({
+        "aplicadas.json": {"aplicadas": [], "login_checagens": {"linkedin": {"em": H(1), "logado": "sim"}}},
+        "vagas_fila.json": {"ultima_coleta": H(1), "stats": {"erros": [],
+                                                            "linkedin_logado": {"em": H(2), "lidas": 0, "zeros": 8}}},
+    })
+    assert r["linkedin"]["estado"] == "falha_recente", r["linkedin"]
+    assert "0 cards" in r["linkedin"]["evidencia"]
+
+
+def test_linkedin_pausado_por_429_nao_e_funcionando():
+    ate = (AGORA + timedelta(hours=6)).isoformat()
+    for li_pausa in ({"n": 2, "ate": ate}, ate):
+        r = _estado({
+            "aplicadas.json": {"aplicadas": [], "login_checagens": {"linkedin": {"em": H(1), "logado": "sim"}}},
+            "vagas_fila.json": {"ultima_coleta": H(1), "li_pausa": li_pausa,
+                                "stats": {"erros": []}},
+        })
+        assert r["linkedin"]["estado"] == "indisponivel", r["linkedin"]
+        assert "429" in r["linkedin"]["evidencia"] and ate[:16] in r["linkedin"]["evidencia"], r["linkedin"]
+
+
+def test_linkedin_colhendo_continua_funcionando():
+    r = _estado({
+        "aplicadas.json": {"aplicadas": [], "login_checagens": {"linkedin": {"em": H(1), "logado": "sim"}}},
+        "vagas_fila.json": {"ultima_coleta": H(1), "stats": {"erros": [],
+                                                            "linkedin_logado": {"em": H(2), "lidas": 39, "zeros": 0}}},
+    })
+    assert r["linkedin"]["estado"] == "funcionando", r["linkedin"]
+
+
+def test_gravar_respects_existing_writer_lock():
+    import jsonlock
+    with tempfile.TemporaryDirectory() as directory:
+        target = os.path.join(directory, "saude_portais.json")
+        cmd = [sys.executable, sp.__file__, "--dir", directory, "--gravar", "--json"]
+        with jsonlock.travado(target):
+            writer = subprocess.Popen(cmd, stdout=subprocess.DEVNULL)
+            try:
+                writer.wait(timeout=0.4)
+            except subprocess.TimeoutExpired:
+                assert not os.path.exists(target)
+            else:
+                raise AssertionError("writer bypassed the lock")
+        with writer:
+            assert writer.wait(timeout=5) == 0
+        with open(target, encoding="utf-8") as written:
+            assert json.load(written)["portais"] == {}
+        assert not any(name.endswith(".tmp") for name in os.listdir(directory))
 
 
 if __name__ == "__main__":

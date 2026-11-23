@@ -1,13 +1,14 @@
 'use client';
 
-import { desde, horaSeg, dia, fmtDur, ROTULO } from '@/lib/dashboard';
+import { desde, horaSeg, dia, fmtDur, ROTULO, rodadasDoLoop } from '@/lib/dashboard';
 import { Barras } from './Charts';
 import { Tiles } from './ui';
 
 // "Why is it not sending?" — the answer first (one verdict line), numbers after.
-function veredito({ horasSemEnviar, loops, d }) {
+function veredito({ horasSemEnviar, loops, fr }) {
   const st = loops.candidaturas?.state;
-  if (!d.updatedAt) return { tom: 'bad', txt: 'Sem heartbeat do PC: o monitor não recebe nada.' };
+  if (!fr.ref) return { tom: 'bad', txt: 'Sem sinal do robô: o monitor ainda não recebeu nenhuma atualização.' };
+  if (fr.semSinal) return { tom: 'bad', txt: 'Sem sinal recente do robô.' };
   if (st === 'quebrado' || st === 'interrompido') return { tom: 'bad', txt: `Loop ${ROTULO[st]?.toLowerCase()}: ${loops.candidaturas?.message || ''}` };
   if (st === 'quota') return { tom: 'warn', txt: 'Modelos grátis no limite — o loop espera a cota voltar.' };
   if (horasSemEnviar != null && horasSemEnviar >= 48) return { tom: 'warn', txt: `${(horasSemEnviar / 24).toFixed(1)} dias sem envio: o funil está descartando tudo (não é falha de envio).` };
@@ -16,9 +17,9 @@ function veredito({ horasSemEnviar, loops, d }) {
 }
 
 export default function DiagnosisPanel({
-  d, loops, agora, ultimaAplicada, rodadasDesdeEnvio, horasSemEnviar, gruposBloq, totalBloqueios
+  d, fr, loops, agora, ultimaAplicada, rodadasDesdeEnvio, horasSemEnviar, gruposBloq, totalBloqueios
 }) {
-  const v = veredito({ horasSemEnviar, loops, d });
+  const v = veredito({ horasSemEnviar, loops, fr });
   const dur = loops.candidaturas?.duracao;
   const desc = d.descartes;
   return (
@@ -31,13 +32,15 @@ export default function DiagnosisPanel({
         <p className={`verdict v-${v.tom}`}>{v.txt}</p>
         <Tiles itens={[
           { rotulo: 'Último envio', valor: ultimaAplicada ? horaSeg(ultimaAplicada).slice(0, 5) : '—', sub: ultimaAplicada ? dia(ultimaAplicada) : 'sem horário' },
-          { rotulo: 'Rodadas sem envio', valor: rodadasDesdeEnvio, sub: 'desde o último', tom: rodadasDesdeEnvio > 12 ? 'warn' : undefined },
-          { rotulo: 'Rodadas hoje', valor: loops.candidaturas?.rodadasHoje ?? 0, sub: `média ${fmtDur(dur?.mediaMin)}` },
-          { rotulo: 'Heartbeat', valor: d.updatedAt ? desde(d.updatedAt, agora).replace('há ', '') : '—', sub: 'do PC', tom: d.updatedAt && agora - new Date(d.updatedAt).getTime() > 180000 ? 'bad' : undefined },
+          { rotulo: 'Rodadas sem envio', valor: rodadasDesdeEnvio ?? '—', sub: 'desde o último', tom: rodadasDesdeEnvio > 12 ? 'warn' : undefined },
+          { rotulo: 'Rodadas hoje', valor: rodadasDoLoop(loops.candidaturas) ?? '—', sub: `média ${fmtDur(dur?.mediaMin)}` },
+          { rotulo: 'Último sinal', valor: fr.ref ? desde(fr.ref, agora).replace('há ', '') : '—', sub: 'do robô', tom: fr.semSinal ? 'bad' : undefined },
         ]} />
         <div className="bars-block">
-          <span className="bars-title">bloqueios por causa · {totalBloqueios} abertos</span>
-          <Barras itens={gruposBloq.slice(0, 8)} tom="warn" />
+          <span className="bars-title">
+            {gruposBloq ? `bloqueios por causa · ${totalBloqueios} abertos` : `bloqueios abertos · ${totalBloqueios ?? '—'}`}
+          </span>
+          {gruposBloq && <Barras itens={gruposBloq.slice(0, 8)} tom="warn" />}
         </div>
         {desc && desc.total > 0 && (
           <div className="bars-block">

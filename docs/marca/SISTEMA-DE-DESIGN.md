@@ -1,30 +1,40 @@
 # Sistema de design — OportunizaVaga
 
-Este documento define como transformar a marca em componentes reutilizáveis sem perder a natureza de dashboard técnico.
+**Versão** 3.0.0
+
+**Direção** Instrumento de Precisão
+
+O monitor organiza as informações por decisão: conferir o estado da automação, agir sobre pendências e entender o ritmo dos envios.
 
 ## Fonte de verdade
 
-- `branding/tokens.json`: tokens semânticos e de marca canônicos.
-- `branding/tokens.css`: CSS variables com aliases compatíveis com os estilos atuais do monitor.
+- `branding/tokens.json` é a fonte canônica dos tokens.
+- `branding/tokens.css` expõe os tokens como variáveis CSS. Os blocos temáticos são espelhados em `monitor/app/globals.css`.
 - `branding/logos/*.svg` e `branding/icons/*.svg`: masters vetoriais.
 - `branding/manifest-assets.json`: inventário dos assets.
 
-Evite duplicar cores hexadecimais espalhadas por componentes. Componentes devem consumir tokens. Em casos onde um token existente é referenciado por muitas classes, mantenha aliases temporários e faça a migração em mudanças pequenas.
+Componentes consomem variáveis CSS. Ao alterar um token, sincronize o JSON e os dois arquivos CSS.
+
+| Categoria | Tokens | Valores |
+|---|---|---|
+| Tipografia | `--fs-micro`, `--fs-small`, `--fs-body`, `--fs-h3`, `--fs-h2`, `--fs-h1`, `--fs-display` | 12, 13, 14, 16, 20, 28 e 48 px com raiz de 16 px. |
+| Espaçamento | `--space-*` | Grade de 4 px. A escala oferece 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 e 80 px. |
+| Raios | `--radius-xs`, `--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-pill` | 4, 8, 12, 16 e 999 px. Cards e painéis usam `--radius-md`. |
+| Movimento | `--motion-fast`, `--motion-normal`, `--motion-slow`, `--motion-ease` | 120, 180 e 280 ms com `cubic-bezier(0.2, 0.75, 0.25, 1)`. |
+| Interação | `--target-min` | Mínimo de 40 px para os alvos. |
+| Gráficos | `--chart-*` | Barras, hoje, seleção, zero, grade, eixos, faixa de hoje e tooltip nos dois temas. |
 
 ## Princípios de layout
 
-- Content width desktop: até 1280 px; manter layout principal dentro dessa largura.
-- Gutter: 32 px em desktop, 24 px em tablet, 16 px em telas móveis.
-- Espaçamento base: múltiplos de 4 px; valores comuns 8, 12, 16, 24, 32 e 48 px.
-- Cards: raio padrão 12 px, borda fina e sombra quase imperceptível. Não colocar cada linha dentro de um cartão separado.
-- Tabelas e listas: usar alinhamento, divisórias e estados tipográficos para densidade; manter alvos clicáveis claros.
-- Navigation/status strip: sticky só onde já melhora o uso; não acrescentar cabeçalho vertical enorme num painel operacional.
+- A área principal tem largura máxima de 1440 px. As margens internas são de 32 px no desktop, 24 px com a lateral compacta, 20 px no tablet e 16 px até 640 px.
+- Cards usam borda fina, raio de 12 px e sombra discreta. Tabelas e listas usam alinhamento e divisórias para manter a leitura em alta densidade.
+- A barra de contexto acompanha a rolagem. A navegação usa lateral com rótulos a partir de 1200 px, lateral compacta entre 1024 e 1199 px e barra inferior abaixo de 1024 px.
 
 ## Componentes
 
 ### Botões
 
-- Primary: cobalto sólido; texto claro; altura-alvo 40–44 px.
+- O botão primário usa cobalto sólido, texto claro e altura mínima de 40 px.
 - Secondary: fundo de superfície, borda e texto principal.
 - Tertiary: baixo peso visual, para ações secundárias.
 - Destructive: cor semântica de erro, apenas para exclusão/parada irreversível.
@@ -44,7 +54,16 @@ Status deve ter pelo menos um rótulo textual. Cor e ícone são redundância vi
 
 ### Métricas (KPIs)
 
-Use números grandes apenas para medidas úteis, título claro e contexto temporal. Adicione tendência somente quando os dados permitirem comparação real. Não mostrar percentagens fabricadas nem somar categorias incompatíveis.
+O Início tem quatro indicadores com rótulo e contexto próprios.
+
+| Indicador | Fonte e recorte |
+|---|---|
+| Enviadas hoje | Último dia da série de envios, com total de sete dias e rodadas de hoje como contexto. |
+| Precisa de você | Itens visíveis que requerem ação humana, com destaque para os críticos. |
+| Respostas de empresas | Total de candidaturas com status de teste, próxima etapa, entrevista, respondida ou encerrada, a partir dos registros ou das contagens agregadas disponíveis. |
+| Novas vagas | Total de novas vagas que passaram pelos filtros da última coleta. |
+
+Use `0` para contagens confirmadas e `—` quando o dado estiver indisponível. Identifique indicadores baseados em retratos em cache ou sem sinal.
 
 ### Terminal e logs
 
@@ -52,7 +71,7 @@ Fundo escuro dedicado em ambos os temas, fonte IBM Plex Mono, contraste alto, ti
 
 ### Gráficos
 
-Use a paleta com parcimônia e legendas legíveis. Estados semânticos devem permanecer semanticamente corretos; não reutilize chartreuse para sucesso só porque é uma cor de marca. Eixos, período e unidade precisam estar claros.
+Início e Candidaturas usam o mesmo componente de envios diários com a mesma janela de 14 dias corridos, incluindo hoje. Use o fuso do retrato. Preencha os dias sem registro com zero quando houver contagem diária, destaque hoje com faixa e rótulo e informe quando a contagem estiver indisponível. Indique período e unidade na legenda e use `--chart-*` para as cores. O gráfico usa um único foco de teclado. As setas selecionam o dia, Home e End movem para as extremidades, Esc limpa a seleção e o leitor de tela recebe um resumo da série.
 
 ### Alertas e exceções
 
@@ -63,7 +82,9 @@ Mensagem com: o que ocorreu, impacto observado, se requer ação e ação recome
 - Loading: skeleton proporcional ao componente que vai aparecer; respeitar reduced motion.
 - Empty: dizer que não há resultados e indicar filtro/ação que pode ajudar, sem prometer resultados.
 - Error: mensagem curta, detalhe expandível e tentativa/recovery quando seguro.
-- Stale/cache: expor quando os dados foram atualizados pela última vez e deixar claro que o cache não é prova de atividade atual.
+- Aos 7 min de idade (`420000` ms), o retrato fica desatualizado e o monitor exibe **Sem sinal**. A API informa o limiar e usa `builtAt` como referência. Para retratos antigos, a interface pode recorrer a `receivedAt` ou `updatedAt`.
+- Na partida sem retrato, informe que nenhuma atualização foi recebida. Quando a atualização falhar e houver um retrato anterior, identifique **Em cache** e mostre a última confirmação.
+- A visão pública exibe agregados permitidos e identifica a origem. A lista de candidaturas, o terminal e textos operacionais privados ficam no acesso autorizado, quando disponíveis.
 - Demo: etiqueta visível “Dados fictícios — demonstração”.
 
 ## Temas claro e escuro
@@ -83,15 +104,17 @@ Os temas devem transmitir a mesma identidade. O claro usa Off White e superfíci
 - Texto normal: contraste mínimo WCAG AA 4,5:1; texto grande 3:1.
 - Foco visível de pelo menos 2 px e offset claro.
 - Não depender só de cor para estado.
-- Alvos interativos confortáveis (ideal 40–44 px); controles de ícone têm tooltip/label acessível.
+- Alvos interativos de pelo menos 40 px. Controles com apenas ícone têm nome acessível.
 - Respeitar `prefers-reduced-motion`.
 - Zoom 200% sem esconder ações essenciais; teclado sem armadilhas.
 
-## Mapeamento sugerido para as telas atuais
+## Organização das abas
+
+A navegação renderiza uma área de trabalho por vez. Ao trocar de aba, o foco vai para o conteúdo principal e a navegação marca o item ativo com `aria-current`. LinkedIn e Telegram aparecem quando o retrato oferece dados desses canais.
 
 ### Dashboard / início
 
-Hero curto com status do monitor, atualização recente e frase “Sinal que vira movimento.”; métricas de candidaturas e oportunidades; primeiro plano para “Precisa de você”; lista de atividades recentes. Não criar novos números só para preencher cards.
+O **Operational Command Header** abre com um título operacional e três blocos: estado do robô, última atualização confirmada e itens que precisam de intervenção. Identifique cache, demo ou visão pública quando aplicável. Abaixo, entram **Precisa de você**, os quatro indicadores, o gráfico de 14 dias e o **Monitor da Automação**.
 
 ### Candidaturas
 
@@ -103,7 +126,7 @@ Agrupar pelo impacto e data; explicar motivo e próxima ação. Não ocultar blo
 
 ### Robô / terminal
 
-Estado do ciclo, último heartbeat, evidência de escrita do log, fontes/modelos usados e painel de log. Diferenciar “rodando”, “aguardando”, “parado”, “dados desatualizados”, “erro” e “demo”.
+Exiba o estado do ciclo, o último sinal confirmado, fontes e modelos, com evidência de escrita e terminal quando disponíveis. Diferencie a atividade do robô da idade do retrato e do modo de acesso.
 
 ### Diagnóstico / saúde / fontes
 

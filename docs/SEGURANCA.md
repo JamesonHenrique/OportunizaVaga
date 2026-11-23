@@ -51,6 +51,14 @@ ln -s ../../scripts/sanitize.sh .git/hooks/pre-commit
   `--forcar` (reescrever um log aberto congelaria a rodada). Complementa — não substitui — a regra 3 do prompt
   (a senha nunca passa pelo modelo: `bot/nova-senha.mjs`).
 
+- **Helper de senha**: `nova-senha.mjs` aceita somente hostname DNS ASCII (IDN em
+  punycode) ou IPv4 canônico, sem ponto final ou sintaxe de URL. Seleciona uma
+  única aba `page` HTTPS com hostname exato (maiúsculas são normalizadas) e porta
+  padrão (443 explícita também é aceita). Subdomínios precisam ser informados.
+  Revalida a origem após attach e imediatamente antes de preencher; falhas de
+  origem ou confirmação impedem a persistência. Caminho e formato TSV permanecem
+  os mesmos; senha e detalhes de exceções CDP não são impressos.
+
 - **Banco do opencode (opt-in)**: ele guarda os argumentos de toda tool-call de toda rodada. `bot/podar-sessoes.py [--dry] [DIAS]`
   apaga, via CLI oficial (`opencode session list --format json` / `session delete`), só as sessões **do robô**
   (título `candidaturas-`/`followup-` **e** pasta do repositório; idade por `created`) com mais de N dias (padrão 3), e

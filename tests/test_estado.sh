@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 ESTADO="bot/estado.py"
 
-TOTAL=30
+TOTAL=31
 N=0
 FAIL=0
 echo "1..$TOTAL"
@@ -205,14 +205,14 @@ relata $? "OV_RODADA carimba rodada; set-campo grava campo"
 
 # 24..28 — intencao: envio com resultado desconhecido nunca vira reenvio cego (processo morto entre clique e registro).
 E() { python3 "$ESTADO" --file "$TMP_STATE" "$@"; }
-OV_RODADA=R1 E intencao w_dev_1 '{"empresa":"Wexample","vaga":"Dev Backend","url":"https://w.example.com/v/1"}' >/dev/null 2>&1 \
-  && OV_RODADA=R1 E intencao w_dev_1 '{"empresa":"Wexample","vaga":"Dev Backend"}' >/dev/null 2>&1
-relata $? "intencao grava e repetir na MESMA rodada e idempotente (exit 0)"
+OV_RODADA=R1 OV_TENTATIVA=R1-1-a E intencao w_dev_1 '{"empresa":"Wexample","vaga":"Dev Backend","url":"https://w.example.com/v/1"}' >/dev/null 2>&1 \
+  && OV_RODADA=R1 OV_TENTATIVA=R1-1-a E intencao w_dev_1 '{"empresa":"Wexample","vaga":"Dev Backend"}' >/dev/null 2>&1
+relata $? "intencao grava e repetir na MESMA tentativa e idempotente (exit 0)"
 
 OUT="$(OV_RODADA=R2 E intencao w_dev_1 '{"empresa":"Wexample"}' 2>&1)"; RC=$?
-OV_RODADA=R1 OV_TENTATIVA=R1-2 E intencao w_dev_1 '{}' >/dev/null 2>&1; RC2=$?
+OV_RODADA=R1 OV_TENTATIVA=R1-1-b E intencao w_dev_1 '{}' >/dev/null 2>&1; RC2=$?
 [ "$RC" -eq 1 ] && [ "$RC2" -eq 1 ] && grep -q "resultado desconhecido" <<<"$OUT"
-relata $? "outra rodada ou outro modelo da cascata (crash entre clique e registro): intencao recusa com exit 1"
+relata $? "outra rodada ou retry do mesmo modelo (crash entre clique e registro): intencao recusa com exit 1"
 
 E resumo | grep -q "ENVIOS COM RESULTADO DESCONHECIDO (1)" \
   && E ja-visto Wexample "Dev Backend" | head -1 | grep -q "ENVIO COM RESULTADO DESCONHECIDO" \
@@ -239,7 +239,7 @@ import json,sys
 evs=[json.loads(l) for l in open(sys.argv[1], encoding='utf-8')]
 cmds=[e['cmd'] for e in evs]
 assert 'add-aplicada' in cmds and 'intencao' in cmds and 'cancelar-intencao' in cmds, cmds
-i=[e for e in evs if e['cmd']=='intencao' and e.get('tentativa')=='R1-2']
+i=[e for e in evs if e['cmd']=='intencao' and e.get('tentativa')=='R1-1-b']
 assert not i, 'recusa nao gera evento'
 c=[e for e in evs if e['cmd']=='cancelar-intencao'][-1]
 assert c['chave']=='z_dev_2' and c['rodada'] is not None if 'rodada' in c else True
@@ -259,6 +259,11 @@ assert ap['s_dev_3'].get('sem_intencao') is True and 'intencao_em' not in ap['s_
 assert ap['c_dev_4'].get('intencao_em') and 'sem_intencao' not in ap['c_dev_4']
 assert 'sem_intencao' not in ap['z_dev_77']   # fora do robo (sem OV_RODADA) nada muda" "$TMP_STATE"
 relata $? "adesao ao d0 mensuravel: sem_intencao (com aviso) x intencao_em"
+
+# 31 — an environment with only the round identifier cannot reopen an unknown send.
+OV_RODADA=R9 OV_TENTATIVA= E intencao d_dev_5 '{}' >/dev/null 2>&1 \
+  && ! OV_RODADA=R9 OV_TENTATIVA= E intencao d_dev_5 '{}' >/dev/null 2>&1
+relata $? "rodada sem identidade de tentativa nao libera novo clique"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "# verde: $N/$TOTAL"

@@ -6,6 +6,52 @@ export const TZ = process.env.NEXT_PUBLIC_BOT_TZ || 'America/Sao_Paulo';
 export const CACHE_KEY = 'monitor:lastGood:v2';
 export const FIRST_SEEN_KEY = 'monitor:firstSeen:v1';
 
+// Single "no signal" threshold, same value the API uses (freshness.thresholdMs).
+export const SEM_SINAL_MS = 7 * 60 * 1000;
+// Polling cadence: foreground / hidden tab; one request in flight at a time.
+export const POLL_MS = 15000;
+export const POLL_BG_MS = 60000;
+export const FETCH_TIMEOUT_MS = 15000;
+
+// Public or fictional snapshots may be persisted in localStorage; an authenticated
+// (or secret-less, full) snapshot stays in memory only.
+export const podeCachear = (d) => Boolean(d && (d._demo || d._redacted || d.publicMode === true));
+
+// Access mode shown in the header: demo > public > full.
+export function modoAcesso(d) {
+  if (d?._demo) return { id: 'demo', rotulo: 'Dados fictícios — demonstração' };
+  if (d?.publicMode === true || d?._redacted) return { id: 'publico', rotulo: 'Visão pública' };
+  return { id: 'completo', rotulo: 'Acesso completo' };
+}
+
+// Use the publisher timestamp, as the API does. Older cached payloads may only contain a receipt timestamp.
+export function frescor(d, agora) {
+  const f = d?.freshness;
+  const ref = f?.state === 'cold_start' ? null : d?.builtAt || d?.receivedAt || d?.updatedAt || null;
+  const limite = Number.isFinite(f?.thresholdMs) ? f.thresholdMs : SEM_SINAL_MS;
+  const idadeMs = ref ? Math.max(0, agora - new Date(ref).getTime()) : null;
+  let estado;
+  if (idadeMs == null) estado = 'cold_start';
+  else if (idadeMs >= limite || f?.state === 'stale') estado = 'stale';
+  else estado = 'live';
+  return { estado, ref, idadeMs, limite, semSinal: estado !== 'live' };
+}
+
+export const diaDoSnapshot = (d, agora) => d?.hoje || new Date(d?.builtAt ?? agora)
+  .toLocaleDateString('sv-SE', { timeZone: d?.tz || TZ });
+
+export function resumoRespostas(porStatus) {
+  if (!porStatus) return null;
+  const entrevistas = porStatus.entrevista ?? 0;
+  const etapas = (porStatus.etapa_teste ?? 0) + (porStatus.proxima_etapa ?? 0);
+  return { total: entrevistas + etapas + (porStatus.respondida ?? 0) + (porStatus.encerrada ?? 0), entrevistas, etapas };
+}
+
+// "Última atualização há X" / "Sem sinal há X" — no "heartbeat" jargon in the UI.
+export const rotuloAtualizacao = (fr, agora) => !fr.ref
+  ? 'Nenhuma atualização recebida'
+  : `${fr.semSinal ? 'Sem sinal' : 'Última atualização'} ${desde(fr.ref, agora)}`;
+
 export const hora = (iso) => iso
   ? new Date(iso).toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })
   : '--:--';
@@ -184,8 +230,21 @@ export function baixarCSV(nome, cabecalho, linhas) {
 // Human status for the status strip: tone (ok|warn|bad) + short phrase.
 // Log wording ("cascateando opencode/...") stays in the Robô tab.
 // `agendada`: next scheduled run (daily loops look "parado" between runs).
+// Each result also carries `fase` for the command header:
+// 'ativo' | 'agendado' | 'retentando' | 'erro' | 'sem-dados'.
+// The public API may send English states (running, sleeping, retrying, stopped, error, idle).
+const ESTADO_EN = { running: 'rodando', sleeping: 'dormindo', retrying: 'retentando', stopped: 'parado', error: 'quebrado', idle: 'ocioso' };
+const FASE_TOM = { ok: 'agendado', warn: 'retentando', bad: 'erro', mute: 'sem-dados' };
+
 export function statusLoop(loop, agora, agendada) {
+  const r = statusLoopBase(loop, agora, agendada);
+  const st = ESTADO_EN[loop?.state] || loop?.state;
+  return { ...r, fase: st === 'rodando' ? 'ativo' : FASE_TOM[r.tom] || 'sem-dados' };
+}
+
+function statusLoopBase(loop, agora, agendada) {
   if (!loop) return { tom: 'mute', frase: 'sem dados' };
+  if (ESTADO_EN[loop.state]) loop = { ...loop, state: ESTADO_EN[loop.state] };
   const msg = (loop.message || '').toLowerCase();
   const futuro = agendada && new Date(agendada).getTime() > agora;
   const quando = (iso) => {
@@ -206,9 +265,47 @@ export function statusLoop(loop, agora, agendada) {
     case 'interrompido': return { tom: 'bad', frase: 'interrompido' };
     case 'parado':
       if (futuro) return { tom: 'ok', frase: `próxima ${quando(agendada)}` };
-      return { tom: 'bad', frase: `parado ${desde(loop.ultimoEvento, agora)}` };
+      return { tom: 'bad', frase: loop.ultimoEvento ? `parado ${desde(loop.ultimoEvento, agora)}` : 'parado' };
     default: return { tom: 'mute', frase: ROTULO[loop.state] || 'sem dados' };
   }
+}
+
+// "Is it working?" — one answer for the command header from the loop pills + freshness.
+// id: sem-sinal | erro | retentando | ativo | agendado | sem-dados
+export function estadoOperacional(pills, fr) {
+  if (fr.semSinal) return { id: 'sem-sinal', rotulo: 'Sem sinal', tom: 'bad', frase: fr.ref ? 'o robô parou de publicar' : 'nenhum dado recebido ainda' };
+  const tem = (f) => pills.filter(p => p.fase === f);
+  if (tem('erro').length) return { id: 'erro', rotulo: 'Com erro', tom: 'bad', frase: tem('erro').map(p => `${p.nome} ${p.frase}`).join(' · ') };
+  if (tem('retentando').length) return { id: 'retentando', rotulo: 'Tentando novamente', tom: 'warn', frase: tem('retentando').map(p => `${p.nome} ${p.frase}`).join(' · ') };
+  if (tem('ativo').length) return { id: 'ativo', rotulo: 'Ativo', tom: 'ok', frase: tem('ativo').map(p => `${p.nome} ${p.frase}`).join(' · '), vivo: true };
+  if (tem('agendado').length) return { id: 'agendado', rotulo: 'Agendado / Em pausa', tom: 'info', frase: tem('agendado').map(p => `${p.nome}: ${p.frase}`).join(' · ') };
+  return { id: 'sem-dados', rotulo: 'Sem dados dos loops', tom: 'mute', frase: 'o robô ainda não publicou o estado dos loops' };
+}
+
+// Rounds today: the public API renames rodadasHoje → roundsToday.
+export const rodadasDoLoop = (loop) => loop?.rodadasHoje ?? loop?.roundsToday ?? null;
+
+// Portal health from the API (saudePortais: { portal: { state, checkedAt } }) or the
+// legacy flat map (portais: { portal: state }). Returns [] when absent.
+export const ROTULO_PORTAL = {
+  funcionando: ['Funcionando', 'ok'],
+  sem_vagas_compativeis: ['Sem vagas compatíveis', 'mute'],
+  nao_verificado: ['Não verificado', 'mute'],
+  falha_recente: ['Falha recente', 'warn'],
+  login_necessario: ['Login necessário', 'bad'],
+  indisponivel: ['Indisponível', 'bad'],
+};
+export function listaPortais(d) {
+  const fonte = d?.saudePortais && Object.keys(d.saudePortais).length ? d.saudePortais : d?.portais;
+  if (!fonte || typeof fonte !== 'object') return [];
+  const itens = Array.isArray(fonte)
+    ? fonte.map(p => [p?.nome || p?.portal || p?.site, p])
+    : Object.entries(fonte);
+  return itens.filter(([nome]) => nome).map(([nome, v]) => {
+    const state = typeof v === 'string' ? v : v?.state || v?.estado || 'nao_verificado';
+    const [rotulo, tom] = ROTULO_PORTAL[state] || [String(state).replace(/_/g, ' '), 'mute'];
+    return { nome, state, rotulo, tom, checkedAt: typeof v === 'object' ? v?.checkedAt || null : null };
+  });
 }
 
 // Last `n` days ending at `hoje` (YYYY-MM-DD), zero-filled: [[ymd, count]].

@@ -40,6 +40,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import perfil_render  # noqa: E402
 import vaga_check  # noqa: E402
 import vagas_filtros as vf  # noqa: E402
+import dedup  # noqa: E402
 try:   # imported at load time: the private wrapper restores sys.path right after loading this module
     import fontes_boards  # noqa: E402
 except ImportError:
@@ -67,6 +68,7 @@ DEFAULTS = {
     "stack_evitar": [],         # title words that reject a job (unless it also has stack_preferida)
     "stack_preferida": [],      # title words that rescue a job and add score (also used by vaga_check on the description)
     "score_palavras": [],       # title words worth +2 in the queue ranking; empty = stack_preferida (else profile terms)
+    "score_familias": [],       # target non-dev job family phrases worth +1 in score(); empty = FAMILIAS_PADRAO
     "linkedin_sufixo": "",      # appended to LinkedIn keywords without a remote word (e.g. "remoto"); "" = off
     "linkedin_cidade_fora": False,  # remote-only profile: LinkedIn card located in a city/state ("Sao Paulo, SP") = "modelo"
     "titulo_exige": [],         # title must have at least one of these words (area check for broad terms); [] = off
@@ -132,10 +134,32 @@ class Ctx:
             self.score_re = vf.regex_lista(sorted(ws))
 
 
-def get(url, timeout=20):
+def get(url, timeout=20, tentativas=3):
+    """28/10 P2: um 5xx/timeout transitorio derrubava o termo inteiro (e a rodada). Agora 5xx/rede
+    tentam 2s/4s; 4xx (inclusive 429) nunca tentam de novo — significam "pare"."""
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read().decode("utf-8", "replace")
+    for i in range(tentativas):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            if e.code in (500, 502, 503, 504) and i + 1 < tentativas:
+                time.sleep(2 ** i)
+                continue
+            # 27/10: o 429 do LinkedIn manda Retry-After em segundos; antes era ignorado e a pausa local
+            # (3h, 6h, 12h, 24h) podia ser mais curta que o pedido do servidor — batia de novo e renovava
+            # o bloqueio.
+            try:
+                e.retry_after = int(e.headers.get("Retry-After") or 0)
+            except (TypeError, ValueError):
+                e.retry_after = 0
+            raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if i + 1 < tentativas:
+                time.sleep(2 ** i)
+                continue
+            raise
+    return ""
 
 
 # ---------------------------------------------------------------- parsers (pure, unit-tested)
@@ -429,12 +453,23 @@ def motivo_filtro(ctx, v, pular_empresas, hoje=None):
     return None
 
 
+# 28/10: familias alvo que nao sao "dev" (o perfil pede suporte, QA, dados, cloud/ops tambem). O score era
+# so-dev: "Analista de Suporte" valia 0 e nunca passava do piso do portao, por isso 24 vagas ficaram paradas.
+# Frases, nao palavras soltas: "dados" sozinho premiou "Estagio em Contabilidade: Dados e IA".
+FAMILIAS_PADRAO = ("suporte", "support", "service desk", "help desk", "qa", "quality assurance",
+                   "analista de teste", "testes", "analista de dados", "data analyst", "engenharia de dados",
+                   "power bi", "infraestrutura", "infrastructure", "cloud", "devops", "sre",
+                   "sustentacao", "aplicacoes", "applications")
+
+
 def score(ctx, v, hoje=None):
     s = 0
     nt = vf.norm(v["titulo"])
     if ctx.score_re and ctx.score_re.search(nt):
         s += 2
     if ctx.bom and ctx.bom.search(nt):
+        s += 1
+    if any(f in nt for f in (ctx.cfg.get("score_familias") or FAMILIAS_PADRAO)):
         s += 1
     if v.get("simplificada"):
         s += 1   # 10/10: Easy Apply was 3 of the 4 LinkedIn sends since 01/10 (no ATS, no account)
@@ -461,7 +496,10 @@ def job_ids(chave, rec):
         ids.add("indeed:" + m.group(1).lower())
     for m in re.finditer(r"gupy[^0-9]{0,30}?(\d{7,9})(?!\d)", t, re.I):
         ids.add("gupy:" + m.group(1))
-    m = re.match(r"([a-z0-9]+)_.*?_(\d{5,})(?:_[a-z]+)?$", str(chave).lower())
+    key = str(chave).lower()
+    m = re.fullmatch(r"([a-z0-9_-]+):([a-z0-9_-]+)", key)
+    if not m:
+        m = re.match(r"([a-z0-9]+)_.*?_(\d{5,})(?:_[a-z]+)?$", key)
     if m:
         ids.add(f"{m.group(1)}:{m.group(2)}")
     if isinstance(rec, dict):
@@ -498,7 +536,13 @@ def ja_registrada(v, blobs):
     if not emp or len(tit) < 2:   # one word ("backend") is too weak to call two postings the same
         return False
     nivel = _niveis(vf.norm(v.get("titulo")))
-    for b in blobs:
+    for record in blobs:
+        if isinstance(record, tuple):
+            b, sources = record
+            if not sources or not v.get("fonte") or str(v["fonte"]).lower() in sources:
+                continue
+        else:
+            b = record
         palavras = set(b.split()) | set(b.replace(".", "").split())
         if not emp <= palavras or len(tit & palavras) < max(1, round(0.7 * len(tit))):
             continue
@@ -510,20 +554,31 @@ def ja_registrada(v, blobs):
 
 
 def ids_conhecidos(aplicadas_path):
-    """(ids, blobs, pular_empresas) from every section of aplicadas.json."""
+    """Canonical IDs and source-tagged text from registered jobs."""
     d = vf.load_json(aplicadas_path, {})
     ids, blobs = set(), []
+
+    def register(key, record):
+        found = job_ids(key, record)
+        ids.update(found)
+        sources = {i.split(":", 1)[0] for i in found if not i.startswith("url:")}
+        source = record.get("fonte")
+        if isinstance(source, str) and source:
+            sources.add(source.lower())
+        if "li" in sources:
+            sources.add("linkedin")
+        text = vf.norm(f"{key} {record.get('empresa', '')} {record.get('vaga', '')} "
+                       f"{str(record.get('motivo', ''))[:220]}").replace("_", " ")
+        blobs.append((text, sources))
+
     for a in d.get("aplicadas", []):
         if isinstance(a, dict):
-            ids |= job_ids(a.get("chave"), a)
-            blobs.append(vf.norm(f"{a.get('chave')} {a.get('empresa')} {a.get('vaga')}").replace("_", " "))
+            register(a.get("chave"), a)
     for sec in ("bloqueados", "bloqueados_arquivados", "quase_la", "aguardando_login"):
-        v = d.get(sec)
-        if isinstance(v, dict):
-            for k, o in v.items():
-                o = o if isinstance(o, dict) else {"motivo": str(o)}
-                ids |= job_ids(k, o)
-                blobs.append(vf.norm(f"{k} {o.get('empresa', '')} {o.get('vaga', '')} {str(o.get('motivo', ''))[:220]}"))
+        records = d.get(sec)
+        if isinstance(records, dict):
+            for key, record in records.items():
+                register(key, record if isinstance(record, dict) else {"motivo": str(record)})
     return ids, blobs, d.get("pular_empresas") or []
 
 
@@ -557,8 +612,14 @@ def gemea_de(v, assinaturas):
 
 
 def assinaturas_da_fila(vagas):
-    """Every queue job that ever reached the model (nova, processada, expirada): a repost of any of them is not new."""
-    return [a for a in (_assinatura(v) for v in vagas.values() if v.get("status") in ("nova", "processada", "expirada")) if a]
+    """Group comparable queue jobs by source for cross-portal matching."""
+    sources = {}
+    for job in vagas.values():
+        if job.get("status") in ("nova", "processada", "expirada") and job.get("fonte"):
+            signature = _assinatura(job)
+            if signature:
+                sources.setdefault(job["fonte"], []).append(signature)
+    return sources
 
 
 def urls_da_fila(vagas):
@@ -620,6 +681,10 @@ def linkedin_pausa(ctx, fila):
         return
     n = int((fila.get("li_pausa") or {}).get("n", 0)) + 1
     horas = min(base * 2 ** (n - 1), float(ctx.cfg["linkedin_pausa_max_h"]))
+    pedido = float(getattr(ctx, "li_retry_after", 0) or 0) / 3600.0   # Retry-After do servidor, em horas
+    if pedido > horas:
+        print(f"descobrir: servidor pediu {pedido:.1f}h de espera (Retry-After), respeitando")
+        horas = min(pedido, float(ctx.cfg["linkedin_pausa_max_h"]))
     fila["li_pausa"] = {"n": n, "ate": (agora() + timedelta(hours=horas)).isoformat(timespec="seconds")}
     print(f"descobrir: linkedin 429, pausado por {horas:g}h (#{n})")
 
@@ -644,7 +709,6 @@ def coletar(ctx, force=False, fontes=None):
     stats = {"lidas": 0, "novas": 0, "erros": []}
     filtro = {}
     por_fonte = {}   # fonte -> [searches, errors, jobs read]
-    gemeas = {_gemea(v) for v in vagas.values() if v.get("empresa") and v.get("status") in ("nova", "processada")}
     assin = assinaturas_da_fila(vagas)
     conhecidos |= urls_da_fila(vagas)
     fontes = fontes or ctx.cfg["fontes"]
@@ -670,12 +734,15 @@ def coletar(ctx, force=False, fontes=None):
     t0, prazo = time.time(), float(ctx.cfg["tempo_max_s"])
     fora_do_prazo = lambda: time.time() - t0 > prazo
     candidatas, vistas_agora = [], set()
+    li_rodados = 0
     for nome, termo in buscas:
         if fora_do_prazo():
             stats["erros"].append(f"{nome}:prazo")
             continue
         if nome == "linkedin" and getattr(ctx, "li_429", False):
             continue   # 10/10: after a 429 the remaining LinkedIn searches only dig the throttle deeper
+        if nome == "linkedin":
+            li_rodados += 1
         pf = por_fonte.setdefault(nome, [0, 0, 0])
         pf[0] += 1
         try:
@@ -685,6 +752,7 @@ def coletar(ctx, force=False, fontes=None):
             pf[1] += 1
             if nome == "linkedin" and getattr(e, "code", None) == 429:
                 ctx.li_429 = True
+                ctx.li_retry_after = getattr(e, "retry_after", 0) or 0
             continue
         pf[2] += len(achadas)
         for v in achadas:
@@ -703,10 +771,17 @@ def coletar(ctx, force=False, fontes=None):
             v["score"], v["termo"] = score(ctx, v), termo
             candidatas.append(v)
         time.sleep(random.uniform(2, 5))  # polite: a handful of requests every ~90 min
+    # 27/10: o indice de termos so avanca sobre o que rodou de fato. Com o LinkedIn em pausa (429) a
+    # coleta pulava a fonte e ainda queimava `termos_por_coleta` termos — a varredura nunca passava dos
+    # mesmos 8. Guardado o que sobrou para a proxima coleta.
+    if "linkedin" in fontes and li_rodados < len(escolhidos):
+        fila["termo_idx"] = (i0 + li_rodados) % len(ctx.termos)
+
     # Phase 2 — description triage. Gupy descriptions come with the search (free); LinkedIn pages cost one request
     # each, so they go to the best-scored candidates first (01/10: 900+ listings, max_descricoes of them checked).
     li_ordem = sorted((v for v in candidatas if v["fonte"] == "linkedin"), key=lambda v: -v["score"])
     checar = {v["id"] for v in li_ordem[:int(ctx.cfg["max_descricoes"])]}
+    aprovadas = []
     for v in sorted(candidatas, key=lambda v: -v["score"]):
         if v["fonte"] != "linkedin" or (v["id"] in checar and not fora_do_prazo()):
             md = motivo_descricao(ctx, v)
@@ -728,15 +803,32 @@ def coletar(ctx, force=False, fontes=None):
                     rec["nivel_oficial"] = v.get("nivel_oficial") or ""
                 vagas[v["id"]] = rec
                 continue
-        if _gemea(v) in gemeas or gemea_de(v, assin):   # same company + title under another id (after the real filters)
+        aprovadas.append(v)
+
+    # Compare surviving descriptions first, so a filtered job never hides a compatible one.
+    # Ambiguous same-portal matches keep their own identity.
+    deduplicadas = dedup.deduplicar_vagas(aprovadas)
+    mantidas_ids = {v["id"] for v in deduplicadas}
+    for v in aprovadas:
+        if v["id"] not in mantidas_ids:
+            filtro["duplicada_cross_portal"] = filtro.get("duplicada_cross_portal", 0) + 1
+            vagas[v["id"]] = {"status": "filtrada", "motivo": "duplicada cross-portal", "visto_em": _stamp()}
+
+    for v in deduplicadas:
+        canonical = url_canon(v.get("url"))
+        source = v["fonte"]
+        cross_portal = not gemea_de(v, assin.get(source, ())) and any(
+            gemea_de(v, signatures) for other, signatures in assin.items() if other != source
+        )
+        if (canonical and canonical in conhecidos) or cross_portal:
             filtro["duplicada"] = filtro.get("duplicada", 0) + 1
             vagas[v["id"]] = {"status": "filtrada", "motivo": "duplicada", "visto_em": _stamp()}
             continue
+        if canonical:
+            conhecidos.add(canonical)
         v.pop("_descricao", None)
         v.update(status="nova", ofertas=0, visto_em=_stamp())
         vagas[v["id"]] = v
-        gemeas.add(_gemea(v))
-        assin.append(_assinatura(v) or ("", frozenset()))
         stats["novas"] += 1
     # Forget filtered/closed ids after 21 days so the file does not grow forever.
     limite = (agora() - timedelta(days=21)).isoformat()
@@ -848,7 +940,7 @@ def triar(ctx, n=8):
     fila = vf.load_json(ctx.fila_path, {"vagas": {}})
     base_fila = copy.deepcopy(fila)   # salvar_fila applies only this run's changes
     vistos = cortados = 0
-    _, blobs, _ = ids_conhecidos(ctx.paths["aplicadas"])
+    conhecidos, blobs, _ = ids_conhecidos(ctx.paths["aplicadas"])
     for v in pendentes(fila, ctx.cfg):
         if vistos >= n:
             break
@@ -858,7 +950,7 @@ def triar(ctx, n=8):
             v.update(status="filtrada", motivo="url nao e vaga (triagem)", visto_em=_stamp())
             cortados += 1
             continue
-        if ja_registrada(v, blobs):
+        if v["id"] in conhecidos or url_canon(v.get("url")) in conhecidos or ja_registrada(v, blobs):
             v.update(status="processada", motivo="ja registrada (triagem)", visto_em=_stamp())
             cortados += 1
             continue

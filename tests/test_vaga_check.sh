@@ -88,7 +88,7 @@ assert d.motivo_descricao(ctx, v) is None and v["desc_checada"] and v["nivel_ofi
 PYEOF
 relata $? "linkedin_detalhe extrai descricao e nivel oficial; vaga compativel passa marcada"
 
-# 5 — descobrir.coletar: Gupy filtra pela descricao da lista; LinkedIn com nivel oficial fora; falha de rede = fail-open.
+# 6 — descobrir.coletar: Gupy filtra pela descricao da lista; LinkedIn com nivel oficial fora; falha de rede = fail-open.
 "$PY" - <<'PYEOF'
 import io, contextlib, json, os, sys
 from datetime import datetime
@@ -109,6 +109,18 @@ fila = json.load(open(ctx.fila_path, encoding="utf-8"))["vagas"]
 assert fila["gupy:9100001"]["status"] == "nova" and fila["gupy:9100001"]["desc_checada"] is True, fila
 assert fila["gupy:9100002"]["status"] == "filtrada" and fila["gupy:9100002"]["motivo"].startswith("desc:stack"), fila
 assert "_descricao" not in fila["gupy:9100001"]
+# A third, description-compatible posting on the same board has its own ID and URL.
+original = d.FONTES["gupy"]
+def another_posting(ctx, termo):
+    found = original(ctx, termo)
+    return [dict(v, id="gupy:9100003", url="https://example.gupy.io/jobs/9100003")
+            for v in found if v["id"] == "gupy:9100001"]
+d.FONTES["gupy"] = another_posting
+with contextlib.redirect_stdout(io.StringIO()):
+    d.coletar(ctx, fontes=["gupy"], force=True)
+fila = json.load(open(ctx.fila_path, encoding="utf-8"))["vagas"]
+assert fila["gupy:9100003"]["status"] == "nova", fila
+
 buf = io.StringIO()
 with contextlib.redirect_stdout(buf):
     d.prompt(ctx, 5)
