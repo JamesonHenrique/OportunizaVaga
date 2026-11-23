@@ -1,38 +1,34 @@
 'use client';
 
 import { ArrowRight } from 'lucide-react';
+import { StaleBadge } from './ui';
 
-// itens: [{ rotulo, valor, sub?, dica?, icone? (lucide), ponto? ('lime'|'cobalt'|'coral'), destaque?, ir? () => void }]
-// `destaque` cards form the large first row; the rest render as a compact secondary row.
-function Kpi({ k }) {
-  const Ico = k.icone;
+// Four non-redundant KPIs. itens: [{ id, rotulo, valor, sub?, dica?, ponto? ('lime'|'cobalt'|'coral'), tom?, ir? () => void }]
+// `valor` may be '—' when the payload does not carry the data (aggregate / public mode): never a fake 0.
+function Kpi({ k, obsoleto }) {
   const corpo = (
     <>
-      <div className="kpi-top">
+      <span className="kpi-top">
         {k.ponto && <i className={`kpi-dot is-${k.ponto}`} aria-hidden="true" />}
         <span className="card-label">{k.rotulo}</span>
-        {!k.ponto && Ico && <Ico className="ico" aria-hidden="true" />}
-      </div>
-      <strong>{k.valor}</strong>
-      <div className="kpi-foot">
+        {obsoleto && <StaleBadge tipo={obsoleto} />}
+      </span>
+      <strong className={k.tom ? `is-${k.tom}` : undefined}>{k.valor}</strong>
+      <span className="kpi-foot">
         {k.sub && <small>{k.sub}</small>}
         {k.ir && <ArrowRight className="ico kpi-go" aria-hidden="true" />}
-      </div>
+      </span>
     </>
   );
-  const cls = `kpi${k.destaque ? ' kpi-main' : ''}`;
   return k.ir
-    ? <button type="button" className={`${cls} is-link`} title={k.dica || ''} onClick={k.ir}>{corpo}</button>
-    : <article className={cls} title={k.dica || ''}>{corpo}</article>;
+    ? <button type="button" className="kpi is-link" title={k.dica || undefined} onClick={k.ir}>{corpo}</button>
+    : <article className="kpi" title={k.dica || undefined}>{corpo}</article>;
 }
 
-export default function KpiRow({ itens }) {
-  const main = itens.filter(k => k.destaque);
-  const resto = itens.filter(k => !k.destaque);
+export default function KpiRow({ itens, obsoleto }) {
   return (
     <section className="kpis" aria-label="Indicadores">
-      {main.length > 0 && <div className="kpis-main">{main.map(k => <Kpi key={k.rotulo} k={k} />)}</div>}
-      {resto.length > 0 && <div className="kpis-sub">{resto.map(k => <Kpi key={k.rotulo} k={k} />)}</div>}
+      {itens.map(k => <Kpi key={k.id || k.rotulo} k={k} obsoleto={obsoleto} />)}
     </section>
   );
 }

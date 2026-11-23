@@ -50,6 +50,17 @@ export function Tiles({ itens }) {
   );
 }
 
+// Visible marker on cards that show data not confirmed by a recent update.
+// tipo: 'cache' (last good snapshot kept after a failed fetch) | 'stale' (source silent past SEM_SINAL_MS).
+const STALE = {
+  cache: ['Em cache', 'Exibindo o último retrato válido; a busca mais recente falhou.'],
+  stale: ['Desatualizado', 'A fonte não confirmou atualização recente; os números podem estar velhos.'],
+};
+export function StaleBadge({ tipo = 'stale' }) {
+  const [rotulo, dica] = STALE[tipo] || STALE.stale;
+  return <span className={`stale-badge is-${tipo}`} title={dica}>{rotulo}<span className="sr-only">: {dica}</span></span>;
+}
+
 export function Pager({ pagina, total, onChange }) {
   if (total <= 1) return null;
   return (

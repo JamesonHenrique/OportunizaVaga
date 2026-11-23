@@ -2,20 +2,21 @@
 
 import { ArrowRight } from 'lucide-react';
 import { horaSeg } from '@/lib/dashboard';
+import { StaleBadge } from './ui';
 
 const PIOR = { bad: 3, warn: 2, mute: 1, ok: 0 };
 const ROT_KIND = { rodada: 'rodada', ok: 'envio/ok', falha: 'falha', cascata: 'cascata', modelo: 'modelo', evento: 'evento' };
 const ROT_SRC = { candidaturas: 'candidaturas', linkedin: 'linkedin-rh' };
 
-// Overview summary of the robot (dark card). Reads the same loop pills / events / heartbeat the Robô tab uses;
+// Overview summary of the robot (dark card). Reads the same loop pills / events / last signal the Automação tab uses;
 // the full terminal and timeline stay in that tab. Public view: event texts arrive empty, so kind + source show.
-export default function AutomationMonitor({ loops, eventos = [], semSinal, heartbeat, rodadasHoje, proximoSite, fontesRuins, onAbrir }) {
+export default function AutomationMonitor({ loops, eventos = [], semSinal, ultimoSinal, rodadasHoje, proximoSite, fontesRuins, onAbrir, obsoleto }) {
   const pior = semSinal ? 'bad' : loops.reduce((p, l) => (PIOR[l.tom] > PIOR[p] ? l.tom : p), 'ok');
   const vivo = !semSinal && loops.some(l => l.vivo);
   const estado = semSinal ? 'Sem sinal' : vivo ? 'Rodando' : { ok: 'Ativo', warn: 'Atenção', bad: 'Com erro', mute: 'Sem dados' }[pior];
   const recentes = eventos.slice(0, 7);
   const linhas = [
-    { k: 'Heartbeat', v: semSinal ? `sem sinal · ${heartbeat}` : heartbeat, tom: semSinal ? 'bad' : 'ok' },
+    { k: semSinal ? 'Sem sinal' : 'Robô conectado', v: `último sinal ${ultimoSinal}`, tom: semSinal ? 'bad' : 'ok' },
     ...loops.map(l => ({ k: l.nome, v: l.frase, tom: l.tom })),
     rodadasHoje != null && { k: 'Rodadas hoje', v: String(rodadasHoje) },
     proximoSite && { k: 'Próximo site', v: proximoSite },
@@ -24,7 +25,8 @@ export default function AutomationMonitor({ loops, eventos = [], semSinal, heart
   return (
     <section className="automation" aria-labelledby="automation-title">
       <div className="automation-head">
-        <h2 id="automation-title"><i className={`auto-dot is-${pior}${vivo ? ' is-live' : ''}`} aria-hidden="true" />Monitor da Automação</h2>
+        <h2 id="automation-title"><i className={`auto-dot is-${pior}${vivo ? ' is-live' : ''}`} aria-hidden="true" />Automação</h2>
+        {obsoleto && <StaleBadge tipo={obsoleto} />}
         <span className={`auto-state is-${vivo ? 'ok' : pior}`}>{estado}</span>
       </div>
       {recentes.length ? (
@@ -44,7 +46,7 @@ export default function AutomationMonitor({ loops, eventos = [], semSinal, heart
         ))}
       </dl>
       <button type="button" className="auto-open" onClick={onAbrir}>
-        Abrir automação <ArrowRight className="ico" aria-hidden="true" />
+        Ver detalhes da automação <ArrowRight className="ico" aria-hidden="true" />
       </button>
     </section>
   );

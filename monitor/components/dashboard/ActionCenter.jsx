@@ -1,63 +1,83 @@
 'use client';
 
-import { CheckCircle2, Check, OctagonAlert, TriangleAlert, Info } from 'lucide-react';
+import { CheckCircle2, Check, OctagonAlert, TriangleAlert, Info, UserRound, RefreshCw } from 'lucide-react';
 import { desde } from '@/lib/dashboard';
+import { StaleBadge } from './ui';
 
-const ORDEM = { bad: 0, warn: 1, info: 2 };
-const ICONE = { bad: OctagonAlert, warn: TriangleAlert, info: Info };
-const ROTULO_TOM = { bad: 'Crítico', warn: 'Atenção', info: 'Informativo' };
+// Severity groups, most urgent first. Only the first three need a human and count toward "Precisa de você".
+export const GRUPOS = {
+  critico: { ordem: 0, rotulo: 'Crítico', icone: OctagonAlert, humano: true },
+  voce: { ordem: 1, rotulo: 'Precisa de você', icone: TriangleAlert, humano: true },
+  dados: { ordem: 2, rotulo: 'Dado do candidato', icone: UserRound, humano: true },
+  retry: { ordem: 3, rotulo: 'Robô tenta de novo', icone: RefreshCw, humano: false },
+  info: { ordem: 4, rotulo: 'Informativo', icone: Info, humano: false },
+};
+export const precisaHumano = (it) => Boolean(GRUPOS[it.grupo]?.humano);
 
-// "Precisa de você": only what needs a human, most severe first (stable within a tone).
-// Each item: { id, tom: 'bad'|'warn'|'info', titulo, sub, acao?: { rotulo, aba } }.
-export default function ActionCenter({ itens, abrirAba, resolvidos = [], agora = Date.now(), onFeito }) {
+function Item({ it, abrirAba, onFeito }) {
+  const g = GRUPOS[it.grupo] || GRUPOS.info;
+  const Ico = g.icone;
+  return (
+    <li className={`todo todo-${it.grupo}`}>
+      <span className="sev"><Ico className="ico" aria-hidden="true" /><span>{g.rotulo}</span></span>
+      <div className="todo-txt">
+        <b>{it.titulo}</b>
+        {it.porque && <p><span className="todo-k">Por que importa:</span> {it.porque}</p>}
+        {it.proximo && <p><span className="todo-k">Próximo passo:</span> {it.proximo}</p>}
+        {it.feitos?.length > 0 && onFeito && (
+          <span className="feitos">{it.feitos.map(f => (
+            <button key={f.chave} type="button" className="btn-ghost btn-feito" onClick={() => onFeito(f.chave)}>
+              <Check className="ico" aria-hidden="true" />Marcar {f.empresa} como feito
+            </button>
+          ))}</span>
+        )}
+      </div>
+      {it.acao && <button type="button" className="btn-ghost" onClick={() => abrirAba(it.acao.aba)}>{it.acao.rotulo}</button>}
+    </li>
+  );
+}
+
+// "Precisa de você": what happened / why it matters / next step, grouped by severity.
+// Each item: { id, grupo: keyof GRUPOS, titulo, porque?, proximo?, acao?: { rotulo, aba } }.
+export default function ActionCenter({ itens, abrirAba, resolvidos = [], agora = Date.now(), onFeito, obsoleto }) {
   const ordenados = itens.map((it, i) => [it, i])
-    .sort((a, b) => (ORDEM[a[0].tom] ?? 3) - (ORDEM[b[0].tom] ?? 3) || a[1] - b[1])
+    .sort((a, b) => (GRUPOS[a[0].grupo]?.ordem ?? 9) - (GRUPOS[b[0].grupo]?.ordem ?? 9) || a[1] - b[1])
     .map(([it]) => it);
-  const criticos = itens.filter(it => it.tom === 'bad').length;
+  const humanos = ordenados.filter(precisaHumano);
+  const sozinho = ordenados.filter(it => !precisaHumano(it));
+  const criticos = humanos.filter(it => it.grupo === 'critico').length;
   return (
     <section className="card action-center" aria-labelledby="action-title">
       <div className="card-head">
-        <h2 id="action-title">Precisa de você?</h2>
-        {itens.length > 0 && (
-          <span className={`count${criticos ? ' is-alert' : ''}`}
-                title={criticos ? `${criticos} crítico(s) de ${itens.length}` : `${itens.length} item(ns)`}>{itens.length}</span>
-        )}
+        <h2 id="action-title">
+          Precisa de você
+          <span className={`count${criticos ? ' is-alert' : ''}`}>
+            {humanos.length}<span className="sr-only"> {humanos.length === 1 ? 'item' : 'itens'}{criticos ? `, ${criticos} crítico(s)` : ''}</span>
+          </span>
+        </h2>
+        {obsoleto && <StaleBadge tipo={obsoleto} />}
       </div>
-      {ordenados.length ? (
-        <ul className="todo">
-          {ordenados.map(it => {
-            const Ico = ICONE[it.tom] || Info;
-            return (
-              <li key={it.id} className={`todo-${it.tom}`}>
-                <span className="sev" title={ROTULO_TOM[it.tom]}>
-                  <Ico className="ico" aria-hidden="true" /><span className="sr-only">{ROTULO_TOM[it.tom]}:</span>
-                </span>
-                <span className="todo-txt"><b>{it.titulo}</b>{it.sub && <small>{it.sub}</small>}
-                  {it.feitos?.length > 0 && onFeito && (
-                    <span className="feitos">{it.feitos.map(f => (
-                      <button key={f.chave} type="button" className="btn-ghost btn-feito" title={`Marcar ${f.empresa} como feito`}
-                        onClick={() => onFeito(f.chave)}><Check className="ico" aria-hidden="true" />{f.empresa}</button>
-                    ))}</span>
-                  )}
-                </span>
-                {it.acao && <button type="button" className="btn-ghost" onClick={() => abrirAba(it.acao.aba)}>{it.acao.rotulo}</button>}
-              </li>
-            );
-          })}
-        </ul>
+      {humanos.length ? (
+        <ul className="todo-list">{humanos.map(it => <Item key={it.id} it={it} abrirAba={abrirAba} onFeito={onFeito} />)}</ul>
       ) : (
         <div className="all-ok">
           <CheckCircle2 className="ico" aria-hidden="true" />
-          <b>Nada pendente</b>
-          <small>O robô segue sozinho. Bloqueios e respostas de empresas aparecem aqui.</small>
+          <b>Nada depende de você agora</b>
+          <small>Logins pendentes, dados faltantes e respostas de empresas aparecem aqui.</small>
         </div>
+      )}
+      {sozinho.length > 0 && (
+        <details className="todo-more">
+          <summary>O robô resolve sozinho · {sozinho.length}</summary>
+          <ul className="todo-list">{sozinho.map(it => <Item key={it.id} it={it} abrirAba={abrirAba} onFeito={onFeito} />)}</ul>
+        </details>
       )}
       {resolvidos.length > 0 && (
         <>
           <p className="resolved-label">Resolvido nas últimas 24h · {resolvidos.length}</p>
-          <ul className="todo">
+          <ul className="todo-list">
             {resolvidos.map(r => (
-              <li key={r.id} className="todo-ok">
+              <li key={r.id} className="todo todo-ok">
                 <CheckCircle2 className="ico" aria-hidden="true" />
                 <span className="todo-txt"><b>{r.titulo}</b><small>{desde(r.em, agora)}</small></span>
               </li>
