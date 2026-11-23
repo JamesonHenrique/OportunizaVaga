@@ -18,8 +18,8 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: var(--font-manrope, "Manrope"), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: var(--font-ibm-mono, "IBM Plex Mono"), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* type scale — 7 steps (px at 16px root): 12 · 13 · 14 · 16 · 20 · 28 · 48 */
   --fs-micro: 0.75rem;

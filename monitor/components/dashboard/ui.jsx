@@ -6,9 +6,9 @@
 
 export function Seg({ opcoes, valor, onChange, rotulo }) {
   return (
-    <div className="seg" role="tablist" aria-label={rotulo}>
+    <div className="seg" role="group" aria-label={rotulo}>
       {opcoes.map(({ id, rotulo: r, conta, tom }) => (
-        <button key={id} type="button" role="tab" aria-selected={valor === id}
+        <button key={id} type="button" aria-pressed={valor === id}
                 className={`seg-btn${tom ? ` seg-${tom}` : ''}${valor === id ? ' is-on' : ''}`} onClick={() => onChange(id)}>
           {r}{conta != null && <span>{conta}</span>}
         </button>

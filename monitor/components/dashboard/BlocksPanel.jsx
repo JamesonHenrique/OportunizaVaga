@@ -78,9 +78,9 @@ export default function BlocksPanel({ bloqueios }) {
         </button>
       </div>
 
-      <div className="seg" role="tablist" aria-label="Quem pode agir">
+      <div className="seg" role="group" aria-label="Quem pode agir">
         {GRUPOS.map(([id, rot]) => (
-          <button key={id} type="button" role="tab" aria-selected={grupo === id}
+          <button key={id} type="button" aria-pressed={grupo === id}
                   className={`seg-btn seg-${id}${grupo === id ? ' is-on' : ''}`} onClick={() => trocarGrupo(id)}>
             {rot} <span>{contaGrupo[id]}</span>
           </button>

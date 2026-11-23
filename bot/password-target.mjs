@@ -34,7 +34,7 @@ export function selectPasswordTarget(targets, input) {
 }
 
 export function buildFillExpression(hostname, selector, password) {
-  const escaped = hostname.replace(/\./g, '\\.');
+  const escaped = hostname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const hrefPattern = `^https:\\/\\/${escaped}(?::443)?(?:[/?#]|$)`;
   return `(() => {
     // Use native Location properties when present (never call page-global URL, which a page can override).

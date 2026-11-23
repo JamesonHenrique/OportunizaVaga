@@ -80,7 +80,7 @@ Fonte principal para wordmark textual, títulos, rótulos e textos de interface.
 
 Fonte técnica para terminal, timestamps, nomes de modelos, ids, números com necessidade de alinhamento e detalhes operacionais. Não use em parágrafos longos nem em toda a interface.
 
-O monitor carrega as duas famílias em uma única folha do Google Fonts no layout raiz, com `display=swap` e fallbacks de sistema definidos nos tokens. A escala de sete tamanhos vai de 12 a 48 px e sustenta a leitura de títulos, números, rótulos e detalhes técnicos.
+O monitor usa `next/font/google` no layout raiz. O Next.js baixa as duas famílias durante o build e as serve como arquivos estáticos. Os tokens `--font-sans` e `--font-mono` usam essas fontes com `display: swap` e alternativas do sistema. A escala de sete tamanhos vai de 12 a 48 px e sustenta a leitura de títulos, números, rótulos e detalhes técnicos.
 
 ## 6. Logo e área de proteção
 

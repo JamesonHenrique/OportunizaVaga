@@ -1,7 +1,7 @@
 /* OportunizaVaga Design Tokens v3.0.0 — "Sinal que vira movimento" · direção "Instrumento de Precisão"
    Canonical source: branding/tokens.json. monitor/app/globals.css carries the two token blocks below verbatim.
-   Fonts are NOT loaded here: the consumer loads Manrope + IBM Plex Mono once (monitor: one <link> in app/layout.jsx);
-   the system fallbacks in --font-* keep the UI usable without them.
+   Consumers load Manrope and IBM Plex Mono. The monitor sets --font-manrope and --font-ibm-mono
+   with next/font/google. The font stacks also support the named families and system fallbacks.
    v3: 7-step type scale (--fs-*), spacing (--space-*), motion (--motion-*), radius (--radius-*; cards 12px),
    chart (--chart-*) and on-dark tint tokens; the --radius alias of v2 was removed (use --radius-md).
 */
@@ -11,8 +11,8 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: var(--font-manrope, "Manrope"), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: var(--font-ibm-mono, "IBM Plex Mono"), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* type scale — 7 steps (px at 16px root): 12 · 13 · 14 · 16 · 20 · 28 · 48 */
   --fs-micro: 0.75rem;

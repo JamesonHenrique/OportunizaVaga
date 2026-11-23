@@ -16,7 +16,7 @@ relata() { N=$((N + 1)); if [ "$1" -eq 0 ]; then echo "ok $N - $2"; else echo "n
 
 TMP="$(mktemp -d)"
 SRV=""
-cleanup() { [ -n "$SRV" ] && kill "$SRV" 2>/dev/null; [ -n "${SLP:-}" ] && kill "$SLP" 2>/dev/null; rm -rf "$TMP"; }
+cleanup() { [ -n "$SRV" ] && kill "$SRV" 2>/dev/null; [ -n "${SLP:-}" ] && { pkill -P "$SLP" 2>/dev/null; kill "$SLP" 2>/dev/null; }; rm -rf "$TMP"; }
 trap cleanup EXIT
 
 # Notificador falso: grava a mensagem recebida.
@@ -33,8 +33,12 @@ unset MONITOR_URL HB_MAX_MIN
 export no_proxy=127.0.0.1 NO_PROXY=127.0.0.1
 
 # "Loop" falso: um processo com nome unico que o padrao do vigia encontra; padrao inexistente = loop parado.
-cp "$(command -v sleep)" "$TMP/loopfalso-$$"
-"$TMP/loopfalso-$$" 300 & SLP=$!
+cat > "$TMP/loopfalso-$$" <<'SH'
+#!/bin/bash
+sleep 300
+SH
+chmod +x "$TMP/loopfalso-$$"
+"$TMP/loopfalso-$$" & SLP=$!
 VIVO="loopfalso-$$"
 MORTO="loop-que-nao-existe-$$"
 
