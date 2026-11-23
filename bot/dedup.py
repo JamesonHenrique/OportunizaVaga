@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-portal job dedup: one identity (company + title) per posting, whatever board it came from.
+"""Cross-portal job dedup for unambiguous company and title matches.
 
 Pure functions, no I/O. Level words are KEPT in the title key by default (descobrir.py measured that merging
 "Java Junior" with "Java Pleno" of one company drops a real job); pass manter_nivel=False to drop them.
@@ -67,7 +67,7 @@ def _prioridade(v):
 
 def deduplicar_vagas(vagas: list[dict]) -> list[dict]:
     """Best source wins (gupy > remotar > linkedin > others; ties: first seen), shallow-copied, with
-    fontes_alternativas=[{fonte,id,url}]. No company / empty title -> never merged. Input not mutated."""
+    fontes_alternativas=[{fonte,id,url}]. A group with repeated or unknown sources is ambiguous and is kept."""
     grupos, saida = {}, []
     for v in vagas:
         emp, tit = normalizar_empresa(v.get("empresa")), normalizar_titulo(v.get("titulo"))
@@ -83,6 +83,10 @@ def deduplicar_vagas(vagas: list[dict]) -> list[dict]:
     for tipo, x in saida:
         if tipo == "solo" or len(grupos[x]) == 1:
             out.append(x if tipo == "solo" else grupos[x][0])
+            continue
+        sources = [str(job.get("fonte") or "").strip().lower() for job in grupos[x]]
+        if not all(sources) or len(set(sources)) != len(sources):
+            out.extend(grupos[x])
             continue
         melhor = max(grupos[x], key=_prioridade)   # max keeps the first on ties
         alt = list(melhor.get("fontes_alternativas") or [])

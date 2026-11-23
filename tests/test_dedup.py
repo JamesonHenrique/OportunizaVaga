@@ -94,6 +94,16 @@ def test_deduplicar_vagas_ties_immutability_and_existing_alternativas():
     assert "fontes_alternativas" not in v2
 
 
+def test_same_portal_postings_remain_distinct_even_with_cross_portal_candidate():
+    shared = {"empresa": "TechCorp", "titulo": "Dev Java Jr"}
+    vagas = [
+        {**shared, "id": "gupy:1000001", "fonte": "gupy", "url": "https://example.gupy.io/jobs/1000001"},
+        {**shared, "id": "gupy:1000002", "fonte": "gupy", "url": "https://example.gupy.io/jobs/1000002"},
+        {**shared, "id": "li:1000000001", "fonte": "linkedin", "url": "https://linkedin.com/jobs/view/1000000001"},
+    ]
+    assert [v["id"] for v in dedup.deduplicar_vagas(vagas)] == [v["id"] for v in vagas]
+
+
 if __name__ == "__main__":
     for f in list(locals().values()):
         if callable(f) and f.__name__.startswith("test_"):

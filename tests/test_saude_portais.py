@@ -2,6 +2,8 @@
 import importlib.util
 import json
 import os
+import subprocess
+import sys
 import tempfile
 from datetime import datetime, timedelta
 
@@ -99,6 +101,26 @@ def test_linkedin_colhendo_continua_funcionando():
                                                             "linkedin_logado": {"em": H(2), "lidas": 39, "zeros": 0}}},
     })
     assert r["linkedin"]["estado"] == "funcionando", r["linkedin"]
+
+
+def test_gravar_respects_existing_writer_lock():
+    import jsonlock
+    with tempfile.TemporaryDirectory() as directory:
+        target = os.path.join(directory, "saude_portais.json")
+        cmd = [sys.executable, sp.__file__, "--dir", directory, "--gravar", "--json"]
+        with jsonlock.travado(target):
+            writer = subprocess.Popen(cmd, stdout=subprocess.DEVNULL)
+            try:
+                writer.wait(timeout=0.4)
+            except subprocess.TimeoutExpired:
+                assert not os.path.exists(target)
+            else:
+                raise AssertionError("writer bypassed the lock")
+        with writer:
+            assert writer.wait(timeout=5) == 0
+        with open(target, encoding="utf-8") as written:
+            assert json.load(written)["portais"] == {}
+        assert not any(name.endswith(".tmp") for name in os.listdir(directory))
 
 
 if __name__ == "__main__":

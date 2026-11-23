@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 
 BOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BOT)
+import jsonlock  # noqa: E402
 import vagas_filtros as vf  # noqa: E402
 
 JANELA_H = 48
@@ -120,12 +121,20 @@ def main(argv):
     aplicadas = _opcao(argv, "--aplicadas")
     state_dir = _opcao(argv, "--dir")
     if not state_dir:
-        aplicadas = aplicadas or vf.resolve_paths()["aplicadas"]
-        state_dir = os.path.dirname(aplicadas)
-    res = avaliar(state_dir, aplicadas_path=aplicadas)
+        if aplicadas:
+            state_dir = os.path.dirname(aplicadas) or "."
+        else:
+            paths = vf.resolve_paths()
+            aplicadas, state_dir = paths["aplicadas"], paths["state_dir"]
     if "--gravar" in argv:
-        vf.save_json(os.path.join(state_dir, "saude_portais.json"),
-                     {"atualizado": datetime.now().astimezone().isoformat(timespec="minutes"), "portais": res})
+        os.makedirs(state_dir, exist_ok=True)
+        target = os.path.join(state_dir, "saude_portais.json")
+        with jsonlock.travado(target):
+            checked_at = datetime.now().astimezone()
+            res = avaliar(state_dir, agora=checked_at, aplicadas_path=aplicadas)
+            jsonlock.gravar(target, {"atualizado": checked_at.isoformat(timespec="seconds"), "portais": res}, indent=1)
+    else:
+        res = avaliar(state_dir, aplicadas_path=aplicadas)
     if "--json" in argv:
         print(json.dumps(res, ensure_ascii=False, indent=1))
     else:

@@ -13,9 +13,9 @@ import subprocess
 import sys
 
 PATTERNS = [
-    rb'@gmail\.com', rb'@hotmail\.', rb'@outlook\.', rb'@yahoo\.',
+    rb'(?<![\w.+-])[\w.+-]+@gmail\.com\b', rb'@hotmail\.', rb'@outlook\.', rb'@yahoo\.',
     rb'home/james', rb'/home/[a-z]',
-    rb'monitor-one-bice', rb'vercel\.app.*[a-z0-9-]{3,}',
+    rb'monitor-one-bice', rb'(?<![a-z0-9.-])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.vercel\.app\b',
     rb'BEGIN (RSA )?PRIVATE KEY', rb'AKIA[0-9A-Z]{16}',
     rb'ghp_[A-Za-z0-9]{20,}', rb'gho_[A-Za-z0-9]{20,}',
     rb'sk-ant-[A-Za-z0-9-]{10,}', rb'sk-or-[A-Za-z0-9-]{10,}',
@@ -30,13 +30,13 @@ ALLOW = re.compile(
     rb'SUA-EMPRESA|<sua-empresa>|sua-url\.vercel\.app|'
     rb'oportunizavaga-demo\.vercel\.app|jamesonhenrique-portfolio\.vercel\.app|'
     rb'\$HOME|\${BOT_ROOT}|\$BOT_ROOT|\$HOME/opensource|00000-0000|'
-    rb'\(00\)|OPENROUTER_API_KEY=\(\.\+\)'
+    rb'(?<![0-9])90000-0000(?![0-9])|\(00\)|OPENROUTER_API_KEY=\(\.\+\)'
 )
 EXCLUDED = {b'scripts/sanitize.sh', b'docs/SEGURANCA.md'}
 FORBIDDEN = {
-    b'bot/dados_candidato.json', b'bot/aplicadas.json', b'config/cron.env',
-    b'cron.env', b'auth.json', b'bot/auth.json',
+    b'config/cron.env', b'cron.env', b'auth.json', b'bot/auth.json',
 }
+PRIVATE_JSON = {b'dados_candidato.json', b'aplicadas.json', b'perfil.json'}
 patterns = [re.compile(pattern) for pattern in PATTERNS]
 
 
@@ -55,9 +55,27 @@ def records(data):
 
 
 def forbidden(path):
-    return path in FORBIDDEN or (
+    if path.startswith(b'tests/fixtures/'):
+        return False
+    name = path.rsplit(b'/', 1)[-1].lower()
+    return name.startswith(b'.env') or name in PRIVATE_JSON or path in FORBIDDEN or (
         path.startswith(b'bot/') and b'/' not in path[4:] and path.endswith(b'.pdf')
     )
+
+
+def forbidden_local_names():
+    def fail(error):
+        raise error
+
+    # Inspect names only, including ignored local state, without following directory symlinks.
+    for directory, dirs, files in os.walk(b'.', onerror=fail):
+        if directory == b'.':
+            dirs[:] = [name for name in dirs if name != b'.git']
+        if directory == b'./tests' and b'fixtures' in dirs:
+            dirs.remove(b'fixtures')
+        if any(forbidden(os.path.join(directory, name)[2:]) for name in dirs + files):
+            return True
+    return False
 
 
 def detected(data):
@@ -83,14 +101,20 @@ def scan():
         mode, oid, stage = metadata.split(b' ')
         if stage != b'0':
             raise ValueError('Unmerged index')
-        failed |= forbidden(path) or detected(path)
+        if forbidden(path):
+            failed = True
+            continue
+        failed |= detected(path)
         if path in EXCLUDED:
             continue
         if mode not in (b'100644', b'100755', b'120000'):
             raise ValueError('Unsupported index entry')
         failed |= detected(git('cat-file', 'blob', oid.decode('ascii')))
     for path in set(local):
-        failed |= forbidden(path) or detected(path)
+        if forbidden(path):
+            failed = True
+            continue
+        failed |= detected(path)
         if path in EXCLUDED:
             continue
         try:
@@ -110,13 +134,7 @@ def scan():
         with open(path, 'rb') as stream:
             data = stream.read()
         failed |= detected(data)
-    # Preserve checks for forbidden local files even when Git ignores them.
-    for path in FORBIDDEN:
-        failed |= os.path.lexists(path)
-    if os.path.isdir(b'bot'):
-        with os.scandir(b'bot') as entries:
-            failed |= any(entry.name.endswith(b'.pdf') for entry in entries)
-    return failed
+    return forbidden_local_names() or failed
 
 
 try:

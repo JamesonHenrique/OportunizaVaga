@@ -148,6 +148,19 @@ def isolated_placeholder(repo):
 
 
 @case
+def public_host_and_sample_postal_code_allow_only_the_match(repo):
+    public_host = 'oportunizavaga-demo' + '.vercel.app'
+    other_host = 'synthetic-unlisted' + '.vercel.app'
+    sample_postal_code = '90000' + '-0000'
+    repo.write('docs.txt', f'Visit https://{public_host}/guide to read more. CEP: {sample_postal_code}.', staged=True)
+    repo.check(True)
+    repo.write('mixed.txt', f'https://{public_host}/guide https://{other_host}')
+    repo.check(False)
+    repo.write('mixed.txt', sample_postal_code + ' ' + sample_postal_code[:-1])
+    repo.check(False)
+
+
+@case
 def placeholder_then_token(repo):
     repo.write('mixed.txt', PLACEHOLDER + ' ' + TOKEN, staged=True)
     repo.check(False)
@@ -244,6 +257,26 @@ def forbidden_staged_deleted_file(repo):
     repo.write('bot/private.pdf', staged=True)
     (repo.root / 'bot/private.pdf').unlink()
     repo.check(False)
+
+
+@case
+def nested_private_names_are_blocked_even_when_ignored(repo):
+    paths = ['export/deep/.env.local', 'export/deep/dados_candidato.json',
+             'export/deep/aplicadas.json', 'export/deep/perfil.json']
+    repo.write('.gitignore', 'export/\n')
+    for path in paths:
+        repo.write(path)
+        repo.check(False)
+        (repo.root / path).unlink()
+    repo.check(True)
+
+
+@case
+def example_and_fixture_filenames_are_allowed(repo):
+    repo.write('export/perfil.example.json', staged=True)
+    repo.write('tests/fixtures/nested/.env.test', staged=True)
+    repo.write('tests/fixtures/nested/aplicadas.json', staged=True)
+    repo.check(True)
 
 
 @case

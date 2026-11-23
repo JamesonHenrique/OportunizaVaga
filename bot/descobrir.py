@@ -496,7 +496,10 @@ def job_ids(chave, rec):
         ids.add("indeed:" + m.group(1).lower())
     for m in re.finditer(r"gupy[^0-9]{0,30}?(\d{7,9})(?!\d)", t, re.I):
         ids.add("gupy:" + m.group(1))
-    m = re.match(r"([a-z0-9]+)_.*?_(\d{5,})(?:_[a-z]+)?$", str(chave).lower())
+    key = str(chave).lower()
+    m = re.fullmatch(r"([a-z0-9_-]+):([a-z0-9_-]+)", key)
+    if not m:
+        m = re.match(r"([a-z0-9]+)_.*?_(\d{5,})(?:_[a-z]+)?$", key)
     if m:
         ids.add(f"{m.group(1)}:{m.group(2)}")
     if isinstance(rec, dict):
@@ -533,7 +536,13 @@ def ja_registrada(v, blobs):
     if not emp or len(tit) < 2:   # one word ("backend") is too weak to call two postings the same
         return False
     nivel = _niveis(vf.norm(v.get("titulo")))
-    for b in blobs:
+    for record in blobs:
+        if isinstance(record, tuple):
+            b, sources = record
+            if not sources or not v.get("fonte") or str(v["fonte"]).lower() in sources:
+                continue
+        else:
+            b = record
         palavras = set(b.split()) | set(b.replace(".", "").split())
         if not emp <= palavras or len(tit & palavras) < max(1, round(0.7 * len(tit))):
             continue
@@ -545,20 +554,31 @@ def ja_registrada(v, blobs):
 
 
 def ids_conhecidos(aplicadas_path):
-    """(ids, blobs, pular_empresas) from every section of aplicadas.json."""
+    """Canonical IDs and source-tagged text from registered jobs."""
     d = vf.load_json(aplicadas_path, {})
     ids, blobs = set(), []
+
+    def register(key, record):
+        found = job_ids(key, record)
+        ids.update(found)
+        sources = {i.split(":", 1)[0] for i in found if not i.startswith("url:")}
+        source = record.get("fonte")
+        if isinstance(source, str) and source:
+            sources.add(source.lower())
+        if "li" in sources:
+            sources.add("linkedin")
+        text = vf.norm(f"{key} {record.get('empresa', '')} {record.get('vaga', '')} "
+                       f"{str(record.get('motivo', ''))[:220]}").replace("_", " ")
+        blobs.append((text, sources))
+
     for a in d.get("aplicadas", []):
         if isinstance(a, dict):
-            ids |= job_ids(a.get("chave"), a)
-            blobs.append(vf.norm(f"{a.get('chave')} {a.get('empresa')} {a.get('vaga')}").replace("_", " "))
+            register(a.get("chave"), a)
     for sec in ("bloqueados", "bloqueados_arquivados", "quase_la", "aguardando_login"):
-        v = d.get(sec)
-        if isinstance(v, dict):
-            for k, o in v.items():
-                o = o if isinstance(o, dict) else {"motivo": str(o)}
-                ids |= job_ids(k, o)
-                blobs.append(vf.norm(f"{k} {o.get('empresa', '')} {o.get('vaga', '')} {str(o.get('motivo', ''))[:220]}"))
+        records = d.get(sec)
+        if isinstance(records, dict):
+            for key, record in records.items():
+                register(key, record if isinstance(record, dict) else {"motivo": str(record)})
     return ids, blobs, d.get("pular_empresas") or []
 
 
@@ -592,8 +612,14 @@ def gemea_de(v, assinaturas):
 
 
 def assinaturas_da_fila(vagas):
-    """Every queue job that ever reached the model (nova, processada, expirada): a repost of any of them is not new."""
-    return [a for a in (_assinatura(v) for v in vagas.values() if v.get("status") in ("nova", "processada", "expirada")) if a]
+    """Group comparable queue jobs by source for cross-portal matching."""
+    sources = {}
+    for job in vagas.values():
+        if job.get("status") in ("nova", "processada", "expirada") and job.get("fonte"):
+            signature = _assinatura(job)
+            if signature:
+                sources.setdefault(job["fonte"], []).append(signature)
+    return sources
 
 
 def urls_da_fila(vagas):
@@ -683,7 +709,6 @@ def coletar(ctx, force=False, fontes=None):
     stats = {"lidas": 0, "novas": 0, "erros": []}
     filtro = {}
     por_fonte = {}   # fonte -> [searches, errors, jobs read]
-    gemeas = {_gemea(v) for v in vagas.values() if v.get("empresa") and v.get("status") in ("nova", "processada")}
     assin = assinaturas_da_fila(vagas)
     conhecidos |= urls_da_fila(vagas)
     fontes = fontes or ctx.cfg["fontes"]
@@ -752,21 +777,11 @@ def coletar(ctx, force=False, fontes=None):
     if "linkedin" in fontes and li_rodados < len(escolhidos):
         fila["termo_idx"] = (i0 + li_rodados) % len(ctx.termos)
 
-    # Phase 1.5 — Cross-portal deduplication: if identical vacancies are found across multiple boards,
-    # keep the higher-priority portal (gupy > remotar > linkedin) and avoid redundant description checks.
-    if candidatas:
-        antes_dedup = {v["id"]: v for v in candidatas}
-        candidatas = dedup.deduplicar_vagas(candidatas)
-        mantidas_ids = {v["id"] for v in candidatas}
-        for vid, v in antes_dedup.items():
-            if vid not in mantidas_ids:
-                filtro["duplicada_cross_portal"] = filtro.get("duplicada_cross_portal", 0) + 1
-                vagas[vid] = {"status": "filtrada", "motivo": "duplicada cross-portal", "visto_em": _stamp()}
-
     # Phase 2 — description triage. Gupy descriptions come with the search (free); LinkedIn pages cost one request
     # each, so they go to the best-scored candidates first (01/10: 900+ listings, max_descricoes of them checked).
     li_ordem = sorted((v for v in candidatas if v["fonte"] == "linkedin"), key=lambda v: -v["score"])
     checar = {v["id"] for v in li_ordem[:int(ctx.cfg["max_descricoes"])]}
+    aprovadas = []
     for v in sorted(candidatas, key=lambda v: -v["score"]):
         if v["fonte"] != "linkedin" or (v["id"] in checar and not fora_do_prazo()):
             md = motivo_descricao(ctx, v)
@@ -788,15 +803,32 @@ def coletar(ctx, force=False, fontes=None):
                     rec["nivel_oficial"] = v.get("nivel_oficial") or ""
                 vagas[v["id"]] = rec
                 continue
-        if _gemea(v) in gemeas or gemea_de(v, assin):   # same company + title under another id (after the real filters)
+        aprovadas.append(v)
+
+    # Compare surviving descriptions first, so a filtered job never hides a compatible one.
+    # Ambiguous same-portal matches keep their own identity.
+    deduplicadas = dedup.deduplicar_vagas(aprovadas)
+    mantidas_ids = {v["id"] for v in deduplicadas}
+    for v in aprovadas:
+        if v["id"] not in mantidas_ids:
+            filtro["duplicada_cross_portal"] = filtro.get("duplicada_cross_portal", 0) + 1
+            vagas[v["id"]] = {"status": "filtrada", "motivo": "duplicada cross-portal", "visto_em": _stamp()}
+
+    for v in deduplicadas:
+        canonical = url_canon(v.get("url"))
+        source = v["fonte"]
+        cross_portal = not gemea_de(v, assin.get(source, ())) and any(
+            gemea_de(v, signatures) for other, signatures in assin.items() if other != source
+        )
+        if (canonical and canonical in conhecidos) or cross_portal:
             filtro["duplicada"] = filtro.get("duplicada", 0) + 1
             vagas[v["id"]] = {"status": "filtrada", "motivo": "duplicada", "visto_em": _stamp()}
             continue
+        if canonical:
+            conhecidos.add(canonical)
         v.pop("_descricao", None)
         v.update(status="nova", ofertas=0, visto_em=_stamp())
         vagas[v["id"]] = v
-        gemeas.add(_gemea(v))
-        assin.append(_assinatura(v) or ("", frozenset()))
         stats["novas"] += 1
     # Forget filtered/closed ids after 21 days so the file does not grow forever.
     limite = (agora() - timedelta(days=21)).isoformat()
@@ -908,7 +940,7 @@ def triar(ctx, n=8):
     fila = vf.load_json(ctx.fila_path, {"vagas": {}})
     base_fila = copy.deepcopy(fila)   # salvar_fila applies only this run's changes
     vistos = cortados = 0
-    _, blobs, _ = ids_conhecidos(ctx.paths["aplicadas"])
+    conhecidos, blobs, _ = ids_conhecidos(ctx.paths["aplicadas"])
     for v in pendentes(fila, ctx.cfg):
         if vistos >= n:
             break
@@ -918,7 +950,7 @@ def triar(ctx, n=8):
             v.update(status="filtrada", motivo="url nao e vaga (triagem)", visto_em=_stamp())
             cortados += 1
             continue
-        if ja_registrada(v, blobs):
+        if v["id"] in conhecidos or url_canon(v.get("url")) in conhecidos or ja_registrada(v, blobs):
             v.update(status="processada", motivo="ja registrada (triagem)", visto_em=_stamp())
             cortados += 1
             continue

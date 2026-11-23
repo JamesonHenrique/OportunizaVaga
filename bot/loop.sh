@@ -255,8 +255,8 @@ rotate_log() {
 
 log() {
   echo "[$(date '+%F %T')] $1" >> loop.log
-  MONITOR_URL="$MONITOR_URL" CANDIDATURAS_ROOT="$BOT_ROOT/bot" \
-    "$NODE_BIN" "$BOT_ROOT/monitor/publish-once.mjs" >/tmp/oportunizavaga-monitor.log 2>&1 9>&- &
+  MONITOR_URL="$MONITOR_URL" CANDIDATURAS_ROOT="$BOT_ROOT/bot" BOT_TZ="$TZ" \
+    "$NODE_BIN" "$BOT_ROOT/monitor/publish-once.mjs" >>/tmp/oportunizavaga-monitor.log 2>&1 9>&- &
 }
 
 ensure_chrome() {
@@ -271,8 +271,8 @@ ensure_chrome() {
 
 ensure_monitor() {
   pgrep -f "monitor/publish-status.mjs" >/dev/null && return 0
-  MONITOR_URL="$MONITOR_URL" CANDIDATURAS_ROOT="$BOT_ROOT/bot" \
-    nohup "$NODE_BIN" "$BOT_ROOT/monitor/publish-status.mjs" >/tmp/oportunizavaga-monitor.log 2>&1 9>&- &
+  MONITOR_URL="$MONITOR_URL" CANDIDATURAS_ROOT="$BOT_ROOT/bot" BOT_TZ="$TZ" \
+    nohup "$NODE_BIN" "$BOT_ROOT/monitor/publish-status.mjs" >>/tmp/oportunizavaga-monitor.log 2>&1 9>&- &
 }
 
 # Quota no log da rodada vem de is_quota(), em prompt_cond/../opencode-erros.sh: esta linha estava
@@ -514,7 +514,8 @@ while true; do
   MODELO=${CASCATA[$CI]}; CI=$((CI + 1))
   # Each cascade attempt is its own owner of estado.py intencao: an intent left by a killed attempt is an
   # unknown result for the next model of the SAME round too, never "mine, retry the click".
-  export OV_TENTATIVA="$OV_RODADA-$CI"
+  attempt_id=$(python3 -c 'import uuid; print(uuid.uuid4())') || exit 1
+  export OV_TENTATIVA="$OV_RODADA-$CI-$attempt_id"
   ROUND_START=$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')
   # elapsed-time clock read by the model (bot/tempo-rodada.py, prompt rule 7d)
   mkdir -p "$STATE_DIR"; date +%s > "$STATE_DIR/rodada_inicio"; rm -f "$STATE_DIR/rodada_travou"

@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const TZ = process.env.BOT_TZ || 'America/Sao_Paulo';
+const TZ = process.env.BOT_TZ || process.env.OV_TZ || 'America/Fortaleza';
 process.env.TZ = TZ;
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.CANDIDATURAS_ROOT || path.join(HERE, '..', 'bot');
@@ -16,15 +16,130 @@ const TELEMETRY_MODE = process.env.MONITOR_TELEMETRY_MODE || 'aggregate';
 const readJson = (file, fallback) => {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 };
-const readLines = (file) => {
-  try { return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean); } catch { return []; }
+const asObj = value => value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: TZ });
+const EVENT_LOG_BYTES = 4 * 1024 * 1024; // Exceeds the loop's 2 MiB rotation threshold.
+const TAIL_LOG_BYTES = 256 * 1024;
+const timestamp = value => {
+  const parsed = typeof value === 'string' ? Date.parse(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : -Infinity;
 };
 
-const tailOf = (files, n) => {
-  const all = [];
-  for (const file of files) all.push(...readLines(file));
-  return all.slice(-n).map(l => (l.length > 300 ? l.slice(0, 300) + '…' : l));
-};
+function readLines(file, limit) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const size = fs.fstatSync(fd).size;
+    const start = Math.max(0, size - limit - 1);
+    const buffer = Buffer.alloc(size - start);
+    let read = 0;
+    while (read < buffer.length) {
+      const sizeRead = fs.readSync(fd, buffer, read, buffer.length - read, start + read);
+      if (!sizeRead) break;
+      read += sizeRead;
+    }
+    const text = buffer.toString('utf8', 0, read);
+    const newline = text.indexOf('\n');
+    if (start && newline === -1) return [];
+    return (start ? text.slice(newline + 1) : text).split('\n').filter(Boolean);
+  } catch {
+    return [];
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+const tailOf = (files, n) => files.flatMap(file => readLines(file, TAIL_LOG_BYTES).slice(-n))
+  .slice(-n).map(line => (line.length > 300 ? line.slice(0, 300) + '…' : line));
+
+function stateLocations() {
+  // Keep resolution aligned with bot/vagas_filtros.py: explicit state directory,
+  // then the profile slug, then the root. Read other profile dirs for aggregation.
+  const state = path.join(ROOT, 'state');
+  const profile = process.env.STATE_DIR ? null : readJson(process.env.BOT_PERFIL || path.join(ROOT, 'perfil.json'), null);
+  const profileName = asObj(profile) && String(profile.nome_perfil ?? 'perfil');
+  const slug = profileName && (profileName.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '').slice(0, 48) || 'perfil');
+  const active = path.resolve(process.env.STATE_DIR || (slug ? path.join(state, slug) : ROOT));
+  const files = new Map();
+  const dirs = new Set();
+  function add(dir, name, file = path.join(dir, 'aplicadas.json')) {
+    dirs.add(path.resolve(dir));
+    const resolved = path.resolve(file);
+    if (!files.has(resolved)) files.set(resolved, { profile: name, doc: asObj(readJson(resolved, null)) });
+  }
+  const appliedFile = process.env.APLICADAS_FILE || path.join(active, 'aplicadas.json');
+  const activeName = active === path.resolve(ROOT) ? 'default' : path.basename(active);
+  add(active, activeName, appliedFile);
+  if (active !== path.resolve(ROOT)) add(ROOT, 'default');
+  if (process.env.APLICADAS_FILE) dirs.add(path.dirname(path.resolve(appliedFile)));
+  if (fs.existsSync(state)) {
+    for (const entry of fs.readdirSync(state, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const dir = path.resolve(state, entry.name);
+      if (entry.isDirectory() && dir !== active) add(dir, entry.name);
+    }
+    // Legacy private layout: applications at the root, auxiliary files in state/.
+    dirs.add(path.resolve(state));
+  }
+  return { dirs, stateDocs: [...files.values()].filter(item => item.doc) };
+}
+
+function portalHealth(dirs) {
+  const health = new Map();
+  for (const dir of dirs) {
+    const doc = readJson(path.join(dir, 'saude_portais.json'), null);
+    for (const [key, item] of Object.entries(asObj(doc?.portais) || {})) {
+      const state = item?.state ?? item?.estado;
+      if (typeof state !== 'string') continue;
+      const evidence = item.evidence ?? item.evidencia ?? null;
+      const rawDate = item.checkedAt ?? item.em ?? doc.atualizado;
+      const checkedAt = Number.isFinite(timestamp(rawDate)) ? rawDate : null;
+      if (health.has(key) && timestamp(checkedAt) <= timestamp(health.get(key).checkedAt)) continue;
+      health.set(key, { state, evidence, checkedAt, reason: item.reason ?? item.motivo ?? null });
+    }
+  }
+  return Object.fromEntries(health);
+}
+
+function discovery(dirs) {
+  const jobs = new Map();
+  const totals = new Map();
+  let newest = null;
+  for (const dir of dirs) {
+    const queue = asObj(readJson(path.join(dir, 'vagas_fila.json'), null));
+    if (!queue) continue;
+    const collectedAt = timestamp(queue.ultima_coleta);
+    if (!newest || collectedAt > timestamp(newest.ultima_coleta)) newest = queue;
+    for (const [key, job] of Object.entries(asObj(queue.vagas) || {})) {
+      if (!asObj(job)) continue;
+      const seenAt = Math.max(timestamp(job.visto_em), timestamp(job.atualizado_em));
+      const at = Number.isFinite(seenAt) ? seenAt : collectedAt;
+      if (!jobs.has(key) || at > jobs.get(key).at) jobs.set(key, { job, at });
+    }
+    for (const [key, count] of Object.entries(asObj(queue.totais) || {})) {
+      if (Number.isSafeInteger(count) && count >= 0) totals.set(key, (totals.get(key) || 0) + count);
+    }
+  }
+  if (!newest) return null;
+  const values = [...jobs.values()].map(({ job }) => job);
+  const counts = new Map();
+  for (const job of values) {
+    const key = job.status || '?';
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return {
+    ultimaColeta: newest.ultima_coleta || null,
+    porStatus: Object.fromEntries(counts),
+    filtradasTotal: Object.fromEntries(totals),
+    ultima: asObj(newest.stats),
+    proximas: INCLUDE_DETAILS
+      ? values.filter(v => v.status === 'nova')
+        .sort((a, b) => (b.score || 0) - (a.score || 0) || (a.ofertas || 0) - (b.ofertas || 0))
+        .slice(0, 8)
+        .map(v => ({ empresa: v.empresa, titulo: v.titulo, fonte: v.fonte, url: v.url, score: v.score, publicada: v.publicada }))
+      : undefined
+  };
+}
 
 const duracoes = (sourceEvents) => {
   const out = [];
@@ -139,15 +254,15 @@ const faltantesDe = (texto) => {
   return [];
 };
 
-const toIso = (stamp) => new Date(stamp.replace(' ', 'T')).toISOString();
 const eventsFrom = (files, source) => {
   const out = [];
   for (const file of files) {
-    for (const line of readLines(file)) {
+    for (const line of readLines(file, EVENT_LOG_BYTES)) {
       const m = STATUS_LINE.exec(line);
       if (!m) continue;
       const [, stamp, text] = m;
-      out.push({ at: toIso(stamp), source, text, ...classify(text) });
+      const at = new Date(stamp.replace(' ', 'T'));
+      if (Number.isFinite(at.getTime())) out.push({ at: at.toISOString(), source, text, ...classify(text) });
     }
   }
   return out.sort((a, b) => a.at.localeCompare(b.at));
@@ -173,7 +288,7 @@ const stateOf = (last, maxRunMin) => {
   return { state: 'ocioso', message: last.text, proximaEm };
 };
 
-const nomeModelo = (txt) => (/([\w.-]+\/[\w.:-]+)/.exec(txt) || [])[1] || null;
+const nomeModelo = (txt) => (/((?:[\w.:-]+\/)+[\w.:-]+)/.exec(txt) || [])[1] || null;
 
 const ESCADA = [
   'openrouter/nex-agi/nex-n2.5-pro:free', 'opencode/muse-spark-1.3-contributor-free',
@@ -193,26 +308,17 @@ const ESCADA = [
 // daemon that calls it repeatedly, so module-level reads would freeze the data
 // at process start while updatedAt kept advancing.
 export function buildSnapshot() {
-  const stateFile = (file, profile) => ({ file, profile, doc: readJson(file, null) });
-  const stateFiles = [stateFile(path.join(ROOT, 'aplicadas.json'), 'default')];
-  const stateDir = path.join(ROOT, 'state');
-  if (fs.existsSync(stateDir)) {
-    for (const entry of fs.readdirSync(stateDir, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      stateFiles.push(stateFile(path.join(stateDir, entry.name, 'aplicadas.json'), entry.name));
-    }
-  }
-  const stateDocs = stateFiles.filter(item => item.doc && typeof item.doc === 'object');
-  const aplicadas = stateDocs.find(item => item.profile === 'default')?.doc || stateDocs[0]?.doc || {};
+  const now = new Date();
+  const { dirs, stateDocs } = stateLocations();
   const allAppliedRaw = stateDocs.flatMap(item => Array.isArray(item.doc.aplicadas) ? item.doc.aplicadas.map(a => ({ ...a, perfil: item.profile })) : []);
   const allBlockedRaw = stateDocs.flatMap(item => {
     const blocked = item.doc.bloqueados || {};
     return Object.entries(blocked).map(([chave, value]) => ({ chave, perfil: item.profile, value }));
   });
 
-  const hojeLocal = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+  const hojeLocal = localDate.format(now);
   const events = eventsFrom([path.join(ROOT, 'loop.log.1'), path.join(ROOT, 'loop.log')], 'candidaturas');
-  const doDia = events.filter(e => e.at.startsWith(hojeLocal) || new Date(e.at).toLocaleDateString('en-CA', { timeZone: TZ }) === hojeLocal);
+  const doDia = events.filter(e => localDate.format(new Date(e.at)) === hojeLocal);
   const ultimoModelo = [...doDia].reverse().find(e => e.kind === 'modelo');
   const doTetoDia = doDia.filter(e => e.kind === 'cascata');
   const tetoPorModelo = {};
@@ -234,7 +340,7 @@ export function buildSnapshot() {
   // Per-day counts are aggregate (no company/job text): safe in both modes, feed the hero chart.
   const porDia = {};
   for (const a of applied) {
-    const k = a.data || (a.quando ? new Date(a.quando).toLocaleDateString('en-CA', { timeZone: TZ }) : null);
+    const k = a.data || (Number.isFinite(timestamp(a.quando)) ? localDate.format(new Date(a.quando)) : null);
     if (k) porDia[k] = (porDia[k] || 0) + 1;
   }
   const blocked = allBlockedRaw.map(item => {
@@ -259,27 +365,7 @@ export function buildSnapshot() {
   });
   // Optional state files written by the side scripts (absent on a fresh install: every read is defensive).
   // descoberta = deterministic discovery queue; gmailStatus = Gmail reply reader summary.
-  const asObj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
-  const fila = asObj(readJson(path.join(ROOT, 'state', 'vagas_fila.json'), null));
-  const descoberta = (() => {
-    if (!fila) return null;
-    const vs = Object.values(asObj(fila.vagas) || {}).filter(asObj);
-    const porStatus = {};
-    for (const v of vs) porStatus[v.status || '?'] = (porStatus[v.status || '?'] || 0) + 1;
-    return {
-      ultimaColeta: fila.ultima_coleta || null,
-      porStatus,
-      filtradasTotal: asObj(fila.totais) || {},
-      ultima: asObj(fila.stats),
-      // Job titles/links only in details mode (aggregate mode keeps counts).
-      proximas: INCLUDE_DETAILS
-        ? vs.filter(v => v.status === 'nova')
-          .sort((a, b) => (b.score || 0) - (a.score || 0) || (a.ofertas || 0) - (b.ofertas || 0))
-          .slice(0, 8)
-          .map(v => ({ empresa: v.empresa, titulo: v.titulo, fonte: v.fonte, url: v.url, score: v.score, publicada: v.publicada }))
-        : undefined
-    };
-  })();
+  const descoberta = discovery(dirs);
   const gmailDoc = asObj(readJson(path.join(ROOT, 'state', 'gmail_status.json'), null));
   const gmailStatus = gmailDoc
     ? { atualizado: gmailDoc.atualizado || null, lidas: gmailDoc.linhas_lidas ?? null, achados: Array.isArray(gmailDoc.achados) ? gmailDoc.achados.length : 0 }
@@ -287,21 +373,16 @@ export function buildSnapshot() {
   const contadorFalta = {};
   for (const b of blocked) for (const campo of faltantesDe(`${b.chave || ''} ${b.motivo || b.detalhe || ''}`)) contadorFalta[campo] = (contadorFalta[campo] || 0) + 1;
   const dadosFaltantes = Object.entries(contadorFalta).map(([campo, vagas]) => ({ campo, vagas })).sort((a, b) => b.vagas - a.vagas);
-  const rodadasHoje = events.filter(e => e.kind === 'rodada' && e.at.startsWith(hojeLocal)).length;
+  const rodadasHoje = doDia.filter(e => e.kind === 'rodada').length;
   const evCand = events.filter(e => e.source === 'candidaturas');
   const sizeOf = (f) => { try { return fs.statSync(f).size; } catch { return 0; } };
   const loopLog = path.join(ROOT, 'loop.log');
   const loopLog1 = path.join(ROOT, 'loop.log.1');
   // Sends whose outcome is unknown (estado.py intencao without add-aplicada): a count only, safe in aggregate mode.
   const enviosPendentes = stateDocs.reduce((sum, item) => sum + (item.doc.envios_pendentes && typeof item.doc.envios_pendentes === 'object' ? Object.keys(item.doc.envios_pendentes).length : 0), 0);
-  // Portal states computed by bot/saude-portais.py (one source of truth): portal name -> state only.
-  const portais = {};
-  for (const item of stateDocs) {
-    const doc = readJson(path.join(path.dirname(item.file), 'saude_portais.json'), null);
-    for (const [nome, v] of Object.entries(asObj(doc?.portais) || {})) {
-      if (v && typeof v.estado === 'string') portais[nome] = v.estado;
-    }
-  }
+  const nextSite = stateDocs[0]?.doc.rodizio?.proximo;
+  const saudePortais = portalHealth(dirs);
+  const portais = Object.fromEntries(Object.entries(saudePortais).map(([key, value]) => [key, value.state]));
   const descarteTotal = stateDocs.reduce((sum, item) => sum + (Number(item.doc.descartes_listagem_total) || 0), 0);
   const rodizioPorPerfil = Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.rodizio || null]));
   const perfis = stateDocs.map(item => ({ nome: item.profile, aplicadas: Array.isArray(item.doc.aplicadas) ? item.doc.aplicadas.length : 0, bloqueados: item.doc.bloqueados && typeof item.doc.bloqueados === 'object' ? Object.keys(item.doc.bloqueados).length : 0 }));
@@ -330,8 +411,8 @@ export function buildSnapshot() {
     ultimoEvento: candLast?.at || null
   };
   return semPII({
-    updatedAtLocal: new Date().toLocaleString('pt-BR', { timeZone: TZ }),
-    builtAt: new Date().toISOString(),
+    updatedAtLocal: now.toLocaleString('pt-BR', { timeZone: TZ }),
+    builtAt: now.toISOString(),
     publisher: { mode: 'aggregate', version: '1.0.0' },
     logSizes: INCLUDE_DETAILS ? { loopLog: sizeOf(loopLog), loopLog1: sizeOf(loopLog1) } : undefined,
     tz: TZ,
@@ -344,7 +425,10 @@ export function buildSnapshot() {
       openrouterQuota,
       quotaMotivo: openrouterQuota ? null : (quotaCache?.motivo || 'quota-cache.json ausente — quota-daemon nao rodou')
     },
-    loops: { candidaturas: { ...stateOf(candLast, 21), ultimoEvento: candLast?.at || null, rodadasHoje, duracao: duracoes(evCand) } },
+    loops: { candidaturas: {
+      ...stateOf(candLast, 21), ultimoEvento: candLast?.at || null, rodadasHoje,
+      nextSite: typeof nextSite === 'string' ? nextSite : undefined, duracao: duracoes(evCand)
+    } },
     applied: INCLUDE_DETAILS ? applied : undefined,
     porFonte,
     porDia,
@@ -353,6 +437,7 @@ export function buildSnapshot() {
     descoberta,
     gmailStatus,
     portais,
+    saudePortais,
     dadosFaltantes,
     descartes: INCLUDE_DETAILS ? Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.descartes_listagem || null])) : { total: descarteTotal },
     pularTipos: INCLUDE_DETAILS ? Object.fromEntries(stateDocs.map(item => [item.profile, item.doc.pular_tipos || []])) : undefined,
